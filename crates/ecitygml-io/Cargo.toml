@@ -1,0 +1,20 @@
+[package]
+name = "ecitygml-io"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "IO related logic for the ecitygml library"
+
+
+[dependencies]
+ecitygml-core = { version = "0.0.1-alpha.1", path = "../ecitygml-core", registry = "custom" }
+
+egml = { workspace = true }
+
+thiserror = { workspace = true }
+serde = { workspace = true, features = [ "derive" ] }
+quick-xml = { workspace = true, features = [ "serialize" ] }
+nalgebra = { workspace = true }
+# parry3d-f64 = { workspace = true, features = ["f64"] }

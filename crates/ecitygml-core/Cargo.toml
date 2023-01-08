@@ -1,0 +1,15 @@
+[package]
+name = "ecitygml-core"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core of the ecitygml library"
+
+[dependencies]
+egml = { workspace = true }
+
+thiserror = { workspace = true }
+nalgebra = { workspace = true }
+# parry3d-f64 = { workspace = true, features = ["f64"] }
