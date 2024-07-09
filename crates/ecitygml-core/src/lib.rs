@@ -11,7 +11,10 @@ pub use model::city_furniture::CityFurniture;
 pub use model::transportation::TrafficArea;
 
 #[doc(inline)]
+pub use model::solitary_vegetation_object::SolitaryVegetationObject;
+
+#[doc(inline)]
 pub use model::construction::WallSurface;
 
 #[doc(inline)]
-pub use error::EcitygmlError;
+pub use error::Error;

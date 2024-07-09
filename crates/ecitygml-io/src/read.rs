@@ -1,37 +1,47 @@
-use crate::error::CitygmlIoError;
+use crate::error::Error;
 use crate::read_impl::read_from_file;
-use nalgebra::Point3;
-use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::io::{Read, Seek};
+
+use crate::error::Error::{InvalidFileExtension, NoFileExtension};
+use crate::validate_impl::validate_from_reader;
+use crate::{FILE_EXTENSION_CITYGML_GML_FORMAT, FILE_EXTENSION_CITYGML_XML_FORMAT};
+use std::path::Path;
 
 /// `CitygmlReader` reads CityGML datasets.
 ///
-#[derive(Clone)]
-pub struct CitygmlReader {
-    path: PathBuf,
-    corner_min: Option<Point3<f64>>,
-    corner_max: Option<Point3<f64>>,
+#[derive(Debug, Clone)]
+pub struct CitygmlReader<R: Read + Seek> {
+    reader: R,
 }
 
-impl CitygmlReader {
-    pub fn new(path: impl AsRef<Path>) -> Self {
-        Self {
-            path: path.as_ref().to_owned(),
-            corner_min: None,
-            corner_max: None,
+impl<R: Read + Seek> CitygmlReader<R> {
+    /// Create a new [`CitygmlReader`] from an existing `Reader`.
+    pub fn new(reader: R) -> Self {
+        Self { reader }
+    }
+
+    pub fn validate(self) -> Result<crate::validate::report::Report, Error> {
+        validate_from_reader(self.reader)
+    }
+
+    pub fn finish(self) -> Result<ecitygml_core::CitygmlModel, Error> {
+        read_from_file(self.reader)
+    }
+}
+
+impl CitygmlReader<File> {
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, Error> {
+        let extension = path.as_ref().extension().ok_or(NoFileExtension())?;
+        if extension != FILE_EXTENSION_CITYGML_GML_FORMAT
+            && extension != FILE_EXTENSION_CITYGML_XML_FORMAT
+        {
+            return Err(InvalidFileExtension(
+                extension.to_str().unwrap_or_default().to_string(),
+            ));
         }
-    }
 
-    pub fn with_corner_min(mut self, corner_min: Option<Point3<f64>>) -> Self {
-        self.corner_min = corner_min;
-        self
-    }
-
-    pub fn with_corner_max(mut self, corner_max: Option<Point3<f64>>) -> Self {
-        self.corner_max = corner_max;
-        self
-    }
-
-    pub fn finish(self) -> Result<ecitygml_core::CitygmlModel, CitygmlIoError> {
-        read_from_file(&self.path, &self.corner_min, &self.corner_max)
+        let file = std::fs::File::open(path)?;
+        Ok(Self::new(file))
     }
 }

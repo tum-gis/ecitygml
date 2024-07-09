@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum EcitygmlIoError {
+pub enum Error {
     #[error(transparent)]
-    CitygmlError(#[from] ecitygml_core::EcitygmlError),
+    EcitygmlError(#[from] ecitygml_core::Error),
 }

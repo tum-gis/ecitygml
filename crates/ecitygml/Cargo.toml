@@ -5,10 +5,10 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Library for processing CityGML data structures"
+description = "Library for processing CityGML data."
 
 
 [dependencies]
-ecitygml-core = { version = "0.0.1-alpha.1", path = "../ecitygml-core", registry = "custom" }
-ecitygml-io = { version = "0.0.1-alpha.1", path = "../ecitygml-io", registry = "custom" }
-ecitygml-transform = { version = "0.0.1-alpha.1", path = "../ecitygml-transform", registry = "custom" }
+ecitygml-core = { version = "0.0.1-alpha.3", path = "../ecitygml-core" }
+ecitygml-io = { version = "0.0.1-alpha.3", path = "../ecitygml-io" }
+ecitygml-transform = { version = "0.0.1-alpha.3", path = "../ecitygml-transform" }

@@ -5,6 +5,7 @@ pub struct WallSurface {
     id: base::Id,
     name: String,
     lod2_multi_surface: Option<geometry::MultiSurface>,
+    lod3_multi_surface: Option<geometry::MultiSurface>,
 }
 
 impl WallSurface {
@@ -13,6 +14,7 @@ impl WallSurface {
             id,
             name,
             lod2_multi_surface: None,
+            lod3_multi_surface: None,
         }
     }
 
@@ -22,5 +24,13 @@ impl WallSurface {
 
     pub fn set_lod2_multi_surface(&mut self, lod2_multi_surface: Option<geometry::MultiSurface>) {
         self.lod2_multi_surface = lod2_multi_surface;
+    }
+
+    pub fn lod3_multi_surface(&self) -> &Option<geometry::MultiSurface> {
+        &self.lod3_multi_surface
+    }
+
+    pub fn set_lod3_multi_surface(&mut self, lod3_multi_surface: Option<geometry::MultiSurface>) {
+        self.lod3_multi_surface = lod3_multi_surface;
     }
 }

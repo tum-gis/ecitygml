@@ -1,6 +1,6 @@
 # ecitygml
 
-A Rust library for processing [CityGML](https://www.ogc.org/standard/citygml/) data.
+Library for processing [CityGML](https://www.ogc.org/standard/citygml/) data.
 
 > [!WARNING]  
 > The library is at an early stage of development.
