@@ -1,5 +1,5 @@
 mod error;
-mod parse;
+mod parser;
 mod read;
 mod read_impl;
 pub mod validate;

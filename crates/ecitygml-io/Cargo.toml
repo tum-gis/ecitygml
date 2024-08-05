@@ -9,15 +9,16 @@ description = "IO operations for processing CityGML data."
 
 
 [dependencies]
-ecitygml-core = { version = "0.0.1-alpha.3", path = "../ecitygml-core" }
+ecitygml-core = { version = "0.0.1-alpha.4", path = "../ecitygml-core" }
 
 egml = { workspace = true }
 
 thiserror = { workspace = true }
-serde = { workspace = true, features = [ "derive" ] }
-quick-xml = { workspace = true, features = [ "serialize" ] }
+serde = { workspace = true, features = ["derive"] }
+quick-xml = { workspace = true, features = ["serialize"] }
 serde_yaml = { workspace = true }
 nalgebra = { workspace = true }
 # parry3d-f64 = { workspace = true, features = ["f64"] }
 itertools = { workspace = true }
-log = "0.4.22"
+uuid = { workspace = true, features = ["v4"] }
+tracing = { workspace = true }

@@ -9,9 +9,10 @@ description = "Supplementary operations for CityGML data."
 
 
 [dependencies]
-ecitygml-core = { version = "0.0.1-alpha.3", path = "../ecitygml-core" }
+ecitygml-core = { version = "0.0.1-alpha.4", path = "../ecitygml-core" }
 
 egml = { workspace = true }
 
 thiserror = { workspace = true }
 nalgebra = { workspace = true }
+rayon = { workspace = true }

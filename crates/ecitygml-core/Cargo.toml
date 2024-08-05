@@ -12,4 +12,5 @@ egml = { workspace = true }
 
 thiserror = { workspace = true }
 nalgebra = { workspace = true }
+rayon = { workspace = true }
 # parry3d-f64 = { workspace = true, features = ["f64"] }

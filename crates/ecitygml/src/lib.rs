@@ -1,9 +1,7 @@
-//! Library for representing [CityGML3](https://www.ogc.org/standards/citygml).
+//! `ecitygml` is a library for processing [CityGML](https://www.ogc.org/standard/citygml/) data.
 //!
 
-pub use ecitygml_core::{
-    CityFurniture, CitygmlModel, Error, SolitaryVegetationObject, TrafficArea, WallSurface,
-};
+pub use ecitygml_core::{model, operations, util, Error};
 
 pub use ecitygml_io as io;
 

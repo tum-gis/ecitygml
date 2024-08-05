@@ -1,70 +1,118 @@
 use crate::error::Error;
-use ecitygml_core::{
-    CityFurniture, CitygmlModel, SolitaryVegetationObject, TrafficArea, WallSurface,
-};
-use egml::geometry::Envelope;
+use ecitygml_core::model::city_model::CitygmlModel;
+use ecitygml_core::model::core::{OccupiedSpace, Space, ThematicSurface};
+use egml::model::geometry::Envelope;
+use egml::operations::geometry::Geometry;
 
 pub fn filter_by_bounding_box(
     mut city_model: CitygmlModel,
     filter_envelope: &Envelope,
 ) -> Result<CitygmlModel, Error> {
-    // x.lod2_solid()
-    let filtered_city_furniture: Vec<CityFurniture> = city_model
-        .city_furniture()
-        .clone()
-        .into_iter()
-        .filter(|f| {
-            f.lod1_solid().as_ref().map_or(false, |g| {
-                filter_envelope.contains_envelope_partially(&g.get_envelope().unwrap())
-            }) || f.lod2_solid().as_ref().map_or(false, |g| {
-                filter_envelope.contains_envelope_partially(&g.get_envelope().unwrap())
-            }) || f.lod2_multi_surface().as_ref().map_or(false, |g| {
-                filter_envelope.contains_envelope_partially(&g.get_envelope().unwrap())
-            }) || f
-                .reference_point()
-                .as_ref()
-                .map_or(false, |g| filter_envelope.contains(g))
-        })
-        .collect();
-    city_model.set_city_furniture(filtered_city_furniture);
+    city_model.building.retain(|f| {
+        f.wall_surface
+            .iter()
+            .any(|w| contains_thematic_surface(filter_envelope, &w.thematic_surface))
+            || f.roof_surface
+                .iter()
+                .any(|w| contains_thematic_surface(filter_envelope, &w.thematic_surface))
+            || f.ground_surface
+                .iter()
+                .any(|w| contains_thematic_surface(filter_envelope, &w.thematic_surface))
+    });
 
-    let filtered_traffic_area: Vec<TrafficArea> = city_model
-        .traffic_area()
-        .clone()
-        .into_iter()
-        .filter(|f| {
-            f.lod2_multi_surface().as_ref().map_or(false, |g| {
-                filter_envelope.contains_envelope_partially(&g.get_envelope().unwrap())
-            })
-        })
-        .collect();
-    city_model.set_traffic_area(filtered_traffic_area);
+    // TODO road
 
-    let filtered_solitary_vegetation_object: Vec<SolitaryVegetationObject> = city_model
-        .solitary_vegetation_object()
-        .clone()
-        .into_iter()
-        .filter(|f| {
-            f.lod1_solid().as_ref().map_or(false, |g| {
-                filter_envelope.contains_envelope_partially(&g.get_envelope().unwrap())
-            })
-        })
-        .collect();
-    city_model.set_solitary_vegetation_object(filtered_solitary_vegetation_object);
+    city_model
+        .city_furniture
+        .retain(|f| contains_occupied_space(filter_envelope, &f.occupied_space));
 
-    let filtered_wall_surface: Vec<WallSurface> = city_model
-        .wall_surface()
-        .clone()
-        .into_iter()
-        .filter(|f| {
-            f.lod2_multi_surface().as_ref().map_or(false, |g| {
-                filter_envelope.contains_envelope_partially(&g.get_envelope().unwrap())
-            }) || f.lod3_multi_surface().as_ref().map_or(false, |g| {
-                filter_envelope.contains_envelope_partially(&g.get_envelope().unwrap())
-            })
-        })
-        .collect();
-    city_model.set_wall_surface(filtered_wall_surface);
+    city_model
+        .solitary_vegetation_object
+        .retain(|f| contains_occupied_space(filter_envelope, &f.occupied_space));
 
     Ok(city_model)
+}
+
+fn contains_thematic_surface(
+    filter_envelope: &Envelope,
+    thematic_surface: &ThematicSurface,
+) -> bool {
+    if let Some(g) = &thematic_surface.lod0_multi_surface {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+    if let Some(g) = &thematic_surface.lod1_multi_surface {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+    if let Some(g) = &thematic_surface.lod2_multi_surface {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+    if let Some(g) = &thematic_surface.lod3_multi_surface {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn contains_occupied_space(filter_envelope: &Envelope, occupied_space: &OccupiedSpace) -> bool {
+    if let Some(g) = &occupied_space.lod1_implicit_representation {
+        if filter_envelope.contains(&g.reference_point) {
+            return true;
+        }
+    }
+    if let Some(g) = &occupied_space.lod2_implicit_representation {
+        if filter_envelope.contains(&g.reference_point) {
+            return true;
+        }
+    }
+    if let Some(g) = &occupied_space.lod3_implicit_representation {
+        if filter_envelope.contains(&g.reference_point) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn contains_space(filter_envelope: &Envelope, space: &Space) -> bool {
+    if let Some(g) = &space.lod1_solid {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+    if let Some(g) = &space.lod2_solid {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+    if let Some(g) = &space.lod3_solid {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+
+    if let Some(g) = &space.lod0_multi_surface {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+    if let Some(g) = &space.lod2_multi_surface {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+    if let Some(g) = &space.lod3_multi_surface {
+        if filter_envelope.contains_envelope_partially(&g.envelope()) {
+            return true;
+        }
+    }
+
+    false
 }

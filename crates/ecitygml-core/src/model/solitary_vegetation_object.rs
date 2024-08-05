@@ -1,26 +1,32 @@
-use egml::{base, geometry};
+use crate::model::core::OccupiedSpace;
+use crate::operations::{FeatureWithGeometry, Visitable, Visitor};
+use egml::model::geometry::Envelope;
+use nalgebra::Isometry3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SolitaryVegetationObject {
-    id: base::Id,
-    name: String,
-    lod1_solid: Option<geometry::Solid>,
+    pub occupied_space: OccupiedSpace,
 }
 
 impl SolitaryVegetationObject {
-    pub fn new(id: base::Id, name: String) -> Self {
-        Self {
-            id,
-            name,
-            lod1_solid: None,
-        }
+    pub fn new(occupied_space: OccupiedSpace) -> Self {
+        Self { occupied_space }
+    }
+}
+
+impl Visitable for SolitaryVegetationObject {
+    fn accept<V: Visitor>(&self, visitor: &mut V) {
+        visitor.visit_solitary_vegetation_object(self);
+        self.occupied_space.accept(visitor);
+    }
+}
+
+impl FeatureWithGeometry for SolitaryVegetationObject {
+    fn envelope(&self) -> Option<Envelope> {
+        self.occupied_space.envelope()
     }
 
-    pub fn lod1_solid(&self) -> &Option<geometry::Solid> {
-        &self.lod1_solid
-    }
-
-    pub fn set_lod1_solid(&mut self, lod1_solid: Option<geometry::Solid>) {
-        self.lod1_solid = lod1_solid;
+    fn apply_transform(&mut self, m: &Isometry3<f64>) {
+        self.occupied_space.apply_transform(m);
     }
 }

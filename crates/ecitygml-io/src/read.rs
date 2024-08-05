@@ -6,6 +6,7 @@ use std::io::{Read, Seek};
 use crate::error::Error::{InvalidFileExtension, NoFileExtension};
 use crate::validate_impl::validate_from_reader;
 use crate::{FILE_EXTENSION_CITYGML_GML_FORMAT, FILE_EXTENSION_CITYGML_XML_FORMAT};
+use ecitygml_core::model::city_model::CitygmlModel;
 use std::path::Path;
 
 /// `CitygmlReader` reads CityGML datasets.
@@ -25,7 +26,7 @@ impl<R: Read + Seek> CitygmlReader<R> {
         validate_from_reader(self.reader)
     }
 
-    pub fn finish(self) -> Result<ecitygml_core::CitygmlModel, Error> {
+    pub fn finish(self) -> Result<CitygmlModel, Error> {
         read_from_file(self.reader)
     }
 }

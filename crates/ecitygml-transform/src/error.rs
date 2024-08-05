@@ -4,4 +4,6 @@ use thiserror::Error;
 pub enum Error {
     #[error(transparent)]
     EcitygmlError(#[from] ecitygml_core::Error),
+    #[error(transparent)]
+    EgmlError(#[from] egml::Error),
 }
