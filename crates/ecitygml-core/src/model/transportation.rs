@@ -1,5 +1,5 @@
 use crate::model::core::{CityObject, Space, ThematicSurface};
-use crate::operations::{FeatureWithGeometry, Visitable, Visitor};
+use crate::operations::{CityObjectVisitor, FeatureWithGeometry, Visitable};
 use egml::model::base;
 use egml::model::base::Gml;
 use egml::model::geometry::Envelope;
@@ -26,7 +26,7 @@ impl Road {
 }
 
 impl Visitable for Road {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_road(self);
         self.section.iter().for_each(|x| x.accept(visitor));
         self.intersection.iter().for_each(|x| x.accept(visitor));
@@ -71,7 +71,7 @@ impl Section {
 }
 
 impl Visitable for Section {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_section(self);
         self.traffic_space.iter().for_each(|x| x.accept(visitor));
         self.auxiliary_traffic_space
@@ -120,7 +120,7 @@ impl Intersection {
 }
 
 impl Visitable for Intersection {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_intersection(self);
         self.traffic_space.iter().for_each(|x| x.accept(visitor));
         self.auxiliary_traffic_space
@@ -164,9 +164,8 @@ impl TrafficSpace {
 }
 
 impl Visitable for TrafficSpace {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_traffic_space(self);
-        self.space.accept(visitor);
         self.traffic_area.iter().for_each(|x| x.accept(visitor));
     }
 }
@@ -203,9 +202,8 @@ impl AuxiliaryTrafficSpace {
 }
 
 impl Visitable for AuxiliaryTrafficSpace {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_auxiliary_traffic_space(self);
-        self.space.accept(visitor);
         self.auxiliary_traffic_area
             .iter()
             .for_each(|x| x.accept(visitor));
@@ -240,9 +238,8 @@ impl TrafficArea {
 }
 
 impl Visitable for TrafficArea {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_traffic_area(self);
-        self.thematic_surface.accept(visitor);
     }
 }
 
@@ -268,9 +265,8 @@ impl AuxiliaryTrafficArea {
 }
 
 impl Visitable for AuxiliaryTrafficArea {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_auxiliary_traffic_area(self);
-        self.thematic_surface.accept(visitor);
     }
 }
 

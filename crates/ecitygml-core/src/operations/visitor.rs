@@ -4,32 +4,18 @@ use crate::model::city_model::CitygmlModel;
 use crate::model::construction::{
     DoorSurface, GroundSurface, RoofSurface, WallSurface, WindowSurface,
 };
-use crate::model::core::{ImplicitGeometry, OccupiedSpace, Space, ThematicSurface};
 use crate::model::solitary_vegetation_object::SolitaryVegetationObject;
 use crate::model::transportation::{
     AuxiliaryTrafficArea, AuxiliaryTrafficSpace, Intersection, Road, Section, TrafficArea,
     TrafficSpace,
 };
-use egml::model::geometry::{DirectPosition, LinearRing, MultiSurface, Polygon, Solid};
-use egml::operations::geometry::Geometry;
 
 pub trait Visitable {
-    fn accept<V: Visitor>(&self, visitor: &mut V);
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V);
 }
 
-pub trait Visitor {
+pub trait CityObjectVisitor {
     type Result;
-
-    fn visit_direct_position(&mut self, v: &DirectPosition) -> Self::Result;
-    fn visit_linear_ring(&mut self, v: &LinearRing) -> Self::Result;
-    fn visit_polygon(&mut self, v: &Polygon) -> Self::Result;
-    fn visit_multi_surface(&mut self, v: &MultiSurface) -> Self::Result;
-    fn visit_solid(&mut self, v: &Solid) -> Self::Result;
-
-    fn visit_implicit_geometry(&mut self, v: &ImplicitGeometry) -> Self::Result;
-    fn visit_thematic_surface(&mut self, v: &ThematicSurface) -> Self::Result;
-    fn visit_space(&mut self, v: &Space) -> Self::Result;
-    fn visit_occupied_space(&mut self, v: &OccupiedSpace) -> Self::Result;
 
     fn visit_city_model(&mut self, v: &CitygmlModel) -> Self::Result;
 
@@ -66,44 +52,8 @@ impl Interpreter {
         Self {}
     }
 }
-impl Visitor for Interpreter {
+impl CityObjectVisitor for Interpreter {
     type Result = ();
-
-    fn visit_direct_position(&mut self, v: &DirectPosition) -> Self::Result {
-        println!("hello direct_position");
-    }
-
-    fn visit_linear_ring(&mut self, v: &LinearRing) -> Self::Result {
-        println!("hello linear_ring {}", v.gml.id);
-    }
-
-    fn visit_polygon(&mut self, v: &Polygon) -> Self::Result {
-        println!("hello polygon {}", v.gml.id);
-    }
-
-    fn visit_multi_surface(&mut self, v: &MultiSurface) -> Self::Result {
-        println!("hello multi_surface {}", v.gml.id);
-    }
-
-    fn visit_solid(&mut self, v: &Solid) -> Self::Result {
-        println!("hello solid {}", v.gml.id);
-    }
-
-    fn visit_implicit_geometry(&mut self, v: &ImplicitGeometry) -> Self::Result {
-        println!("hello implicit_geometry",);
-    }
-
-    fn visit_thematic_surface(&mut self, v: &ThematicSurface) -> Self::Result {
-        println!("hello thematic_surface {}", v.city_object.gml.id);
-    }
-
-    fn visit_space(&mut self, v: &Space) -> Self::Result {
-        println!("hello space {}", v.city_object.gml.id);
-    }
-
-    fn visit_occupied_space(&mut self, v: &OccupiedSpace) -> Self::Result {
-        println!("hello occupied_space {}", v.space.city_object.gml.id);
-    }
 
     fn visit_city_model(&mut self, v: &CitygmlModel) -> Self::Result {
         println!("hello city_model");
@@ -197,40 +147,5 @@ impl Visitor for Interpreter {
             "hello auxiliary_traffic_area {}",
             v.thematic_surface.city_object.gml.id
         );
-    }
-}
-
-impl Visitable for DirectPosition {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_direct_position(self);
-    }
-}
-
-impl Visitable for LinearRing {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_linear_ring(self);
-        self.points().iter().for_each(|x| x.accept(visitor));
-    }
-}
-
-impl Visitable for Polygon {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_polygon(self);
-        visitor.visit_linear_ring(&self.exterior);
-        self.interior.iter().for_each(|x| x.accept(visitor));
-    }
-}
-
-impl Visitable for MultiSurface {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_multi_surface(self);
-        self.surface_member().iter().for_each(|x| x.accept(visitor));
-    }
-}
-
-impl Visitable for Solid {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_solid(self);
-        self.members().iter().for_each(|x| x.accept(visitor));
     }
 }

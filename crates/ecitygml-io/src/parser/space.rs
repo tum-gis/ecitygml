@@ -1,13 +1,12 @@
 use crate::error::Error;
 use egml::io::{parse_multi_surface, parse_solid};
-use egml::model::base;
 use egml::model::base::{Gml, Id};
 
 use ecitygml_core::model::core::{
     CityObject, ImplicitGeometry, OccupiedSpace, Space, ThematicSurface,
 };
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use tracing::warn;
 
 pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
@@ -261,13 +260,12 @@ pub fn parse_implicit_geometry(xml_document: &String) -> Result<ImplicitGeometry
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => match e.name().as_ref() {
-                b"referencePoint" => {
+            Ok(Event::Start(e)) => {
+                if e.name().as_ref() == b"referencePoint" {
                     let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
                     implicit_geometry.reference_point = egml::io::parse_point(&xml_snippet)?;
                 }
-                _ => {}
-            },
+            }
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
             Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),

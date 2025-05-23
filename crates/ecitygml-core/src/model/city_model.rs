@@ -2,7 +2,7 @@ use crate::model::building::Building;
 use crate::model::city_furniture::CityFurniture;
 use crate::model::solitary_vegetation_object::SolitaryVegetationObject;
 use crate::model::transportation::Road;
-use crate::operations::{FeatureWithGeometry, Visitable, Visitor};
+use crate::operations::{CityObjectVisitor, FeatureWithGeometry, Visitable};
 use egml::model::geometry::Envelope;
 use nalgebra::Isometry3;
 use rayon::prelude::*;
@@ -67,7 +67,7 @@ impl CitygmlModel {
 }
 
 impl Visitable for CitygmlModel {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_city_model(self);
         self.building.iter().for_each(|x| x.accept(visitor));
         self.city_furniture.iter().for_each(|x| x.accept(visitor));

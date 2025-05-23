@@ -6,7 +6,7 @@ mod visitor;
 pub use visitor::Interpreter;
 
 #[doc(inline)]
-pub use visitor::Visitor;
+pub use visitor::CityObjectVisitor;
 
 #[doc(inline)]
 pub use visitor::Visitable;
@@ -16,6 +16,9 @@ pub use traits::FeatureWithGeometry;
 
 #[doc(inline)]
 pub use geometry_collector::GeometryCollector;
+
+#[doc(inline)]
+pub use geometry_collector::CityObjectGeometryCollection;
 
 /*#[doc(inline)]
 pub use traits::SpaceFeature;

@@ -1,13 +1,13 @@
+use crate::Error;
 use crate::parser::attributes::extract_attributes;
 use crate::parser::space::{parse_space, parse_thematic_surface};
-use crate::Error;
 use ecitygml_core::model::transportation::{
     AuxiliaryTrafficArea, AuxiliaryTrafficSpace, Intersection, Road, Section, TrafficArea,
     TrafficSpace,
 };
 use egml::model::base::Id;
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use std::collections::HashMap;
 
 pub fn parse_road(id: &Id, xml_document: &String) -> Result<Road, Error> {
@@ -27,8 +27,7 @@ pub fn parse_road(id: &Id, xml_document: &String) -> Result<Road, Error> {
                 let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
-                    .map(|x| Id::try_from(x.as_str()).ok())
-                    .flatten();
+                    .and_then(|x| Id::try_from(x.as_str()).ok());
 
                 match e.name().as_ref() {
                     b"tran:Section" => {
@@ -75,8 +74,7 @@ pub fn parse_section(id: &Id, xml_document: &String) -> Result<Section, Error> {
                 let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
-                    .map(|x| Id::try_from(x.as_str()).ok())
-                    .flatten();
+                    .and_then(|x| Id::try_from(x.as_str()).ok());
 
                 match e.name().as_ref() {
                     b"tran:TrafficSpace" => {
@@ -126,8 +124,7 @@ pub fn parse_intersection(id: &Id, xml_document: &String) -> Result<Intersection
                 let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
-                    .map(|x| Id::try_from(x.as_str()).ok())
-                    .flatten();
+                    .and_then(|x| Id::try_from(x.as_str()).ok());
 
                 match e.name().as_ref() {
                     b"tran:TrafficSpace" => {
@@ -161,7 +158,7 @@ pub fn parse_intersection(id: &Id, xml_document: &String) -> Result<Intersection
 }
 
 pub fn parse_traffic_space(id: &Id, xml_document: &String) -> Result<TrafficSpace, Error> {
-    let space = parse_space(id, &xml_document)?;
+    let space = parse_space(id, xml_document)?;
     let mut traffic_space = TrafficSpace::new(space);
 
     let mut reader = Reader::from_str(xml_document.as_str());
@@ -177,19 +174,15 @@ pub fn parse_traffic_space(id: &Id, xml_document: &String) -> Result<TrafficSpac
                 let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
-                    .map(|x| Id::try_from(x.as_str()).ok())
-                    .flatten();
+                    .and_then(|x| Id::try_from(x.as_str()).ok());
 
-                match e.name().as_ref() {
-                    b"tran:TrafficArea" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
-                        let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
+                if e.name().as_ref() == b"tran:TrafficArea" {
+                    let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                    let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
-                        let thematic_surface = parse_thematic_surface(&id, &xml_snippet)?;
-                        let traffic_area = TrafficArea::new(thematic_surface);
-                        traffic_space.traffic_area.push(traffic_area);
-                    }
-                    _ => {}
+                    let thematic_surface = parse_thematic_surface(&id, &xml_snippet)?;
+                    let traffic_area = TrafficArea::new(thematic_surface);
+                    traffic_space.traffic_area.push(traffic_area);
                 }
             }
             Ok(Event::Eof) => break,
@@ -206,7 +199,7 @@ pub fn parse_auxiliary_traffic_space(
     id: &Id,
     xml_document: &String,
 ) -> Result<AuxiliaryTrafficSpace, Error> {
-    let space = parse_space(id, &xml_document)?;
+    let space = parse_space(id, xml_document)?;
     let mut auxiliary_traffic_space = AuxiliaryTrafficSpace::new(space);
 
     let mut reader = Reader::from_str(xml_document.as_str());
@@ -222,23 +215,18 @@ pub fn parse_auxiliary_traffic_space(
                 let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
-                    .map(|x| Id::try_from(x.as_str()).ok())
-                    .flatten();
+                    .and_then(|x| Id::try_from(x.as_str()).ok());
 
-                match e.name().as_ref() {
-                    b"tran:AuxiliaryTrafficArea" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
-                        let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
+                if e.name().as_ref() == b"tran:AuxiliaryTrafficArea" {
+                    let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                    let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
-                        let thematic_surface = parse_thematic_surface(&id, &xml_snippet)?;
-                        let mut auxiliary_traffic_area =
-                            AuxiliaryTrafficArea::new(thematic_surface);
+                    let thematic_surface = parse_thematic_surface(&id, &xml_snippet)?;
+                    let auxiliary_traffic_area = AuxiliaryTrafficArea::new(thematic_surface);
 
-                        auxiliary_traffic_space
-                            .auxiliary_traffic_area
-                            .push(auxiliary_traffic_area);
-                    }
-                    _ => {}
+                    auxiliary_traffic_space
+                        .auxiliary_traffic_area
+                        .push(auxiliary_traffic_area);
                 }
             }
             Ok(Event::Eof) => break,

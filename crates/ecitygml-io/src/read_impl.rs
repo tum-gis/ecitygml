@@ -1,7 +1,7 @@
 use crate::error::Error;
 
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use std::collections::HashMap;
 
 use crate::parser::attributes::extract_attributes;
@@ -13,7 +13,6 @@ use ecitygml_core::model::city_model::CitygmlModel;
 use ecitygml_core::model::solitary_vegetation_object::SolitaryVegetationObject;
 use egml::model::base::Id;
 use std::io::{BufReader, Read, Seek};
-use uuid::Uuid;
 
 extern crate quick_xml;
 extern crate serde;
@@ -37,8 +36,7 @@ pub fn read_from_file<R: Read + Seek>(reader: R) -> Result<CitygmlModel, Error> 
                 let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
-                    .map(|x| Id::try_from(x.as_str()).ok())
-                    .flatten();
+                    .and_then(|x| Id::try_from(x.as_str()).ok());
 
                 match e.name().as_ref() {
                     b"bldg:Building" => {
@@ -54,7 +52,7 @@ pub fn read_from_file<R: Read + Seek>(reader: R) -> Result<CitygmlModel, Error> 
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let occupied_space = parse_occupied_space(&id, &xml_snippet)?;
-                        let mut city_furniture = CityFurniture::new(occupied_space);
+                        let city_furniture = CityFurniture::new(occupied_space);
                         citygml_model.city_furniture.push(city_furniture);
                     }
                     b"tran:Road" => {

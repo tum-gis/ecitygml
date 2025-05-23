@@ -1,5 +1,5 @@
-use quick_xml::events::BytesStart;
 use quick_xml::Reader;
+use quick_xml::events::BytesStart;
 use std::collections::HashMap;
 
 pub fn extract_attributes(reader: &Reader<&[u8]>, e: &BytesStart) -> HashMap<String, String> {

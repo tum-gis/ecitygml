@@ -1,5 +1,5 @@
 use crate::model::core::{OccupiedSpace, ThematicSurface};
-use crate::operations::{FeatureWithGeometry, Visitable, Visitor};
+use crate::operations::{CityObjectVisitor, FeatureWithGeometry, Visitable};
 use egml::model::geometry::Envelope;
 use nalgebra::Isometry3;
 
@@ -21,9 +21,8 @@ impl WallSurface {
 }
 
 impl Visitable for WallSurface {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_wall_surface(self);
-        self.thematic_surface.accept(visitor);
         self.door_surface.iter().for_each(|x| x.accept(visitor));
         self.window_surface.iter().for_each(|x| x.accept(visitor));
     }
@@ -61,9 +60,8 @@ impl RoofSurface {
 }
 
 impl Visitable for RoofSurface {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_roof_surface(self);
-        self.thematic_surface.accept(visitor);
     }
 }
 
@@ -89,9 +87,8 @@ impl GroundSurface {
 }
 
 impl Visitable for GroundSurface {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_ground_surface(self);
-        self.thematic_surface.accept(visitor);
     }
 }
 
@@ -117,9 +114,8 @@ impl WindowSurface {
 }
 
 impl Visitable for WindowSurface {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_window_surface(self);
-        self.occupied_space.accept(visitor);
     }
 }
 
@@ -145,9 +141,8 @@ impl DoorSurface {
 }
 
 impl Visitable for DoorSurface {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_door_surface(self);
-        self.occupied_space.accept(visitor);
     }
 }
 

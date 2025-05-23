@@ -1,5 +1,5 @@
 use crate::model::core::OccupiedSpace;
-use crate::operations::{FeatureWithGeometry, Visitable, Visitor};
+use crate::operations::{CityObjectVisitor, FeatureWithGeometry, Visitable};
 use egml::model::geometry::Envelope;
 use nalgebra::Isometry3;
 
@@ -15,9 +15,8 @@ impl CityFurniture {
 }
 
 impl Visitable for CityFurniture {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_city_furniture(self);
-        self.occupied_space.accept(visitor);
     }
 }
 

@@ -1,16 +1,16 @@
-mod arguments;
+mod cli;
 mod commands;
 
-use crate::arguments::{Arguments, Commands};
+use crate::cli::{Cli, Commands};
 use clap::Parser;
 use std::path::Path;
 use std::path::PathBuf;
 
 fn main() {
     tracing_subscriber::fmt::init();
-    let arguments = Arguments::parse();
+    let cli = Cli::parse();
 
-    match &arguments.command {
+    match &cli.command {
         Commands::Statistics { file_path } => {
             let file_path = Path::new(file_path).canonicalize().unwrap();
             commands::statistics::run(file_path);

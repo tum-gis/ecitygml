@@ -1,6 +1,6 @@
 use crate::model::construction::{GroundSurface, RoofSurface, WallSurface};
 use crate::model::core::CityObject;
-use crate::operations::{FeatureWithGeometry, Visitable, Visitor};
+use crate::operations::{CityObjectVisitor, FeatureWithGeometry, Visitable};
 use egml::model::base;
 use egml::model::base::Gml;
 use egml::model::geometry::Envelope;
@@ -29,7 +29,7 @@ impl Building {
 }
 
 impl Visitable for Building {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
         visitor.visit_building(self);
         self.wall_surface.iter().for_each(|x| x.accept(visitor));
         self.roof_surface.iter().for_each(|x| x.accept(visitor));

@@ -3,10 +3,10 @@ use crate::validate::extracted_information::{
     CityObjectRelation, ExtractedInformation, GmlIdCount,
 };
 use crate::validate::report::Report;
-use quick_xml::de;
-use quick_xml::events::attributes::Attribute;
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::de;
+use quick_xml::events::Event;
+use quick_xml::events::attributes::Attribute;
 
 use std::io::{BufReader, Read, Seek};
 use std::ops::Deref;
@@ -59,17 +59,13 @@ pub fn validate_from_reader<R: Read + Seek>(reader: R) -> Result<Report, Error> 
                         .or_insert(0) += 1;
                 };
 
-                match e.name().as_ref() {
-                    b"relatedTo" => {
-                        let read_text: &str = &xml_reader.read_text(e.name()).unwrap();
-                        let city_object_relation: CityObjectRelation =
-                            de::from_str(read_text).unwrap();
+                if e.name().as_ref() == b"relatedTo" {
+                    let read_text: &str = &xml_reader.read_text(e.name()).unwrap();
+                    let city_object_relation: CityObjectRelation = de::from_str(read_text).unwrap();
 
-                        extracted_information
-                            .city_object_relations
-                            .insert(city_object_relation);
-                    }
-                    _ => {}
+                    extracted_information
+                        .city_object_relations
+                        .insert(city_object_relation);
                 };
             }
             Ok(Event::Empty(e)) => {
@@ -129,8 +125,7 @@ mod tests {
     fn parsing_city_object_relation() {
         let _source_text = "<relationType>belongsTo</relationType>\
                  <relatedTo xlink:href=\"#UUID_c930adc7-9e6c-3eea-a377-b31d9d5b6239\"/>";
-        let source_text =
-            "<CityObjectRelation><relationType>belongsTo</relationType><relatedTo xlink:href=\"#UUID_c930adc7-9e6c-3eea-a377-b31d9d5b6239\"/></CityObjectRelation>";
+        let source_text = "<CityObjectRelation><relationType>belongsTo</relationType><relatedTo xlink:href=\"#UUID_c930adc7-9e6c-3eea-a377-b31d9d5b6239\"/></CityObjectRelation>";
 
         let city_object_relation = parse_city_object_relation(source_text).unwrap();
 

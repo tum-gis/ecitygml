@@ -1,4 +1,4 @@
-use crate::operations::{FeatureWithGeometry, Visitable, Visitor};
+use crate::operations::FeatureWithGeometry;
 use egml::model::base::Gml;
 use egml::model::geometry;
 use egml::model::geometry::{DirectPosition, Envelope};
@@ -25,12 +25,6 @@ pub struct ImplicitGeometry {
 impl ImplicitGeometry {
     pub fn new(reference_point: geometry::DirectPosition) -> Self {
         Self { reference_point }
-    }
-}
-
-impl Visitable for ImplicitGeometry {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_implicit_geometry(self);
     }
 }
 
@@ -67,31 +61,6 @@ impl Space {
             lod0_multi_surface: None,
             lod2_multi_surface: None,
             lod3_multi_surface: None,
-        }
-    }
-}
-
-impl Visitable for Space {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_space(self);
-
-        if let Some(g) = &self.lod1_solid {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod2_solid {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod3_solid {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod0_multi_surface {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod2_multi_surface {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod3_multi_surface {
-            g.accept(visitor);
         }
     }
 }
@@ -155,22 +124,6 @@ impl OccupiedSpace {
     }
 }
 
-impl Visitable for OccupiedSpace {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_occupied_space(self);
-        self.space.accept(visitor);
-        if let Some(g) = &self.lod1_implicit_representation {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod2_implicit_representation {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod3_implicit_representation {
-            g.accept(visitor);
-        }
-    }
-}
-
 impl FeatureWithGeometry for OccupiedSpace {
     fn envelope(&self) -> Option<Envelope> {
         let envelopes: Vec<Option<Envelope>> = vec![
@@ -221,24 +174,6 @@ impl ThematicSurface {
             lod1_multi_surface: None,
             lod2_multi_surface: None,
             lod3_multi_surface: None,
-        }
-    }
-}
-
-impl Visitable for ThematicSurface {
-    fn accept<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_thematic_surface(self);
-        if let Some(g) = &self.lod0_multi_surface {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod1_multi_surface {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod2_multi_surface {
-            g.accept(visitor);
-        }
-        if let Some(g) = &self.lod3_multi_surface {
-            g.accept(visitor);
         }
     }
 }
