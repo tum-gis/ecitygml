@@ -24,8 +24,7 @@ pub fn read_from_file<R: Read + Seek>(reader: R) -> Result<CitygmlModel, Error> 
     let mut file_content: String = Default::default();
     BufReader::new(reader).read_to_string(&mut file_content)?;
     let mut reader = Reader::from_str(file_content.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let _count = 0;
     let mut txt = Vec::new();
@@ -79,7 +78,7 @@ pub fn read_from_file<R: Read + Seek>(reader: R) -> Result<CitygmlModel, Error> 
             }
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
 

@@ -18,6 +18,9 @@ pub fn filter_by_bounding_box(
             || f.ground_surface
                 .iter()
                 .any(|w| contains_thematic_surface(filter_envelope, &w.thematic_surface))
+            || f.building_constructive_element
+                .iter()
+                .any(|w| contains_occupied_space(filter_envelope, &w.occupied_space))
     });
 
     // TODO road
@@ -78,7 +81,7 @@ fn contains_occupied_space(filter_envelope: &Envelope, occupied_space: &Occupied
         }
     }
 
-    false
+    contains_space(filter_envelope, &occupied_space.space)
 }
 
 fn contains_space(filter_envelope: &Envelope, space: &Space) -> bool {

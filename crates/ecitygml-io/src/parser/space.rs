@@ -16,8 +16,7 @@ pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
     let mut space = Space::new(city_object);
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
@@ -97,11 +96,13 @@ pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
                         })
                         .ok();
                 }
-                _ => {}
+                _ => {
+                    reader.read_to_end(e.name()).unwrap();
+                }
             },
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }
@@ -114,8 +115,7 @@ pub fn parse_occupied_space(id: &Id, xml_document: &String) -> Result<OccupiedSp
     let mut occupied_space = OccupiedSpace::new(space);
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
@@ -162,11 +162,13 @@ pub fn parse_occupied_space(id: &Id, xml_document: &String) -> Result<OccupiedSp
                             })
                             .ok();
                 }
-                _ => {}
+                _ => {
+                    reader.read_to_end(e.name()).unwrap();
+                }
             },
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }
@@ -181,8 +183,7 @@ pub fn parse_thematic_surface(id: &Id, xml_document: &String) -> Result<Thematic
     let mut thematic_surface = ThematicSurface::new(city_object);
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
@@ -237,11 +238,13 @@ pub fn parse_thematic_surface(id: &Id, xml_document: &String) -> Result<Thematic
                         })
                         .ok();
                 }
-                _ => {}
+                _ => {
+                    reader.read_to_end(e.name()).unwrap();
+                }
             },
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }
@@ -253,22 +256,24 @@ pub fn parse_implicit_geometry(xml_document: &String) -> Result<ImplicitGeometry
     let mut implicit_geometry = ImplicitGeometry::default();
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => {
-                if e.name().as_ref() == b"referencePoint" {
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                b"referencePoint" => {
                     let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
                     implicit_geometry.reference_point = egml::io::parse_point(&xml_snippet)?;
                 }
-            }
+                _ => {
+                    reader.read_to_end(e.name()).unwrap();
+                }
+            },
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }

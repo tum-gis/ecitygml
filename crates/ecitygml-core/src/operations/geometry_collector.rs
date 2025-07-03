@@ -1,4 +1,4 @@
-use crate::model::building::Building;
+use crate::model::building::{Building, BuildingConstructiveElement};
 use crate::model::city_furniture::CityFurniture;
 use crate::model::city_model::CitygmlModel;
 use crate::model::common::{CityObjectClass, LevelOfDetail};
@@ -139,6 +139,20 @@ impl CityObjectVisitor for GeometryCollector {
     }
 
     fn visit_building(&mut self, v: &Building) -> Self::Result {}
+
+    fn visit_building_constructive_element(
+        &mut self,
+        v: &BuildingConstructiveElement,
+    ) -> Self::Result {
+        let city_object_geometry_collection = CityObjectGeometryCollection::from_occupied_space(
+            CityObjectClass::BuildingConstructiveElement,
+            &v.occupied_space,
+        );
+        self.city_objects.insert(
+            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection,
+        );
+    }
 
     fn visit_roof_surface(&mut self, v: &RoofSurface) -> Self::Result {
         let city_object_geometry_collection = CityObjectGeometryCollection::from_thematic_surface(

@@ -1,5 +1,8 @@
 use ecitygml::io::{FILE_EXTENSION_CITYGML_GML_FORMAT, FILE_EXTENSION_CITYGML_XML_FORMAT};
-use ecitygml::model::construction::{GroundSurface, RoofSurface, WallSurface};
+use ecitygml::model::building::{Building, BuildingConstructiveElement};
+use ecitygml::model::construction::{
+    DoorSurface, GroundSurface, RoofSurface, WallSurface, WindowSurface,
+};
 use ecitygml::model::core::{OccupiedSpace, Space, ThematicSurface};
 use ecitygml::operations::FeatureWithGeometry;
 use std::path::Path;
@@ -56,7 +59,12 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
         envelope.upper_corner()
     );
 
+    let buildings: Vec<&Building> = citygml_model.building.iter().collect();
     info!("Total Building: {}", citygml_model.building.len());
+    if !buildings.is_empty() {
+        print_statistics_occupied_space(buildings.iter().map(|x| &x.occupied_space).collect());
+    }
+
     let wall_surfaces: Vec<&WallSurface> = citygml_model
         .building
         .iter()
@@ -66,6 +74,30 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
     if !wall_surfaces.is_empty() {
         print_statistics_thematic_surface(
             wall_surfaces.iter().map(|x| &x.thematic_surface).collect(),
+        );
+    }
+
+    let door_surfaces: Vec<&DoorSurface> = citygml_model
+        .building
+        .iter()
+        .flat_map(|x| &x.wall_surface)
+        .flat_map(|x| &x.door_surface)
+        .collect();
+    info!("Total DoorSurface: {}", door_surfaces.len());
+    if !door_surfaces.is_empty() {
+        print_statistics_occupied_space(door_surfaces.iter().map(|x| &x.occupied_space).collect());
+    }
+
+    let window_surfaces: Vec<&WindowSurface> = citygml_model
+        .building
+        .iter()
+        .flat_map(|x| &x.wall_surface)
+        .flat_map(|x| &x.window_surface)
+        .collect();
+    info!("Total WindowSurface: {}", window_surfaces.len());
+    if !window_surfaces.is_empty() {
+        print_statistics_occupied_space(
+            window_surfaces.iter().map(|x| &x.occupied_space).collect(),
         );
     }
 
@@ -92,6 +124,24 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
             ground_surfaces
                 .iter()
                 .map(|x| &x.thematic_surface)
+                .collect(),
+        );
+    }
+
+    let building_constructive_elements: Vec<&BuildingConstructiveElement> = citygml_model
+        .building
+        .iter()
+        .flat_map(|x| &x.building_constructive_element)
+        .collect();
+    info!(
+        "Total BuildingConstructiveElement: {}",
+        building_constructive_elements.len()
+    );
+    if !building_constructive_elements.is_empty() {
+        print_statistics_occupied_space(
+            building_constructive_elements
+                .iter()
+                .map(|x| &x.occupied_space)
                 .collect(),
         );
     }

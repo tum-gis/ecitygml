@@ -1,29 +1,26 @@
 use crate::model::construction::{GroundSurface, RoofSurface, WallSurface};
-use crate::model::core::CityObject;
+use crate::model::core::OccupiedSpace;
 use crate::operations::{CityObjectVisitor, FeatureWithGeometry, Visitable};
-use egml::model::base;
-use egml::model::base::Gml;
 use egml::model::geometry::Envelope;
 use nalgebra::Isometry3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Building {
-    pub city_object: CityObject, // TODO: space
+    pub occupied_space: OccupiedSpace,
     pub wall_surface: Vec<WallSurface>,
     pub roof_surface: Vec<RoofSurface>,
     pub ground_surface: Vec<GroundSurface>,
+    pub building_constructive_element: Vec<BuildingConstructiveElement>,
 }
 
 impl Building {
-    pub fn new(id: base::Id) -> Self {
-        let gml = Gml::new(id);
-        let city_object = CityObject::new(gml);
-
+    pub fn new(occupied_space: OccupiedSpace) -> Self {
         Self {
-            city_object,
+            occupied_space,
             wall_surface: Vec::new(),
             roof_surface: Vec::new(),
             ground_surface: Vec::new(),
+            building_constructive_element: Vec::new(),
         }
     }
 }
@@ -34,6 +31,9 @@ impl Visitable for Building {
         self.wall_surface.iter().for_each(|x| x.accept(visitor));
         self.roof_surface.iter().for_each(|x| x.accept(visitor));
         self.ground_surface.iter().for_each(|x| x.accept(visitor));
+        self.building_constructive_element
+            .iter()
+            .for_each(|x| x.accept(visitor));
     }
 }
 
@@ -44,6 +44,11 @@ impl FeatureWithGeometry for Building {
         envelopes.extend(self.wall_surface.iter().map(|x| x.envelope()));
         envelopes.extend(self.roof_surface.iter().map(|x| x.envelope()));
         envelopes.extend(self.ground_surface.iter().map(|x| x.envelope()));
+        envelopes.extend(
+            self.building_constructive_element
+                .iter()
+                .map(|x| x.envelope()),
+        );
 
         Envelope::from_optional_envelopes(&envelopes).expect("should work")
     }
@@ -59,5 +64,35 @@ impl FeatureWithGeometry for Building {
         self.ground_surface
             .iter_mut()
             .for_each(|x| x.apply_transform(m));
+        self.building_constructive_element
+            .iter_mut()
+            .for_each(|x| x.apply_transform(m));
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BuildingConstructiveElement {
+    pub occupied_space: OccupiedSpace,
+}
+
+impl BuildingConstructiveElement {
+    pub fn new(occupied_space: OccupiedSpace) -> Self {
+        Self { occupied_space }
+    }
+}
+
+impl Visitable for BuildingConstructiveElement {
+    fn accept<V: CityObjectVisitor>(&self, visitor: &mut V) {
+        visitor.visit_building_constructive_element(self);
+    }
+}
+
+impl FeatureWithGeometry for BuildingConstructiveElement {
+    fn envelope(&self) -> Option<Envelope> {
+        self.occupied_space.envelope()
+    }
+
+    fn apply_transform(&mut self, m: &Isometry3<f64>) {
+        self.occupied_space.apply_transform(m);
     }
 }

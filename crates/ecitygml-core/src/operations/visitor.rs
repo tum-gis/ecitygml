@@ -1,4 +1,4 @@
-use crate::model::building::Building;
+use crate::model::building::{Building, BuildingConstructiveElement};
 use crate::model::city_furniture::CityFurniture;
 use crate::model::city_model::CitygmlModel;
 use crate::model::construction::{
@@ -22,6 +22,10 @@ pub trait CityObjectVisitor {
     fn visit_city_furniture(&mut self, v: &CityFurniture) -> Self::Result;
 
     fn visit_building(&mut self, v: &Building) -> Self::Result;
+    fn visit_building_constructive_element(
+        &mut self,
+        v: &BuildingConstructiveElement,
+    ) -> Self::Result;
     fn visit_roof_surface(&mut self, v: &RoofSurface) -> Self::Result;
     fn visit_ground_surface(&mut self, v: &GroundSurface) -> Self::Result;
     fn visit_wall_surface(&mut self, v: &WallSurface) -> Self::Result;
@@ -67,7 +71,20 @@ impl CityObjectVisitor for Interpreter {
     }
 
     fn visit_building(&mut self, v: &Building) -> Self::Result {
-        println!("hello building {}", v.city_object.gml.id);
+        println!(
+            "hello building {}",
+            v.occupied_space.space.city_object.gml.id
+        );
+    }
+
+    fn visit_building_constructive_element(
+        &mut self,
+        v: &BuildingConstructiveElement,
+    ) -> Self::Result {
+        println!(
+            "hello building_constructive_element {}",
+            v.occupied_space.space.city_object.gml.id
+        );
     }
 
     fn visit_roof_surface(&mut self, v: &RoofSurface) -> Self::Result {
@@ -113,15 +130,15 @@ impl CityObjectVisitor for Interpreter {
     }
 
     fn visit_road(&mut self, v: &Road) -> Self::Result {
-        println!("hello road {}", v.city_object.gml.id);
+        println!("hello road {}", v.space.city_object.gml.id);
     }
 
     fn visit_section(&mut self, v: &Section) -> Self::Result {
-        println!("hello section {}", v.city_object.gml.id);
+        println!("hello section {}", v.space.city_object.gml.id);
     }
 
     fn visit_intersection(&mut self, v: &Intersection) -> Self::Result {
-        println!("hello intersection {}", v.city_object.gml.id);
+        println!("hello intersection {}", v.space.city_object.gml.id);
     }
 
     fn visit_traffic_space(&mut self, v: &TrafficSpace) -> Self::Result {

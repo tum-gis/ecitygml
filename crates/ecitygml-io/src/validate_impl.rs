@@ -18,8 +18,7 @@ pub fn validate_from_reader<R: Read + Seek>(reader: R) -> Result<Report, Error> 
     let mut file_content: String = Default::default();
     BufReader::new(reader).read_to_string(&mut file_content)?;
     let mut xml_reader = Reader::from_str(file_content.as_str());
-    xml_reader.config_mut().trim_text_start = true;
-    xml_reader.config_mut().trim_text_end = true;
+    xml_reader.config_mut().trim_text(true);
 
     let mut buf = Vec::new();
     loop {

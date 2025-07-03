@@ -11,12 +11,11 @@ use quick_xml::events::Event;
 use std::collections::HashMap;
 
 pub fn parse_road(id: &Id, xml_document: &String) -> Result<Road, Error> {
-    let mut road = Road::new(id.clone());
-    // todo: road.space = parse_space(xml_document)?;
+    let space = parse_space(id, xml_document)?;
+    let mut road = Road::new(space);
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
@@ -49,7 +48,7 @@ pub fn parse_road(id: &Id, xml_document: &String) -> Result<Road, Error> {
             }
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }
@@ -58,12 +57,11 @@ pub fn parse_road(id: &Id, xml_document: &String) -> Result<Road, Error> {
 }
 
 pub fn parse_section(id: &Id, xml_document: &String) -> Result<Section, Error> {
-    let mut section = Section::new(id.clone());
-    // todo: section.space = parse_space(xml_document)?;
+    let space = parse_space(id, xml_document)?;
+    let mut section = Section::new(space);
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
@@ -99,7 +97,7 @@ pub fn parse_section(id: &Id, xml_document: &String) -> Result<Section, Error> {
             }
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }
@@ -108,12 +106,11 @@ pub fn parse_section(id: &Id, xml_document: &String) -> Result<Section, Error> {
 }
 
 pub fn parse_intersection(id: &Id, xml_document: &String) -> Result<Intersection, Error> {
-    let mut intersection = Intersection::new(id.clone());
-    // todo: intersection.space = parse_space(xml_document)?;
+    let space = parse_space(id, xml_document)?;
+    let mut intersection = Intersection::new(space);
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
@@ -149,7 +146,7 @@ pub fn parse_intersection(id: &Id, xml_document: &String) -> Result<Intersection
             }
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }
@@ -162,8 +159,7 @@ pub fn parse_traffic_space(id: &Id, xml_document: &String) -> Result<TrafficSpac
     let mut traffic_space = TrafficSpace::new(space);
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
@@ -187,7 +183,7 @@ pub fn parse_traffic_space(id: &Id, xml_document: &String) -> Result<TrafficSpac
             }
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }
@@ -203,8 +199,7 @@ pub fn parse_auxiliary_traffic_space(
     let mut auxiliary_traffic_space = AuxiliaryTrafficSpace::new(space);
 
     let mut reader = Reader::from_str(xml_document.as_str());
-    reader.config_mut().trim_text_start = true;
-    reader.config_mut().trim_text_end = true;
+    reader.config_mut().trim_text(true);
 
     let mut txt = Vec::new();
     let mut buf = Vec::new();
@@ -231,7 +226,7 @@ pub fn parse_auxiliary_traffic_space(
             }
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-            Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
+            Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
             _ => (),
         }
     }

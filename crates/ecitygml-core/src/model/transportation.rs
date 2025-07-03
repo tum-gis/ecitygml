@@ -1,24 +1,19 @@
-use crate::model::core::{CityObject, Space, ThematicSurface};
+use crate::model::core::{Space, ThematicSurface};
 use crate::operations::{CityObjectVisitor, FeatureWithGeometry, Visitable};
-use egml::model::base;
-use egml::model::base::Gml;
 use egml::model::geometry::Envelope;
 use nalgebra::Isometry3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Road {
-    pub city_object: CityObject, // TODO: space
+    pub space: Space,
     pub section: Vec<Section>,
     pub intersection: Vec<Intersection>,
 }
 
 impl Road {
-    pub fn new(id: base::Id) -> Self {
-        let gml = Gml::new(id);
-        let city_object = CityObject::new(gml);
-
+    pub fn new(space: Space) -> Self {
         Self {
-            city_object,
+            space,
             section: Default::default(),
             intersection: Default::default(),
         }
@@ -52,18 +47,15 @@ impl FeatureWithGeometry for Road {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Section {
-    pub city_object: CityObject, // TODO: space
+    pub space: Space,
     pub traffic_space: Vec<TrafficSpace>,
     pub auxiliary_traffic_space: Vec<AuxiliaryTrafficSpace>,
 }
 
 impl Section {
-    pub fn new(id: base::Id) -> Self {
-        let gml = Gml::new(id);
-        let city_object = CityObject::new(gml);
-
+    pub fn new(space: Space) -> Self {
         Self {
-            city_object,
+            space,
             traffic_space: Vec::new(),
             auxiliary_traffic_space: Vec::new(),
         }
@@ -101,18 +93,15 @@ impl FeatureWithGeometry for Section {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Intersection {
-    pub city_object: CityObject, // TODO: space
+    pub space: Space,
     pub traffic_space: Vec<TrafficSpace>,
     pub auxiliary_traffic_space: Vec<AuxiliaryTrafficSpace>,
 }
 
 impl Intersection {
-    pub fn new(id: base::Id) -> Self {
-        let gml = Gml::new(id);
-        let city_object = CityObject::new(gml);
-
+    pub fn new(space: Space) -> Self {
         Self {
-            city_object,
+            space,
             traffic_space: Vec::new(),
             auxiliary_traffic_space: Vec::new(),
         }

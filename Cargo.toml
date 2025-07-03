@@ -6,23 +6,23 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.0.1-alpha.5"
+version = "0.0.1-alpha.7"
 authors = ["Benedikt Schwab <benedikt.schwab@gmail.com>"]
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/envis-space/ecitygml"
 
 [workspace.dependencies]
-egml = { version = "0.0.1-alpha.5" }
+egml = { version = "0.0.1-alpha.7" }
 
 thiserror = "2.0.12"
-clap = "4.5.38"
+clap = "4.5.40"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 nalgebra = "0.33.2"
 serde = "1.0.219"
 serde_yaml = "0.9.34"
-quick-xml = "0.37.5"
+quick-xml = "0.38.0"
 itertools = "0.14.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
