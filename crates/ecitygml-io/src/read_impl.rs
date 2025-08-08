@@ -4,10 +4,10 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::HashMap;
 
-use crate::parser::attributes::extract_attributes;
 use crate::parser::building::parse_building;
 use crate::parser::space::parse_occupied_space;
 use crate::parser::transportation::parse_road;
+use crate::parser::util::extract_xml_element_attributes;
 use ecitygml_core::model::city_furniture::CityFurniture;
 use ecitygml_core::model::city_model::CitygmlModel;
 use ecitygml_core::model::solitary_vegetation_object::SolitaryVegetationObject;
@@ -32,7 +32,8 @@ pub fn read_from_file<R: Read + Seek>(reader: R) -> Result<CitygmlModel, Error> 
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
-                let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
+                let extracted_attributes: HashMap<String, String> =
+                    extract_xml_element_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
                     .and_then(|x| Id::try_from(x.as_str()).ok());

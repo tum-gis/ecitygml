@@ -1,6 +1,6 @@
 # ecitygml-core
 
-Core primitives and operations for processing [CityGML](https://www.ogc.org/standard/citygml/) data.
+Core primitives and operations for processing [CityGML](https://www.ogc.org/standards/citygml/) data.
 
 The library is at an early stage of development.
 

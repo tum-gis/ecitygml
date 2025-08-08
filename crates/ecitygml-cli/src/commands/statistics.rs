@@ -1,3 +1,4 @@
+use crate::error::Error;
 use ecitygml::io::{FILE_EXTENSION_CITYGML_GML_FORMAT, FILE_EXTENSION_CITYGML_XML_FORMAT};
 use ecitygml::model::building::{Building, BuildingConstructiveElement};
 use ecitygml::model::construction::{
@@ -10,11 +11,11 @@ use std::time::Instant;
 use tracing::info;
 use walkdir::WalkDir;
 
-pub fn run(path: impl AsRef<Path>) {
+pub fn run(path: impl AsRef<Path>) -> Result<(), Error> {
     info!("Creating statistics for: {}", path.as_ref().display());
 
     if path.as_ref().is_file() {
-        print_citygml_model_statistics(path);
+        print_citygml_model_statistics(path)?;
     } else if path.as_ref().is_dir() {
         for entry in WalkDir::new(path)
             .sort_by(|a, b| a.file_name().cmp(b.file_name()))
@@ -30,21 +31,18 @@ pub fn run(path: impl AsRef<Path>) {
         {
             info!("Start reading: {:?}", entry);
             let now = Instant::now();
-            let citygml_model = ecitygml::io::CitygmlReader::from_path(entry.into_path())
-                .unwrap()
-                .finish()
-                .unwrap();
+            let citygml_model =
+                ecitygml::io::CitygmlReader::from_path(entry.into_path())?.finish()?;
             info!("Read model in {:.3?}", now.elapsed());
         }
     }
+
+    Ok(())
 }
 
-fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
+fn print_citygml_model_statistics(file_path: impl AsRef<Path>) -> Result<(), Error> {
     let now = Instant::now();
-    let citygml_model = ecitygml::io::CitygmlReader::from_path(file_path)
-        .unwrap()
-        .finish()
-        .unwrap();
+    let citygml_model = ecitygml::io::CitygmlReader::from_path(file_path)?.finish()?;
     info!("Read model in {:.3?}", now.elapsed());
 
     info!(
@@ -74,7 +72,7 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
     if !wall_surfaces.is_empty() {
         print_statistics_thematic_surface(
             wall_surfaces.iter().map(|x| &x.thematic_surface).collect(),
-        );
+        )?;
     }
 
     let door_surfaces: Vec<&DoorSurface> = citygml_model
@@ -85,7 +83,7 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
         .collect();
     info!("Total DoorSurface: {}", door_surfaces.len());
     if !door_surfaces.is_empty() {
-        print_statistics_occupied_space(door_surfaces.iter().map(|x| &x.occupied_space).collect());
+        print_statistics_occupied_space(door_surfaces.iter().map(|x| &x.occupied_space).collect())?;
     }
 
     let window_surfaces: Vec<&WindowSurface> = citygml_model
@@ -98,7 +96,7 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
     if !window_surfaces.is_empty() {
         print_statistics_occupied_space(
             window_surfaces.iter().map(|x| &x.occupied_space).collect(),
-        );
+        )?;
     }
 
     let roof_surfaces: Vec<&RoofSurface> = citygml_model
@@ -110,7 +108,7 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
     if !roof_surfaces.is_empty() {
         print_statistics_thematic_surface(
             roof_surfaces.iter().map(|x| &x.thematic_surface).collect(),
-        );
+        )?;
     }
 
     let ground_surfaces: Vec<&GroundSurface> = citygml_model
@@ -125,7 +123,7 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
                 .iter()
                 .map(|x| &x.thematic_surface)
                 .collect(),
-        );
+        )?;
     }
 
     let building_constructive_elements: Vec<&BuildingConstructiveElement> = citygml_model
@@ -143,7 +141,7 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
                 .iter()
                 .map(|x| &x.occupied_space)
                 .collect(),
-        );
+        )?;
     }
 
     info!(
@@ -157,7 +155,7 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
                 .iter()
                 .map(|x| &x.occupied_space)
                 .collect(),
-        );
+        )?;
     }
 
     info!("Total Road: {}", citygml_model.road.len());
@@ -173,20 +171,13 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) {
                 .iter()
                 .map(|x| &x.occupied_space)
                 .collect(),
-        );
+        )?;
     }
 
-    /*info!("Offset city model");
-    let translation = nalgebra::Vector3::new(-678071.2478652871, -5403609.8367785765, -415.28);
-    let isometry = Isometry3::new(translation, Default::default());
-    citygml_model.apply_transform(&isometry);
-    info!(
-        "Number of city objects: {}",
-        citygml_model.number_of_objects()
-    );*/
+    Ok(())
 }
 
-fn print_statistics_occupied_space(occupied_space: Vec<&OccupiedSpace>) {
+fn print_statistics_occupied_space(occupied_space: Vec<&OccupiedSpace>) -> Result<(), Error> {
     info!(
         "\t- with lod1_implicit_representation: {}",
         occupied_space
@@ -209,10 +200,12 @@ fn print_statistics_occupied_space(occupied_space: Vec<&OccupiedSpace>) {
             .count()
     );
 
-    print_statistics_space(occupied_space.iter().map(|x| &x.space).collect());
+    print_statistics_space(occupied_space.iter().map(|x| &x.space).collect())?;
+
+    Ok(())
 }
 
-fn print_statistics_space(space: Vec<&Space>) {
+fn print_statistics_space(space: Vec<&Space>) -> Result<(), Error> {
     info!(
         "\t- with lod1_solid: {}",
         space.iter().filter(|x| x.lod1_solid.is_some()).count()
@@ -247,9 +240,11 @@ fn print_statistics_space(space: Vec<&Space>) {
             .filter(|x| x.lod3_multi_surface.is_some())
             .count()
     );
+
+    Ok(())
 }
 
-fn print_statistics_thematic_surface(thematic_surface: Vec<&ThematicSurface>) {
+fn print_statistics_thematic_surface(thematic_surface: Vec<&ThematicSurface>) -> Result<(), Error> {
     info!(
         "\t- with lod0_multi_surface: {}",
         thematic_surface
@@ -278,4 +273,6 @@ fn print_statistics_thematic_surface(thematic_surface: Vec<&ThematicSurface>) {
             .filter(|x| x.lod3_multi_surface.is_some())
             .count()
     );
+
+    Ok(())
 }

@@ -1,18 +1,15 @@
 use crate::error::Error;
 use egml::io::{parse_multi_surface, parse_solid};
-use egml::model::base::{Gml, Id};
+use egml::model::base::Id;
 
-use ecitygml_core::model::core::{
-    CityObject, ImplicitGeometry, OccupiedSpace, Space, ThematicSurface,
-};
+use crate::parser::city_object::parse_city_object;
+use ecitygml_core::model::core::{ImplicitGeometry, OccupiedSpace, Space, ThematicSurface};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use tracing::warn;
 
 pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
-    let mut gml = Gml::new(id.clone());
-    gml.name = vec!["name".to_string()]; // TODO
-    let city_object = CityObject::new(gml);
+    let city_object = parse_city_object(id, xml_document)?;
     let mut space = Space::new(city_object);
 
     let mut reader = Reader::from_str(xml_document.as_str());
@@ -177,9 +174,7 @@ pub fn parse_occupied_space(id: &Id, xml_document: &String) -> Result<OccupiedSp
 }
 
 pub fn parse_thematic_surface(id: &Id, xml_document: &String) -> Result<ThematicSurface, Error> {
-    let mut gml = Gml::new(id.clone());
-    gml.name = vec!["name".to_string()]; // TODO
-    let city_object = CityObject::new(gml);
+    let city_object = parse_city_object(id, xml_document)?;
     let mut thematic_surface = ThematicSurface::new(city_object);
 
     let mut reader = Reader::from_str(xml_document.as_str());

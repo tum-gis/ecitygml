@@ -15,4 +15,6 @@ pub enum Error {
     InvalidFileExtension(String),
     #[error("the data for key `{0}` is not available")]
     ElementNotFound(String),
+    #[error("attribute has no name: `{0}")]
+    AttributeWithoutName(String),
 }

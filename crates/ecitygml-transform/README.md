@@ -1,6 +1,6 @@
 # ecitygml-transform
 
-Supplementary operations for [CityGML](https://www.ogc.org/standard/citygml/) data.
+Supplementary operations for [CityGML](https://www.ogc.org/standards/citygml/) data.
 
 The library is at an early stage of development.
 

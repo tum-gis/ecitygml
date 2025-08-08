@@ -1,6 +1,6 @@
 # ecitygml-io
 
-IO operations for processing [CityGML](https://www.ogc.org/standard/citygml/) data.
+IO operations for processing [CityGML](https://www.ogc.org/standards/citygml/) data.
 
 The library is at an early stage of development.
 

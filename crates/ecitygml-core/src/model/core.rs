@@ -8,12 +8,15 @@ use nalgebra::Isometry3;
 #[derive(Debug, Clone, PartialEq)]
 pub struct CityObject {
     pub gml: Gml,
-    // TODO: generic_attributes: Vec<String>,
+    pub generic_attributes: Vec<GenericAttribute>,
 }
 
 impl CityObject {
-    pub fn new(gml: Gml) -> Self {
-        Self { gml }
+    pub fn new(gml: Gml, generic_attributes: Vec<GenericAttribute>) -> Self {
+        Self {
+            gml,
+            generic_attributes,
+        }
     }
 }
 
@@ -203,5 +206,82 @@ impl FeatureWithGeometry for ThematicSurface {
         if let Some(g) = &mut self.lod3_multi_surface {
             g.apply_transform(m);
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct StringAttribute {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct IntAttribute {
+    pub name: String,
+    pub value: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct DoubleAttribute {
+    pub name: String,
+    pub value: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GenericAttribute {
+    String(StringAttribute),
+    Int(IntAttribute),
+    Double(DoubleAttribute),
+}
+
+impl GenericAttribute {
+    pub fn name(&self) -> &str {
+        match self {
+            GenericAttribute::String(attr) => &attr.name,
+            GenericAttribute::Int(attr) => &attr.name,
+            GenericAttribute::Double(attr) => &attr.name,
+        }
+    }
+
+    pub fn as_string(&self) -> Option<&StringAttribute> {
+        if let GenericAttribute::String(attr) = self {
+            Some(attr)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_int(&self) -> Option<&IntAttribute> {
+        if let GenericAttribute::Int(attr) = self {
+            Some(attr)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_double(&self) -> Option<&DoubleAttribute> {
+        if let GenericAttribute::Double(attr) = self {
+            Some(attr)
+        } else {
+            None
+        }
+    }
+}
+
+impl From<StringAttribute> for GenericAttribute {
+    fn from(attr: StringAttribute) -> Self {
+        GenericAttribute::String(attr)
+    }
+}
+
+impl From<IntAttribute> for GenericAttribute {
+    fn from(attr: IntAttribute) -> Self {
+        GenericAttribute::Int(attr)
+    }
+}
+
+impl From<DoubleAttribute> for GenericAttribute {
+    fn from(attr: DoubleAttribute) -> Self {
+        GenericAttribute::Double(attr)
     }
 }

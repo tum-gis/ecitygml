@@ -1,15 +1,19 @@
+use crate::error::Error;
 use ecitygml::io::CitygmlReader;
 use std::fs;
 use std::path::Path;
 use tracing::info;
 
-pub fn run(file_path: impl AsRef<Path>, output_directory_path: impl AsRef<Path>) {
+pub fn run(
+    file_path: impl AsRef<Path>,
+    output_directory_path: impl AsRef<Path>,
+) -> Result<(), Error> {
     info!("Start validation");
 
-    let reader = CitygmlReader::from_path(file_path).expect("TODO: panic message");
-    let report = reader.validate().unwrap();
+    let reader = CitygmlReader::from_path(file_path)?;
+    let report = reader.validate()?;
 
-    fs::create_dir_all(&output_directory_path).unwrap();
+    fs::create_dir_all(&output_directory_path)?;
     let path = output_directory_path
         .as_ref()
         .to_owned()
@@ -49,4 +53,6 @@ pub fn run(file_path: impl AsRef<Path>, output_directory_path: impl AsRef<Path>)
             r.0, r.1.with_gml_id_count, r.1.without_gml_id_count
         );
     }*/
+
+    Ok(())
 }

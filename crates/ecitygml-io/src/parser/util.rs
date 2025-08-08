@@ -2,7 +2,10 @@ use quick_xml::Reader;
 use quick_xml::events::BytesStart;
 use std::collections::HashMap;
 
-pub fn extract_attributes(reader: &Reader<&[u8]>, e: &BytesStart) -> HashMap<String, String> {
+pub fn extract_xml_element_attributes(
+    reader: &Reader<&[u8]>,
+    e: &BytesStart,
+) -> HashMap<String, String> {
     let extracted_attributes: HashMap<String, String> = e
         .attributes()
         .map(|attr_res| match attr_res {

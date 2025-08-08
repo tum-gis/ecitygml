@@ -1,6 +1,6 @@
 use crate::Error;
-use crate::parser::attributes::extract_attributes;
 use crate::parser::space::{parse_space, parse_thematic_surface};
+use crate::parser::util::extract_xml_element_attributes;
 use ecitygml_core::model::transportation::{
     AuxiliaryTrafficArea, AuxiliaryTrafficSpace, Intersection, Road, Section, TrafficArea,
     TrafficSpace,
@@ -23,7 +23,8 @@ pub fn parse_road(id: &Id, xml_document: &String) -> Result<Road, Error> {
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
-                let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
+                let extracted_attributes: HashMap<String, String> =
+                    extract_xml_element_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
                     .and_then(|x| Id::try_from(x.as_str()).ok());
@@ -69,7 +70,8 @@ pub fn parse_section(id: &Id, xml_document: &String) -> Result<Section, Error> {
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
-                let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
+                let extracted_attributes: HashMap<String, String> =
+                    extract_xml_element_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
                     .and_then(|x| Id::try_from(x.as_str()).ok());
@@ -118,7 +120,8 @@ pub fn parse_intersection(id: &Id, xml_document: &String) -> Result<Intersection
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
-                let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
+                let extracted_attributes: HashMap<String, String> =
+                    extract_xml_element_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
                     .and_then(|x| Id::try_from(x.as_str()).ok());
@@ -167,7 +170,8 @@ pub fn parse_traffic_space(id: &Id, xml_document: &String) -> Result<TrafficSpac
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
-                let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
+                let extracted_attributes: HashMap<String, String> =
+                    extract_xml_element_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
                     .and_then(|x| Id::try_from(x.as_str()).ok());
@@ -207,7 +211,8 @@ pub fn parse_auxiliary_traffic_space(
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => {
-                let extracted_attributes: HashMap<String, String> = extract_attributes(&reader, &e);
+                let extracted_attributes: HashMap<String, String> =
+                    extract_xml_element_attributes(&reader, &e);
                 let id: Option<Id> = extracted_attributes
                     .get("id")
                     .and_then(|x| Id::try_from(x.as_str()).ok());

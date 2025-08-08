@@ -1,6 +1,6 @@
 # ecitygml-cli
 
-CLI tool for processing [CityGML](https://www.ogc.org/standard/citygml/) data.
+CLI tool for processing [CityGML](https://www.ogc.org/standards/citygml/) data.
 
 The library is at an early stage of development.
 
