@@ -40,81 +40,81 @@ fn contains_thematic_surface(
     filter_envelope: &Envelope,
     thematic_surface: &ThematicSurface,
 ) -> bool {
-    if let Some(g) = &thematic_surface.lod0_multi_surface {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &thematic_surface.lod0_multi_surface
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
-    if let Some(g) = &thematic_surface.lod1_multi_surface {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &thematic_surface.lod1_multi_surface
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
-    if let Some(g) = &thematic_surface.lod2_multi_surface {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &thematic_surface.lod2_multi_surface
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
-    if let Some(g) = &thematic_surface.lod3_multi_surface {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &thematic_surface.lod3_multi_surface
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
 
     false
 }
 
 fn contains_occupied_space(filter_envelope: &Envelope, occupied_space: &OccupiedSpace) -> bool {
-    if let Some(g) = &occupied_space.lod1_implicit_representation {
-        if filter_envelope.contains(&g.reference_point) {
-            return true;
-        }
+    if let Some(g) = &occupied_space.lod1_implicit_representation
+        && filter_envelope.contains(&g.reference_point)
+    {
+        return true;
     }
-    if let Some(g) = &occupied_space.lod2_implicit_representation {
-        if filter_envelope.contains(&g.reference_point) {
-            return true;
-        }
+    if let Some(g) = &occupied_space.lod2_implicit_representation
+        && filter_envelope.contains(&g.reference_point)
+    {
+        return true;
     }
-    if let Some(g) = &occupied_space.lod3_implicit_representation {
-        if filter_envelope.contains(&g.reference_point) {
-            return true;
-        }
+    if let Some(g) = &occupied_space.lod3_implicit_representation
+        && filter_envelope.contains(&g.reference_point)
+    {
+        return true;
     }
 
     contains_space(filter_envelope, &occupied_space.space)
 }
 
 fn contains_space(filter_envelope: &Envelope, space: &Space) -> bool {
-    if let Some(g) = &space.lod1_solid {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &space.lod1_solid
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
-    if let Some(g) = &space.lod2_solid {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &space.lod2_solid
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
-    if let Some(g) = &space.lod3_solid {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &space.lod3_solid
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
 
-    if let Some(g) = &space.lod0_multi_surface {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &space.lod0_multi_surface
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
-    if let Some(g) = &space.lod2_multi_surface {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &space.lod2_multi_surface
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
-    if let Some(g) = &space.lod3_multi_surface {
-        if filter_envelope.contains_envelope_partially(&g.envelope()) {
-            return true;
-        }
+    if let Some(g) = &space.lod3_multi_surface
+        && filter_envelope.contains_envelope_partially(&g.envelope())
+    {
+        return true;
     }
 
     false

@@ -1,4 +1,4 @@
-use strum_macros::EnumIter;
+use strum_macros::{Display, EnumIter};
 
 #[derive(Debug, Copy, Hash, Eq, Clone, PartialEq, EnumIter)]
 pub enum LevelOfDetail {
@@ -8,7 +8,7 @@ pub enum LevelOfDetail {
     Three,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Display)]
 pub enum CityObjectClass {
     AuxiliaryTrafficArea,
     AuxiliaryTrafficSpace,

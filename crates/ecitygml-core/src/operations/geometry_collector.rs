@@ -167,7 +167,7 @@ impl CityObjectVisitor for GeometryCollector {
 
     fn visit_ground_surface(&mut self, v: &GroundSurface) -> Self::Result {
         let city_object_geometry_collection = CityObjectGeometryCollection::from_thematic_surface(
-            CityObjectClass::WallSurface,
+            CityObjectClass::GroundSurface,
             &v.thematic_surface,
         );
         self.city_objects.insert(
