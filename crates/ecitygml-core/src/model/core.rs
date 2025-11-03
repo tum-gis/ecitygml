@@ -1,5 +1,5 @@
 use crate::operations::FeatureWithGeometry;
-use egml::model::base::Gml;
+use egml::model::base::AbstractGml;
 use egml::model::geometry;
 use egml::model::geometry::{DirectPosition, Envelope};
 use egml::operations::geometry::Geometry;
@@ -7,14 +7,14 @@ use nalgebra::Isometry3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CityObject {
-    pub gml: Gml,
+    pub abstract_gml: AbstractGml,
     pub generic_attributes: Vec<GenericAttribute>,
 }
 
 impl CityObject {
-    pub fn new(gml: Gml, generic_attributes: Vec<GenericAttribute>) -> Self {
+    pub fn new(abstract_gml: AbstractGml, generic_attributes: Vec<GenericAttribute>) -> Self {
         Self {
-            gml,
+            abstract_gml,
             generic_attributes,
         }
     }

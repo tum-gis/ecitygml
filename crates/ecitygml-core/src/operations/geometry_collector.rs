@@ -12,13 +12,13 @@ use crate::model::transportation::{
     TrafficSpace,
 };
 use crate::operations::CityObjectVisitor;
-use egml::model::base::{Gml, Id};
+use egml::model::base::{AbstractGml, Id};
 use egml::model::geometry::{MultiSurface, Solid};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CityObjectGeometryCollection {
-    pub gml: Gml,
+    pub abstract_gml: AbstractGml,
     pub class: CityObjectClass,
     pub implicit_geometries: HashMap<LevelOfDetail, ImplicitGeometry>,
     pub multi_surfaces: HashMap<LevelOfDetail, MultiSurface>,
@@ -50,7 +50,7 @@ impl CityObjectGeometryCollection {
         }
 
         Self {
-            gml: space.city_object.gml.clone(),
+            abstract_gml: space.city_object.abstract_gml.clone(),
             class,
             implicit_geometries: HashMap::new(),
             multi_surfaces,
@@ -100,7 +100,7 @@ impl CityObjectGeometryCollection {
         }
 
         Self {
-            gml: thematic_surface.city_object.gml.clone(),
+            abstract_gml: thematic_surface.city_object.abstract_gml.clone(),
             class,
             implicit_geometries: HashMap::new(),
             multi_surfaces,
@@ -133,7 +133,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.occupied_space,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -149,7 +149,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.occupied_space,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -160,7 +160,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.thematic_surface,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -171,7 +171,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.thematic_surface,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -182,7 +182,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.thematic_surface,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -193,7 +193,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.occupied_space,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -204,7 +204,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.occupied_space,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -215,7 +215,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.occupied_space,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -230,7 +230,7 @@ impl CityObjectVisitor for GeometryCollector {
         let city_object_geometry_collection =
             CityObjectGeometryCollection::from_space(CityObjectClass::TrafficSpace, &v.space);
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -241,7 +241,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.space,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -252,7 +252,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.thematic_surface,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }
@@ -263,7 +263,7 @@ impl CityObjectVisitor for GeometryCollector {
             &v.thematic_surface,
         );
         self.city_objects.insert(
-            city_object_geometry_collection.gml.id.clone(),
+            city_object_geometry_collection.abstract_gml.id.clone(),
             city_object_geometry_collection,
         );
     }

@@ -21,7 +21,7 @@
 //! for current_building in citygml_model.building {
 //!     println!(
 //!         "GML ID of the current building: {}",
-//!         current_building.occupied_space.space.city_object.gml.id
+//!         current_building.occupied_space.space.city_object.abstract_gml.id
 //!     );
 //! }
 //! ```

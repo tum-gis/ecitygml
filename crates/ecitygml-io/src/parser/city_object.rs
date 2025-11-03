@@ -1,14 +1,14 @@
 use crate::Error;
 use crate::parser::attribute::parse_generic_attribute;
 use ecitygml_core::model::core::CityObject;
-use egml::model::base::{Gml, Id};
+use egml::io::parse_abstract_gml;
+use egml::model::base::Id;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
 pub fn parse_city_object(id: &Id, xml_document: &String) -> Result<CityObject, Error> {
-    let mut gml = Gml::new(id.clone());
-    gml.name = vec!["name".to_string()]; // TODO
-    let mut city_object = CityObject::new(gml, Vec::new());
+    let abstract_gml = parse_abstract_gml(xml_document, id.clone())?;
+    let mut city_object = CityObject::new(abstract_gml, Vec::new());
 
     let mut reader = Reader::from_str(xml_document.as_str());
     reader.config_mut().trim_text(true);
@@ -20,14 +20,14 @@ pub fn parse_city_object(id: &Id, xml_document: &String) -> Result<CityObject, E
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => match e.name().as_ref() {
                 b"genericAttribute" => {
-                    let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
                     let generic_attribute = parse_generic_attribute(&xml_snippet).ok();
                     if let Some(generic_attribute) = generic_attribute {
                         city_object.generic_attributes.push(generic_attribute);
                     }
                 }
                 _ => {
-                    reader.read_to_end(e.name()).unwrap();
+                    reader.read_to_end(e.name())?;
                 }
             },
             Ok(Event::Eof) => break,
@@ -65,7 +65,7 @@ mod tests {
 
         let city_object = parse_city_object(&id, &xml_document).expect("should work");
 
-        assert_eq!(city_object.gml.id, id);
+        assert_eq!(city_object.abstract_gml.id, id);
         assert_eq!(city_object.generic_attributes.len(), 2);
     }
 
@@ -97,8 +97,8 @@ mod tests {
 
         let city_object = parse_city_object(&id, &xml_document).expect("should work");
 
-        assert_eq!(city_object.gml.id, id);
-        assert_eq!(city_object.gml.name, vec!["name".to_string()]);
+        assert_eq!(city_object.abstract_gml.id, id);
+        assert!(city_object.abstract_gml.name.is_empty());
         assert_eq!(city_object.generic_attributes.len(), 3);
     }
 }

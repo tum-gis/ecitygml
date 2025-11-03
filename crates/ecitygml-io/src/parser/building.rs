@@ -31,7 +31,7 @@ pub fn parse_building(id: &Id, xml_document: &String) -> Result<Building, Error>
 
                 match e.name().as_ref() {
                     b"con:GroundSurface" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let thematic_surface = parse_thematic_surface(&id, &xml_snippet)?;
@@ -40,7 +40,7 @@ pub fn parse_building(id: &Id, xml_document: &String) -> Result<Building, Error>
                         building.ground_surface.push(ground_surface);
                     }
                     b"bldg:BuildingConstructiveElement" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let thematic_surface = parse_occupied_space(&id, &xml_snippet)?;
@@ -52,7 +52,7 @@ pub fn parse_building(id: &Id, xml_document: &String) -> Result<Building, Error>
                             .push(building_constructive_element);
                     }
                     b"con:RoofSurface" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let thematic_surface = parse_thematic_surface(&id, &xml_snippet)?;
@@ -61,7 +61,7 @@ pub fn parse_building(id: &Id, xml_document: &String) -> Result<Building, Error>
                         building.roof_surface.push(roof_surface);
                     }
                     b"con:WallSurface" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let wall_surface = parse_wall_surface(&id, &xml_snippet)?;
@@ -101,7 +101,7 @@ pub fn parse_wall_surface(id: &Id, xml_document: &String) -> Result<WallSurface,
 
                 match e.name().as_ref() {
                     b"con:DoorSurface" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let occupied_space = parse_occupied_space(&id, &xml_snippet)?;
@@ -110,7 +110,7 @@ pub fn parse_wall_surface(id: &Id, xml_document: &String) -> Result<WallSurface,
                         wall_surface.door_surface.push(door_surface);
                     }
                     b"con:WindowSurface" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let occupied_space = parse_occupied_space(&id, &xml_snippet)?;

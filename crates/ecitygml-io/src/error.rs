@@ -5,7 +5,11 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
+    QuickXmlError(#[from] quick_xml::Error),
+    #[error(transparent)]
     QuickXmlDeError(#[from] quick_xml::DeError),
+    #[error(transparent)]
+    QuickXmlSeError(#[from] quick_xml::SeError),
     #[error(transparent)]
     GmlIoError(#[from] egml::io::Error),
 
