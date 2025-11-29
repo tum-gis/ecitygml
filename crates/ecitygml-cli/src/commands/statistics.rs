@@ -50,17 +50,18 @@ fn print_citygml_model_statistics(file_path: impl AsRef<Path>) -> Result<(), Err
         citygml_model.number_of_objects()
     );
 
-    let envelope = citygml_model.envelope().unwrap();
-    info!(
-        "Envelope: lower corner{}, upper corner {}\n",
-        envelope.lower_corner(),
-        envelope.upper_corner()
-    );
+    if let Some(envelope) = citygml_model.envelope() {
+        info!(
+            "Envelope: lower corner{}, upper corner {}\n",
+            envelope.lower_corner(),
+            envelope.upper_corner()
+        );
+    }
 
     let buildings: Vec<&Building> = citygml_model.building.iter().collect();
     info!("Total Building: {}", citygml_model.building.len());
     if !buildings.is_empty() {
-        print_statistics_occupied_space(buildings.iter().map(|x| &x.occupied_space).collect());
+        print_statistics_occupied_space(buildings.iter().map(|x| &x.occupied_space).collect())?;
     }
 
     let wall_surfaces: Vec<&WallSurface> = citygml_model

@@ -4,15 +4,6 @@ use ecitygml_core::model;
 use quick_xml::de;
 use serde::{Deserialize, Serialize};
 
-pub fn parse_generic_string_attribute(
-    xml_document: &String,
-) -> Result<model::core::StringAttribute, Error> {
-    let parsed_attribute: StringAttribute = de::from_str(xml_document)?;
-    let attribute = model::core::StringAttribute::try_from(parsed_attribute)?;
-
-    Ok(attribute)
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 struct StringAttribute {
     pub name: String,
@@ -34,15 +25,6 @@ impl TryFrom<StringAttribute> for model::core::StringAttribute {
     }
 }
 
-pub fn parse_generic_int_attribute(
-    xml_document: &String,
-) -> Result<model::core::IntAttribute, Error> {
-    let parsed_attribute: IntAttribute = de::from_str(xml_document)?;
-    let attribute = model::core::IntAttribute::try_from(parsed_attribute)?;
-
-    Ok(attribute)
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 struct IntAttribute {
     pub name: String,
@@ -62,15 +44,6 @@ impl TryFrom<IntAttribute> for model::core::IntAttribute {
             value: value.value,
         })
     }
-}
-
-pub fn parse_generic_double_attribute(
-    xml_document: &String,
-) -> Result<model::core::DoubleAttribute, Error> {
-    let parsed_attribute: DoubleAttribute = de::from_str(xml_document)?;
-    let attribute = model::core::DoubleAttribute::try_from(parsed_attribute)?;
-
-    Ok(attribute)
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -166,10 +139,15 @@ mod tests {
         </gen:StringAttribute>",
         );
 
-        let string_attribute = parse_generic_string_attribute(&xml_document).expect("should work");
+        let generic_attribute = parse_generic_attribute(&xml_document).expect("should work");
 
-        assert_eq!(string_attribute.name, "attribute_name");
-        assert_eq!(string_attribute.value, "1100");
+        match generic_attribute {
+            model::core::GenericAttribute::String(x) => {
+                assert_eq!(x.name, "attribute_name");
+                assert_eq!(x.value, "1100");
+            }
+            other => panic!("Expected Double attribute, got {:?}", other),
+        }
     }
 
     #[test]
@@ -181,24 +159,34 @@ mod tests {
         </gen:IntAttribute>",
         );
 
-        let int_attribute = parse_generic_int_attribute(&xml_document).expect("should work");
+        let generic_attribute = parse_generic_attribute(&xml_document).expect("should work");
 
-        assert_eq!(int_attribute.name, "attribute_name");
-        assert_eq!(int_attribute.value, 1100);
+        match generic_attribute {
+            model::core::GenericAttribute::Int(x) => {
+                assert_eq!(x.name, "attribute_name");
+                assert_eq!(x.value, 1100);
+            }
+            other => panic!("Expected Double attribute, got {:?}", other),
+        }
     }
 
     #[test]
     fn test_parse_double_attribute_basic() {
         let xml_document = String::from(
-            "<gen:IntAttribute>
+            "<gen:DoubleAttribute>
           <gen:name>attribute_name</gen:name>
           <gen:value>42.2</gen:value>
-        </gen:IntAttribute>",
+        </gen:DoubleAttribute>",
         );
 
-        let double_attribute = parse_generic_double_attribute(&xml_document).expect("should work");
+        let generic_attribute = parse_generic_attribute(&xml_document).expect("should work");
 
-        assert_eq!(double_attribute.name, "attribute_name");
-        assert_eq!(double_attribute.value, 42.2);
+        match generic_attribute {
+            model::core::GenericAttribute::Double(x) => {
+                assert_eq!(x.name, "attribute_name");
+                assert_eq!(x.value, 42.2);
+            }
+            other => panic!("Expected Double attribute, got {:?}", other),
+        }
     }
 }

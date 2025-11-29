@@ -20,7 +20,7 @@ pub fn parse_city_object(id: &Id, xml_document: &String) -> Result<CityObject, E
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => match e.name().as_ref() {
                 b"genericAttribute" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     let generic_attribute = parse_generic_attribute(&xml_snippet).ok();
                     if let Some(generic_attribute) = generic_attribute {
                         city_object.generic_attributes.push(generic_attribute);

@@ -22,7 +22,7 @@ pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => match e.name().as_ref() {
                 b"lod1Solid" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     space.lod1_solid = parse_solid(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -34,7 +34,7 @@ pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
                         .ok();
                 }
                 b"lod2Solid" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     space.lod2_solid = parse_solid(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -46,7 +46,7 @@ pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
                         .ok();
                 }
                 b"lod3Solid" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     space.lod3_solid = parse_solid(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -58,7 +58,7 @@ pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
                         .ok();
                 }
                 b"lod0MultiSurface" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     space.lod0_multi_surface = parse_multi_surface(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -70,7 +70,7 @@ pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
                         .ok();
                 }
                 b"lod2MultiSurface" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     space.lod2_multi_surface = parse_multi_surface(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -82,7 +82,7 @@ pub fn parse_space(id: &Id, xml_document: &String) -> Result<Space, Error> {
                         .ok();
                 }
                 b"lod3MultiSurface" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     space.lod3_multi_surface = parse_multi_surface(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -121,7 +121,7 @@ pub fn parse_occupied_space(id: &Id, xml_document: &String) -> Result<OccupiedSp
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => match e.name().as_ref() {
                 b"lod1ImplicitRepresentation" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     occupied_space.lod1_implicit_representation =
                         parse_implicit_geometry(&xml_snippet)
                             .map_err(|e| {
@@ -134,7 +134,7 @@ pub fn parse_occupied_space(id: &Id, xml_document: &String) -> Result<OccupiedSp
                             .ok();
                 }
                 b"lod2ImplicitRepresentation" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     occupied_space.lod2_implicit_representation =
                         parse_implicit_geometry(&xml_snippet)
                             .map_err(|e| {
@@ -147,7 +147,7 @@ pub fn parse_occupied_space(id: &Id, xml_document: &String) -> Result<OccupiedSp
                             .ok();
                 }
                 b"lod3ImplicitRepresentation" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     occupied_space.lod3_implicit_representation =
                         parse_implicit_geometry(&xml_snippet)
                             .map_err(|e| {
@@ -187,7 +187,7 @@ pub fn parse_thematic_surface(id: &Id, xml_document: &String) -> Result<Thematic
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) => match e.name().as_ref() {
                 b"lod0MultiSurface" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     thematic_surface.lod0_multi_surface = parse_multi_surface(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -199,7 +199,7 @@ pub fn parse_thematic_surface(id: &Id, xml_document: &String) -> Result<Thematic
                         .ok();
                 }
                 b"lod1MultiSurface" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     thematic_surface.lod1_multi_surface = parse_multi_surface(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -211,7 +211,7 @@ pub fn parse_thematic_surface(id: &Id, xml_document: &String) -> Result<Thematic
                         .ok();
                 }
                 b"lod2MultiSurface" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     thematic_surface.lod2_multi_surface = parse_multi_surface(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -223,7 +223,7 @@ pub fn parse_thematic_surface(id: &Id, xml_document: &String) -> Result<Thematic
                         .ok();
                 }
                 b"lod3MultiSurface" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     thematic_surface.lod3_multi_surface = parse_multi_surface(&xml_snippet)
                         .map_err(|e| {
                             warn!(
@@ -257,15 +257,13 @@ pub fn parse_implicit_geometry(xml_document: &String) -> Result<ImplicitGeometry
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => match e.name().as_ref() {
-                b"referencePoint" => {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
-                    implicit_geometry.reference_point = egml::io::parse_point(&xml_snippet)?;
+            Ok(Event::Start(e)) => {
+                if e.name().as_ref() == b"referencePoint" {
+                    let xml_snippet = reader.read_text(e.name())?.into_owned();
+                    implicit_geometry.reference_point =
+                        egml::io::parse_point(xml_snippet.as_bytes())?;
                 }
-                _ => {
-                    reader.read_to_end(e.name())?;
-                }
-            },
+            }
             Ok(Event::Eof) => break,
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
             Ok(Event::Text(e)) => txt.push(e.decode().unwrap().into_owned()),
@@ -274,4 +272,28 @@ pub fn parse_implicit_geometry(xml_document: &String) -> Result<ImplicitGeometry
     }
 
     Ok(implicit_geometry)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_implicit_geometry_basic() {
+        let xml_document = String::from(
+            "<ImplicitGeometry>
+    <transformationMatrix>-0.5894514707536183 -0.8078037903020735 0.0 0.0 0.8078037903020735 -0.5894514707536183 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0</transformationMatrix>
+    <referencePoint>
+        <gml:Point>
+            <gml:pos srsDimension=\"3\">678298.3706294019 5403791.857383491 366.9430094360463</gml:pos>
+        </gml:Point>
+    </referencePoint>
+</ImplicitGeometry>");
+
+        let generic_attribute = parse_implicit_geometry(&xml_document).expect("should work");
+
+        assert_eq!(generic_attribute.reference_point.x(), 678298.3706294019);
+        assert_eq!(generic_attribute.reference_point.y(), 5403791.857383491);
+        assert_eq!(generic_attribute.reference_point.z(), 366.9430094360463);
+    }
 }

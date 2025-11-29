@@ -20,13 +20,11 @@ extern crate serde;
 pub fn read_from_file<R: Read + Seek>(reader: R) -> Result<CitygmlModel, Error> {
     let mut citygml_model = CitygmlModel::default();
 
-    // TODO: improve
     let mut file_content: String = Default::default();
     BufReader::new(reader).read_to_string(&mut file_content)?;
     let mut reader = Reader::from_str(file_content.as_str());
     reader.config_mut().trim_text(true);
 
-    let _count = 0;
     let mut txt = Vec::new();
     let mut buf = Vec::new();
     loop {
@@ -40,31 +38,31 @@ pub fn read_from_file<R: Read + Seek>(reader: R) -> Result<CitygmlModel, Error> 
 
                 match e.name().as_ref() {
                     b"bldg:Building" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
-                        let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
+                        let id: Id = id.unwrap_or(Id::from_hashed_bytes(&xml_snippet));
 
                         let building = parse_building(&id, &xml_snippet)?;
 
                         citygml_model.building.push(building);
                     }
                     b"frn:CityFurniture" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
-                        let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
+                        let id: Id = id.unwrap_or(Id::from_hashed_bytes(&xml_snippet));
 
                         let occupied_space = parse_occupied_space(&id, &xml_snippet)?;
                         let city_furniture = CityFurniture::new(occupied_space);
                         citygml_model.city_furniture.push(city_furniture);
                     }
                     b"tran:Road" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
-                        let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
+                        let id: Id = id.unwrap_or(Id::from_hashed_bytes(&xml_snippet));
 
                         let road = parse_road(&id, &xml_snippet)?;
                         citygml_model.road.push(road);
                     }
                     b"veg:SolitaryVegetationObject" => {
-                        let xml_snippet: String = reader.read_text(e.name()).unwrap().to_string();
-                        let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
+                        let id: Id = id.unwrap_or(Id::from_hashed_bytes(&xml_snippet));
 
                         let occupied_space = parse_occupied_space(&id, &xml_snippet)?;
                         let solitary_vegetation_object =

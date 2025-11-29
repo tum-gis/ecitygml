@@ -31,14 +31,14 @@ pub fn parse_road(id: &Id, xml_document: &String) -> Result<Road, Error> {
 
                 match e.name().as_ref() {
                     b"tran:Section" => {
-                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let section = parse_section(&id, &xml_snippet)?;
                         road.section.push(section);
                     }
                     b"tran:Intersection" => {
-                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let intersection = parse_intersection(&id, &xml_snippet)?;
@@ -78,14 +78,14 @@ pub fn parse_section(id: &Id, xml_document: &String) -> Result<Section, Error> {
 
                 match e.name().as_ref() {
                     b"tran:TrafficSpace" => {
-                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let traffic_space = parse_traffic_space(&id, &xml_snippet)?;
                         section.traffic_space.push(traffic_space);
                     }
                     b"tran:AuxiliaryTrafficSpace" => {
-                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let auxiliary_traffic_space =
@@ -128,14 +128,14 @@ pub fn parse_intersection(id: &Id, xml_document: &String) -> Result<Intersection
 
                 match e.name().as_ref() {
                     b"tran:TrafficSpace" => {
-                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let traffic_space = parse_traffic_space(&id, &xml_snippet)?;
                         intersection.traffic_space.push(traffic_space);
                     }
                     b"tran:AuxiliaryTrafficSpace" => {
-                        let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                        let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                         let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                         let auxiliary_traffic_space =
@@ -177,7 +177,7 @@ pub fn parse_traffic_space(id: &Id, xml_document: &String) -> Result<TrafficSpac
                     .and_then(|x| Id::try_from(x.as_str()).ok());
 
                 if e.name().as_ref() == b"tran:TrafficArea" {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                     let thematic_surface = parse_thematic_surface(&id, &xml_snippet)?;
@@ -218,7 +218,7 @@ pub fn parse_auxiliary_traffic_space(
                     .and_then(|x| Id::try_from(x.as_str()).ok());
 
                 if e.name().as_ref() == b"tran:AuxiliaryTrafficArea" {
-                    let xml_snippet: String = reader.read_text(e.name())?.to_string();
+                    let xml_snippet: String = reader.read_text(e.name())?.into_owned();
                     let id: Id = id.unwrap_or(Id::from_hashed_string(&xml_snippet));
 
                     let thematic_surface = parse_thematic_surface(&id, &xml_snippet)?;
