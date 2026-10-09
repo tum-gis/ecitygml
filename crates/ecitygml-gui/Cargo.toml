@@ -12,8 +12,8 @@ name = "ecitygml-gui"
 path = "src/main.rs"
 
 [dependencies]
-ecitygml = { version = "0.0.2-alpha.5", path = "../ecitygml" }
-ecitygml-core = { version = "0.0.2-alpha.5", path = "../ecitygml-core" }
+ecitygml = { version = "0.0.2-alpha.6", path = "../ecitygml" }
+ecitygml-core = { version = "0.0.2-alpha.6", path = "../ecitygml-core" }
 egml = { workspace = true }
 
 thiserror = { workspace = true }
@@ -24,3 +24,5 @@ bvh = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 nalgebra = { workspace = true }
+chrono = { workspace = true }
+image = { workspace = true }

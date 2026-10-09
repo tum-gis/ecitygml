@@ -1,27 +1,22 @@
 use crate::Error;
 use crate::gml::codec::core::serialize_city_model;
 use ecitygml_core::model::core::CityModel;
-use egml::io::util::Formatting;
-use quick_xml::events::{BytesDecl, Event};
+use egml::io::util::{ChunkedSink, Formatting, XmlFragmentWriter};
 use std::io::Write;
 
-pub fn serialize<W: Write>(
+pub fn serialize<W: Write + Sync>(
     writer: &mut W,
-    city_model: CityModel,
+    city_model: &CityModel,
     formatting: Formatting,
 ) -> Result<(), Error> {
-    let mut xml_writer = quick_xml::Writer::new(writer);
+    let mut xml_fragment_writer = XmlFragmentWriter::<ChunkedSink>::new_chunked(formatting);
 
-    xml_writer.write_event(Event::Decl(BytesDecl::new(
-        "1.0",
-        Some("UTF-8"),
-        Some("yes"),
-    )))?;
-    if formatting != Formatting::Compact {
-        xml_writer.get_mut().write_all(b"\n")?;
-    }
+    xml_fragment_writer
+        .write_leaf_bytes(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#)?;
 
-    serialize_city_model(&mut xml_writer, city_model, formatting)?;
+    serialize_city_model(city_model, &mut xml_fragment_writer)?;
+
+    xml_fragment_writer.write_to(writer)?;
 
     Ok(())
 }

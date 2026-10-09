@@ -1,0 +1,30 @@
+namespace Envis.Ecitygml;
+
+public enum GeometryType : int
+{
+    Point = 0,
+    LineString = 1,
+    Curve = 2,
+    OrientableCurve = 3,
+    LinearRing = 4,
+    Ring = 5,
+    Polygon = 6,
+    Surface = 7,
+    OrientableSurface = 8,
+    PolyhedralSurface = 9,
+    TriangulatedSurface = 10,
+    Tin = 11,
+    Shell = 12,
+    Solid = 13,
+    MultiGeometry = 14,
+    MultiPoint = 15,
+    MultiCurve = 16,
+    MultiSurface = 17,
+    MultiSolid = 18,
+    GeometricComplex = 19,
+    CompositeCurve = 20,
+    CompositeSurface = 21,
+    CompositeSolid = 22,
+    Grid = 23,
+    RectifiedGrid = 24,
+}

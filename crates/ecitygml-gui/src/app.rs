@@ -6,6 +6,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 
+/// Outcome of the most recent screenshot save attempt, shown in the toolbar.
+pub enum ScreenshotStatus {
+    Saved(PathBuf),
+    Error(String),
+}
+
 pub enum LoadResult {
     Ok(CityModelGraphicsStore),
     Err(String),
@@ -20,15 +26,36 @@ pub enum LoadState {
     Error(String),
 }
 
-#[derive(Default)]
 pub struct AppState {
     pub graphics: Option<Arc<CityModelGraphicsStore>>,
     /// Cached once on load (rather than recomputed by walking the arena every frame) since the
     /// toolbar redraws this count on every frame.
+    pub feature_count: usize,
+    /// Count of city objects (a subset of `feature_count` — excludes non-city-object features
+    /// such as appearances). Cached alongside `feature_count` for the same reason.
     pub city_object_count: usize,
     pub selected_id: Option<Id>,
     pub load_state: LoadState,
     pub hidden_feature_types: HashSet<FeatureType>,
+    pub screenshot_status: Option<ScreenshotStatus>,
+    pub show_sidebar: bool,
+    pub show_inspector: bool,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            graphics: None,
+            feature_count: 0,
+            city_object_count: 0,
+            selected_id: None,
+            load_state: LoadState::default(),
+            hidden_feature_types: HashSet::new(),
+            screenshot_status: None,
+            show_sidebar: true,
+            show_inspector: true,
+        }
+    }
 }
 
 impl AppState {
@@ -46,7 +73,7 @@ impl AppState {
         if let Some(graphics) = &self.graphics {
             self.hidden_feature_types = graphics
                 .city_model_arena
-                .iter_city_objects()
+                .iter_features()
                 .map(|x| x.feature_type())
                 .collect();
         }
@@ -71,6 +98,7 @@ impl AppState {
         };
         match result {
             Some(LoadResult::Ok(graphics)) => {
+                self.feature_count = graphics.city_model_arena.iter_features().count();
                 self.city_object_count = graphics.city_model_arena.iter_city_objects().count();
                 self.graphics = Some(Arc::new(graphics));
                 self.load_state = LoadState::Loaded;

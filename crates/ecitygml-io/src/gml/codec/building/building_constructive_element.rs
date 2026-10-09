@@ -1,131 +1,124 @@
 use crate::Error;
 use crate::gml::codec::construction::{
     deserialize_abstract_constructive_element, serialize_abstract_constructive_element,
+    serialize_abstract_constructive_element_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::building::BuildingConstructiveElement;
-use ecitygml_core::model::building::values::{
-    BuildingConstructiveElementClassValue, BuildingConstructiveElementFunctionValue,
-    BuildingConstructiveElementUsageValue,
-};
 use ecitygml_core::model::construction::AsAbstractConstructiveElement;
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_building_constructive_element(
     xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<BuildingConstructiveElement, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let (abstract_constructive_element_result, parsed_result) = rayon::join(
-        || deserialize_abstract_constructive_element(xml_document, &spans),
-        || de::from_reader::<_, GmlBuildingConstructiveElement>(xml_document).map_err(Error::from),
-    );
-    let abstract_constructive_element = abstract_constructive_element_result?;
-    let parsed = parsed_result?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_constructive_element =
+        deserialize_abstract_constructive_element(xml_document, index, config)?;
     let mut building_constructive_element =
         BuildingConstructiveElement::from_abstract_constructive_element(
             abstract_constructive_element,
         );
 
-    building_constructive_element.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(BuildingConstructiveElementClassValue::from),
-    );
-    building_constructive_element.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(BuildingConstructiveElementFunctionValue::from)
-            .collect(),
-    );
-    building_constructive_element.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(BuildingConstructiveElementUsageValue::from)
-            .collect(),
-    );
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    building_constructive_element.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    building_constructive_element.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    building_constructive_element.set_usages(usages.into_iter().map(Into::into).collect());
 
     Ok(building_constructive_element)
 }
 
 pub fn serialize_building_constructive_element(
     building_constructive_element: &BuildingConstructiveElement,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut xml_node_parts = serialize_abstract_constructive_element(
-        building_constructive_element.abstract_constructive_element(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes =
+        serialize_building_constructive_element_attributes(building_constructive_element);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Building,
+        CityGmlElement::BuildingConstructiveElement,
+        attributes,
     )?;
 
-    if let Some(raw) = serialize_inner(
-        GmlBuildingConstructiveElement::from(building_constructive_element),
-        formatting,
-    )? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    serialize_abstract_constructive_element(
+        building_constructive_element.abstract_constructive_element(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = building_constructive_element.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Building,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::BuildingConstructiveElement.into(),
-        xml_node_parts,
-    ))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlBuildingConstructiveElement {
-    #[serde(
-        rename(serialize = "bldg:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "bldg:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "bldg:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-}
-
-impl From<&BuildingConstructiveElement> for GmlBuildingConstructiveElement {
-    fn from(item: &BuildingConstructiveElement) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(BuildingConstructiveElementClassValue::code)
-                .map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(BuildingConstructiveElementFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(BuildingConstructiveElementUsageValue::code)
-                .map(Into::into)
-                .collect(),
-        }
+    for function in building_constructive_element.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Building,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
+
+    for usage in building_constructive_element.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Building,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Building,
+        CityGmlElement::BuildingConstructiveElement,
+    )?;
+
+    Ok(())
+}
+
+pub fn serialize_building_constructive_element_attributes(
+    building_constructive_element: &BuildingConstructiveElement,
+) -> Vec<(String, String)> {
+    serialize_abstract_constructive_element_attributes(
+        building_constructive_element.abstract_constructive_element(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ecitygml_core::model::construction::AsAbstractConstructiveElementMut;
     use ecitygml_core::model::core::AsAbstractFeature;
     use egml::model::base::Id;
-    use egml::model::basic_types::Code;
-    use quick_xml::se;
 
     #[test]
     fn test_deserialize_building_constructive_element() {
@@ -221,51 +214,17 @@ mod tests {
           <bldg:class>Slab</bldg:class>
         </bldg:BuildingConstructiveElement>";
 
-        let building_constructive_element =
-            deserialize_building_constructive_element(xml_document).expect("should work");
+        let building_constructive_element = deserialize_building_constructive_element(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             building_constructive_element.feature_id(),
             &Id::try_from("_FZK-Haus-Storey-Construction-tex-Windows_BD.CvWEAVLAPO2cqWPW8xrz_BP.Um20q9TChr2VYbrcN9zj").expect("should work")
         );
-        /*assert_eq!(
-            building_constructive_element.name().first().expect("should work"),
-            "AC14-FZK-Haus"
-        );
-        assert_eq!(building_constructive_element.wall_surface.len(), 2);
-        assert_eq!(building_constructive_element.generic_attributes().len(), 3);
-
-        let first_wall_surface = building_constructive_element.wall_surface.first().unwrap();
-        assert_eq!(
-            first_wall_surface.id(),
-            &Id::try_from("GML_5856d7ad-5e34-498a-817b-9544bfbb1475").expect("should work")
-        );*/
-    }
-
-    #[test]
-    fn test_serialize_building_constructive_element() {
-        let id = Id::try_from("test-id").expect("should work");
-        let mut building_constructive_element = BuildingConstructiveElement::new(id);
-        building_constructive_element.set_is_structural_element(Some(true));
-        building_constructive_element.set_class(Code::new("Slab").into());
-
-        let gml_building_constructive_element =
-            GmlBuildingConstructiveElement::from(&building_constructive_element);
-        let xml_document = se::to_string_with_root(
-            "bldg:BuildingConstructiveElement",
-            &gml_building_constructive_element,
-        )
-        .expect("should work");
-
-        print!("ac");
-
-        /*let building_constructive_element =
-            deserialize_building_constructive_element(xml_document).expect("should work");
-
-        assert_eq!(
-            building_constructive_element.id(),
-            &Id::try_from("_FZK-Haus-Storey-Construction-tex-Windows_BD.CvWEAVLAPO2cqWPW8xrz_BP.Um20q9TChr2VYbrcN9zj").expect("should work")
-        );*/
         /*assert_eq!(
             building_constructive_element.name().first().expect("should work"),
             "AC14-FZK-Haus"

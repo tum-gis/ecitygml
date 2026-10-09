@@ -92,7 +92,6 @@ mod tests {
     use crate::model::building::AsAbstractBuilding;
     use crate::model::construction::AsAbstractConstruction;
     use crate::model::core::AsAbstractFeatureWithLifespan;
-    use egml::io::util::extract_xml_element_spans;
 
     #[test]
     fn test_arena_construction() {

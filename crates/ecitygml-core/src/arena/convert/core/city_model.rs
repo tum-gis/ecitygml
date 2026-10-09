@@ -28,5 +28,8 @@ pub fn flatten_city_model(
 }
 
 pub fn unflatten_city_model_arena(_city_model_arena: CityModelArena) -> Result<CityModel, Error> {
-    Ok(CityModel::new(Id::generate_uuid_v4()))
+    // Not implemented yet: returns an empty city model.
+    Ok(CityModel::new(
+        Id::try_from("ecitygml-unflattened-city-model").expect("is a valid xsd:ID"),
+    ))
 }

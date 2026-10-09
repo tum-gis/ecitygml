@@ -1,16 +1,16 @@
 use crate::model::core::{AbstractFeature, AsAbstractFeature, AsAbstractFeatureMut};
-use chrono::{DateTime, FixedOffset};
 use egml::model::base::Id;
 use egml::model::common::ApplyTransform;
+use egml::model::xs::DateTime;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AbstractFeatureWithLifespan {
     pub(crate) abstract_feature: AbstractFeature,
-    creation_date: Option<DateTime<FixedOffset>>,
-    termination_date: Option<DateTime<FixedOffset>>,
-    valid_from: Option<DateTime<FixedOffset>>,
-    valid_to: Option<DateTime<FixedOffset>>,
+    creation_date: Option<DateTime>,
+    termination_date: Option<DateTime>,
+    valid_from: Option<DateTime>,
+    valid_to: Option<DateTime>,
 }
 
 impl AbstractFeatureWithLifespan {
@@ -32,21 +32,21 @@ impl AbstractFeatureWithLifespan {
 pub trait AsAbstractFeatureWithLifespan: AsAbstractFeature {
     fn abstract_feature_with_lifespan(&self) -> &AbstractFeatureWithLifespan;
 
-    fn creation_date(&self) -> Option<&DateTime<FixedOffset>> {
+    fn creation_date(&self) -> Option<&DateTime> {
         self.abstract_feature_with_lifespan().creation_date.as_ref()
     }
 
-    fn termination_date(&self) -> Option<&DateTime<FixedOffset>> {
+    fn termination_date(&self) -> Option<&DateTime> {
         self.abstract_feature_with_lifespan()
             .termination_date
             .as_ref()
     }
 
-    fn valid_from(&self) -> Option<&DateTime<FixedOffset>> {
+    fn valid_from(&self) -> Option<&DateTime> {
         self.abstract_feature_with_lifespan().valid_from.as_ref()
     }
 
-    fn valid_to(&self) -> Option<&DateTime<FixedOffset>> {
+    fn valid_to(&self) -> Option<&DateTime> {
         self.abstract_feature_with_lifespan().valid_to.as_ref()
     }
 }
@@ -56,19 +56,19 @@ pub trait AsAbstractFeatureWithLifespanMut:
 {
     fn abstract_feature_with_lifespan_mut(&mut self) -> &mut AbstractFeatureWithLifespan;
 
-    fn set_creation_date(&mut self, creation_date: Option<DateTime<FixedOffset>>) {
+    fn set_creation_date(&mut self, creation_date: Option<DateTime>) {
         self.abstract_feature_with_lifespan_mut().creation_date = creation_date;
     }
 
-    fn set_termination_date(&mut self, termination_date: Option<DateTime<FixedOffset>>) {
+    fn set_termination_date(&mut self, termination_date: Option<DateTime>) {
         self.abstract_feature_with_lifespan_mut().termination_date = termination_date;
     }
 
-    fn set_valid_from(&mut self, valid_from: Option<DateTime<FixedOffset>>) {
+    fn set_valid_from(&mut self, valid_from: Option<DateTime>) {
         self.abstract_feature_with_lifespan_mut().valid_from = valid_from;
     }
 
-    fn set_valid_to(&mut self, valid_to: Option<DateTime<FixedOffset>>) {
+    fn set_valid_to(&mut self, valid_to: Option<DateTime>) {
         self.abstract_feature_with_lifespan_mut().valid_to = valid_to;
     }
 }

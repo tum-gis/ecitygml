@@ -4,7 +4,6 @@ use bvh::aabb::{Aabb, Bounded};
 use bvh::bounding_hierarchy::BHShape;
 use bvh::bvh::Bvh;
 use egml::model::geometry::Envelope;
-use nalgebra::Point3;
 
 struct SpatialEntry {
     index: usize,
@@ -79,15 +78,15 @@ impl BvhIndex {
 }
 
 fn envelope_to_aabb(envelope: &Envelope) -> Aabb<f64, 3> {
-    let min = Point3::new(
+    let min = [
         envelope.lower_corner().x(),
         envelope.lower_corner().y(),
         envelope.lower_corner().z(),
-    );
-    let max = Point3::new(
+    ];
+    let max = [
         envelope.upper_corner().x(),
         envelope.upper_corner().y(),
         envelope.upper_corner().z(),
-    );
-    Aabb::with_bounds(min, max)
+    ];
+    Aabb::with_bounds(min.into(), max.into())
 }

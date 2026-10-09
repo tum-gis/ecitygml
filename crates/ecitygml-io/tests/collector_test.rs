@@ -8,6 +8,7 @@ fn test_lod2_building_model_fzk() {
     let city_model =
         GmlReader::from_path("../../tests/fixtures/FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3.gml")
             .expect("should work")
+            .with_rebuild_object_bounds(true)
             .finish()
             .expect("should work");
 

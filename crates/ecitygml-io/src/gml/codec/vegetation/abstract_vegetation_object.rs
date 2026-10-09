@@ -1,18 +1,24 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_occupied_space, serialize_abstract_occupied_space,
+    serialize_abstract_occupied_space_attributes,
 };
-use crate::gml::util::CombinedCityGmlElement;
+use crate::gml::util::{CombinedCityGmlElement, DeserializationConfig};
 use ecitygml_core::model::core::AsAbstractOccupiedSpace;
 use ecitygml_core::model::vegetation::AbstractVegetationObject;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNodeParts};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
 pub fn deserialize_abstract_vegetation_object(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractVegetationObject, Error> {
-    let occupied_space = deserialize_abstract_occupied_space(xml_document, spans)?;
+    debug_assert!(
+        !index.is_truncated(),
+        "deserialize_abstract_vegetation_object received a truncated index — caller must scan to sufficient depth"
+    );
+
+    let occupied_space = deserialize_abstract_occupied_space(xml_document, index, config)?;
     let abstract_vegetation_object =
         AbstractVegetationObject::from_abstract_occupied_space(occupied_space);
 
@@ -21,19 +27,18 @@ pub fn deserialize_abstract_vegetation_object(
 
 pub fn serialize_abstract_vegetation_object(
     abstract_vegetation_object: &AbstractVegetationObject,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
     serialize_abstract_occupied_space(
         abstract_vegetation_object.abstract_occupied_space(),
-        formatting,
+        xml_fragment_writer,
     )
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractVegetationObject {}
-
-impl From<&AbstractVegetationObject> for GmlAbstractVegetationObject {
-    fn from(_item: &AbstractVegetationObject) -> Self {
-        Self {}
-    }
+pub fn serialize_abstract_vegetation_object_attributes(
+    abstract_vegetation_object: &AbstractVegetationObject,
+) -> Vec<(String, String)> {
+    serialize_abstract_occupied_space_attributes(
+        abstract_vegetation_object.abstract_occupied_space(),
+    )
 }

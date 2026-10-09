@@ -2,90 +2,160 @@ use crate::Error;
 use crate::gml::codec::appearance::abstract_surface_data_property::{
     deserialize_abstract_surface_data_property, serialize_abstract_surface_data_property,
 };
-use crate::gml::codec::core::{deserialize_abstract_appearance, serialize_abstract_appearance};
-use crate::gml::util::CityGmlElement;
+use crate::gml::codec::common::{deserialize_string, serialize_string};
+use crate::gml::codec::core::{
+    deserialize_abstract_appearance, serialize_abstract_appearance,
+    serialize_abstract_appearance_attributes,
+};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::appearance::Appearance;
 use ecitygml_core::model::core::AsAbstractAppearance;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, collect_children, extract_xml_element_spans,
-    serialize_inner,
-};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter, collect_children};
 
-pub fn deserialize_appearance(xml_document: &[u8]) -> Result<Appearance, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_appearance(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Appearance, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
     let mut abstract_appearance_result = None;
-    let mut parsed_result = None;
     let mut surface_data_result = None;
 
     rayon::scope(|s| {
         s.spawn(|_| {
             abstract_appearance_result =
-                Some(deserialize_abstract_appearance(xml_document, &spans));
-        });
-        s.spawn(|_| {
-            parsed_result = Some(
-                quick_xml::de::from_reader::<_, GmlAppearance>(xml_document).map_err(Error::from),
-            );
+                Some(deserialize_abstract_appearance(xml_document, index, config));
         });
         s.spawn(|_| {
             surface_data_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::AbstractSurfaceDataProperty.into(),
+                config,
                 deserialize_abstract_surface_data_property,
             ));
         });
     });
 
-    let abstract_appearance =
-        abstract_appearance_result.expect("rayon::scope guarantees all spawns complete")?;
-    let parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let surface_data = surface_data_result.expect("rayon::scope guarantees all spawns complete")?;
+    let mut appearance = Appearance::from_abstract_appearance(
+        abstract_appearance_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
 
-    let mut appearance = Appearance::from_abstract_appearance(abstract_appearance);
-    appearance.set_theme_opt(parsed.theme);
-    appearance.set_surface_data(surface_data);
+    let theme: Option<String> = index
+        .first(CityGmlElement::ThemeProperty.into())
+        .map(|x| deserialize_string(&xml_document[x.range()]))
+        .transpose()?;
+    appearance.set_theme_opt(theme);
+
+    appearance.set_surface_data(
+        surface_data_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
 
     Ok(appearance)
 }
 
 pub fn serialize_appearance(
     appearance: &Appearance,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut xml_node_parts =
-        serialize_abstract_appearance(appearance.abstract_appearance(), formatting)?;
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_appearance_attributes(appearance);
 
-    if let Some(raw) = serialize_inner(GmlAppearance::from(appearance), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Appearance,
+        CityGmlElement::Appearance,
+        attributes,
+    )?;
+
+    serialize_abstract_appearance(appearance.abstract_appearance(), xml_fragment_writer)?;
+
+    if let Some(theme) = appearance.theme() {
+        serialize_string(
+            theme,
+            xml_fragment_writer,
+            CityGmlNamespace::Appearance,
+            CityGmlElement::ThemeProperty,
+        )?;
     }
 
     for prop in appearance.surface_data() {
-        let node = serialize_abstract_surface_data_property(prop, formatting)?;
-        xml_node_parts.content.push(XmlNodeContent::Child(node));
+        serialize_abstract_surface_data_property(prop, xml_fragment_writer)?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::Appearance.into(),
-        xml_node_parts,
-    ))
+    xml_fragment_writer
+        .write_end_event(CityGmlNamespace::Appearance, CityGmlElement::Appearance)?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAppearance {
-    #[serde(
-        rename(serialize = "app:theme", deserialize = "theme"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub theme: Option<String>,
+pub fn serialize_appearance_attributes(appearance: &Appearance) -> Vec<(String, String)> {
+    serialize_abstract_appearance_attributes(appearance.abstract_appearance())
 }
 
-impl From<&Appearance> for GmlAppearance {
-    fn from(item: &Appearance) -> Self {
-        Self {
-            theme: item.theme().to_owned().map(String::from),
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egml::io::util::Formatting;
+
+    #[test]
+    fn test_deserialize_appearance_with_theme() {
+        let xml_document = b"\
+<app:Appearance gml:id=\"UUID_ae81947d-a661-3678-a5ee-eed58b68694f\">
+    <app:theme>visual</app:theme>
+</app:Appearance>";
+
+        let appearance = deserialize_appearance(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(appearance.theme(), Some("visual"));
+    }
+
+    #[test]
+    fn test_round_trip_appearance_with_theme() {
+        let xml_document = b"\
+<app:Appearance gml:id=\"UUID_ae81947d-a661-3678-a5ee-eed58b68694f\">
+    <app:theme>visual</app:theme>
+</app:Appearance>";
+
+        let appearance = deserialize_appearance(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_appearance(&appearance, &mut xml_fragment_writer).expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        assert!(xml.contains("app:theme"));
+        assert!(xml.contains("visual"));
+
+        let round_tripped = deserialize_appearance(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(appearance.theme(), round_tripped.theme());
     }
 }

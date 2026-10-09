@@ -13,10 +13,10 @@ use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 #[derive(Debug, Clone, PartialEq)]
 pub struct AbstractPhysicalSpace {
     pub(crate) abstract_space: AbstractSpace,
-    lod1_terrain_intersection_curve: Option<MultiCurveProperty>,
-    lod2_terrain_intersection_curve: Option<MultiCurveProperty>,
-    lod3_terrain_intersection_curve: Option<MultiCurveProperty>,
-    point_cloud: Option<AbstractPointCloudProperty>,
+    lod1_terrain_intersection_curve: Option<Box<MultiCurveProperty>>,
+    lod2_terrain_intersection_curve: Option<Box<MultiCurveProperty>>,
+    lod3_terrain_intersection_curve: Option<Box<MultiCurveProperty>>,
+    point_cloud: Option<Box<AbstractPointCloudProperty>>,
 }
 
 impl AbstractPhysicalSpace {
@@ -41,23 +41,23 @@ pub trait AsAbstractPhysicalSpace: AsAbstractSpace {
     fn lod1_terrain_intersection_curve(&self) -> Option<&MultiCurveProperty> {
         self.abstract_physical_space()
             .lod1_terrain_intersection_curve
-            .as_ref()
+            .as_deref()
     }
 
     fn lod2_terrain_intersection_curve(&self) -> Option<&MultiCurveProperty> {
         self.abstract_physical_space()
             .lod2_terrain_intersection_curve
-            .as_ref()
+            .as_deref()
     }
 
     fn lod3_terrain_intersection_curve(&self) -> Option<&MultiCurveProperty> {
         self.abstract_physical_space()
             .lod3_terrain_intersection_curve
-            .as_ref()
+            .as_deref()
     }
 
     fn point_cloud(&self) -> Option<&AbstractPointCloudProperty> {
-        self.abstract_physical_space().point_cloud.as_ref()
+        self.abstract_physical_space().point_cloud.as_deref()
     }
 }
 
@@ -69,7 +69,7 @@ pub trait AsAbstractPhysicalSpaceMut: AsAbstractSpaceMut + AsAbstractPhysicalSpa
         lod1_terrain_intersection_curve: Option<MultiCurveProperty>,
     ) {
         self.abstract_physical_space_mut()
-            .lod1_terrain_intersection_curve = lod1_terrain_intersection_curve;
+            .lod1_terrain_intersection_curve = lod1_terrain_intersection_curve.map(Box::new);
     }
 
     fn set_lod2_terrain_intersection_curve(
@@ -77,7 +77,7 @@ pub trait AsAbstractPhysicalSpaceMut: AsAbstractSpaceMut + AsAbstractPhysicalSpa
         lod2_terrain_intersection_curve: Option<MultiCurveProperty>,
     ) {
         self.abstract_physical_space_mut()
-            .lod2_terrain_intersection_curve = lod2_terrain_intersection_curve;
+            .lod2_terrain_intersection_curve = lod2_terrain_intersection_curve.map(Box::new);
     }
 
     fn set_lod3_terrain_intersection_curve(
@@ -85,33 +85,35 @@ pub trait AsAbstractPhysicalSpaceMut: AsAbstractSpaceMut + AsAbstractPhysicalSpa
         lod3_terrain_intersection_curve: Option<MultiCurveProperty>,
     ) {
         self.abstract_physical_space_mut()
-            .lod3_terrain_intersection_curve = lod3_terrain_intersection_curve;
+            .lod3_terrain_intersection_curve = lod3_terrain_intersection_curve.map(Box::new);
     }
 
     fn set_point_cloud(&mut self, value: Option<AbstractPointCloudProperty>) {
-        self.abstract_physical_space_mut().point_cloud = value;
+        self.abstract_physical_space_mut().point_cloud = value.map(Box::new);
     }
 
     fn lod1_terrain_intersection_curve_mut(&mut self) -> Option<&mut MultiCurveProperty> {
         self.abstract_physical_space_mut()
             .lod1_terrain_intersection_curve
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn lod2_terrain_intersection_curve_mut(&mut self) -> Option<&mut MultiCurveProperty> {
         self.abstract_physical_space_mut()
             .lod2_terrain_intersection_curve
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn lod3_terrain_intersection_curve_mut(&mut self) -> Option<&mut MultiCurveProperty> {
         self.abstract_physical_space_mut()
             .lod3_terrain_intersection_curve
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn point_cloud_mut(&mut self) -> Option<&mut AbstractPointCloudProperty> {
-        self.abstract_physical_space_mut().point_cloud.as_mut()
+        self.abstract_physical_space_mut()
+            .point_cloud
+            .as_deref_mut()
     }
 }
 

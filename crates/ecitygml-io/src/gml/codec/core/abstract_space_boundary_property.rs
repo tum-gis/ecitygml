@@ -2,84 +2,90 @@ use crate::Error;
 use crate::gml::codec::core::abstract_space_boundary_kind::{
     deserialize_abstract_space_boundary_kind, serialize_abstract_space_boundary_kind,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::AbstractSpaceBoundaryProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_abstract_space_boundary_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractSpaceBoundaryProperty, Error> {
-    let parsed: GmlSpaceBoundaryProperty = de::from_reader(xml_document)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
-    let object = deserialize_abstract_space_boundary_kind(xml_document, spans)?;
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
+    let object = deserialize_abstract_space_boundary_kind(xml_document, index, config)?;
 
     Ok(AbstractSpaceBoundaryProperty::new(
         object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
+        association,
+        ownership,
     ))
 }
 
 pub fn serialize_abstract_space_boundary_property(
     abstract_space_boundary_property: &AbstractSpaceBoundaryProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-
-    parts.attributes.extend(serialize_association_attributes(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
         abstract_space_boundary_property.association(),
-    ));
-    parts.attributes.extend(serialize_ownership_attributes(
         abstract_space_boundary_property.ownership(),
-    ));
+    );
 
-    if let Some(object) = abstract_space_boundary_property.object() {
-        parts.content.push(XmlNodeContent::Child(
-            serialize_abstract_space_boundary_kind(object, formatting)?,
-        ));
+    match abstract_space_boundary_property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Core,
+                CityGmlElement::BoundaryProperty,
+                attributes,
+            )?;
+            serialize_abstract_space_boundary_kind(object, xml_fragment_writer)?;
+            xml_fragment_writer
+                .write_end_event(CityGmlNamespace::Core, CityGmlElement::BoundaryProperty)?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Core,
+                CityGmlElement::BoundaryProperty,
+                attributes,
+            )?;
+        }
     }
 
-    Ok(XmlNode::new(CityGmlElement::BoundaryProperty.into(), parts))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlSpaceBoundaryProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gml::codec::core::deserialize_abstract_thematic_surface;
-    use ecitygml_core::model::core::{
-        AsAbstractCityObject, AsAbstractFeature, AsAbstractThematicSurface,
-    };
-    use egml::io::util::extract_xml_element_spans;
+
+    use ecitygml_core::model::core::AsAbstractFeature;
     use egml::model::base::{HasAssociationAttributes, Id};
     use egml::model::xlink::HRef;
-    use quick_xml::{DeError, de};
 
     #[test]
     fn test_deserialize_basic_href_boundary() {
-        use egml::io::util::extract_xml_element_spans;
         let xml_document =
             b"<boundary xlink:href=\"#DEBY_LOD2_59772_4becb506-d53b-44ca-a483-e6a3d238b4c2\" />";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space_boundary_property =
-            deserialize_abstract_space_boundary_property(xml_document, &spans)
-                .expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space_boundary_property = deserialize_abstract_space_boundary_property(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             abstract_space_boundary_property
@@ -94,10 +100,13 @@ mod tests {
         let xml_document =
             b"<boundary><ClosureSurface gml:id=\"fme-gen-f460209b-63b5-4ff8-92d5-cec932987265\"/></boundary>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space_boundary_property =
-            deserialize_abstract_space_boundary_property(xml_document, &spans)
-                .expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space_boundary_property = deserialize_abstract_space_boundary_property(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             abstract_space_boundary_property

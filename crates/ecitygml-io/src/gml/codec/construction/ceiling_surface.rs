@@ -1,16 +1,28 @@
 use crate::Error;
 use crate::gml::codec::construction::abstract_construction_surface::{
     deserialize_abstract_construction_surface, serialize_abstract_construction_surface,
+    serialize_abstract_construction_surface_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::construction::{AsAbstractConstructionSurface, CeilingSurface};
-use egml::io::util::{Formatting, XmlNode, extract_xml_element_spans};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
-pub fn deserialize_ceiling_surface(xml_document: &[u8]) -> Result<CeilingSurface, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_ceiling_surface(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<CeilingSurface, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
     let abstract_construction_surface =
-        deserialize_abstract_construction_surface(xml_document, &spans)?;
+        deserialize_abstract_construction_surface(xml_document, index, config)?;
+
     Ok(CeilingSurface::from_abstract_construction_surface(
         abstract_construction_surface,
     ))
@@ -18,23 +30,33 @@ pub fn deserialize_ceiling_surface(xml_document: &[u8]) -> Result<CeilingSurface
 
 pub fn serialize_ceiling_surface(
     ceiling_surface: &CeilingSurface,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let xml_node_parts = serialize_abstract_construction_surface(
-        ceiling_surface.abstract_construction_surface(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_ceiling_surface_attributes(ceiling_surface);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Construction,
+        CityGmlElement::CeilingSurface,
+        attributes,
     )?;
-    Ok(XmlNode::new(
-        CityGmlElement::CeilingSurface.into(),
-        xml_node_parts,
-    ))
+
+    serialize_abstract_construction_surface(
+        ceiling_surface.abstract_construction_surface(),
+        xml_fragment_writer,
+    )?;
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Construction,
+        CityGmlElement::CeilingSurface,
+    )?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlCeilingSurface {}
-
-impl From<&CeilingSurface> for GmlCeilingSurface {
-    fn from(_item: &CeilingSurface) -> Self {
-        Self {}
-    }
+pub fn serialize_ceiling_surface_attributes(
+    ceiling_surface: &CeilingSurface,
+) -> Vec<(String, String)> {
+    serialize_abstract_construction_surface_attributes(
+        ceiling_surface.abstract_construction_surface(),
+    )
 }

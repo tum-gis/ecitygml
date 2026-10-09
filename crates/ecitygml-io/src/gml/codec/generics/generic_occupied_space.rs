@@ -1,118 +1,110 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_occupied_space, serialize_abstract_occupied_space,
+    serialize_abstract_occupied_space_attributes,
 };
-use crate::gml::codec::vegetation::GmlPlantCover;
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::AsAbstractOccupiedSpace;
 use ecitygml_core::model::generics::GenericOccupiedSpace;
-use ecitygml_core::model::generics::values::{
-    GenericOccupiedSpaceClassValue, GenericOccupiedSpaceFunctionValue,
-    GenericOccupiedSpaceUsageValue,
-};
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_generic_occupied_space(
     xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<GenericOccupiedSpace, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let (abstract_occupied_space_result, parsed_result) = rayon::join(
-        || deserialize_abstract_occupied_space(xml_document, &spans),
-        || de::from_reader::<_, GmlPlantCover>(xml_document).map_err(Error::from),
-    );
-    let abstract_occupied_space = abstract_occupied_space_result?;
-    let parsed = parsed_result?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_occupied_space = deserialize_abstract_occupied_space(xml_document, index, config)?;
 
     let mut generic_occupied_space =
         GenericOccupiedSpace::from_abstract_occupied_space(abstract_occupied_space);
-    generic_occupied_space.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(GenericOccupiedSpaceClassValue::from),
-    );
-    generic_occupied_space.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(GenericOccupiedSpaceFunctionValue::from)
-            .collect(),
-    );
-    generic_occupied_space.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(GenericOccupiedSpaceUsageValue::from)
-            .collect(),
-    );
+
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    generic_occupied_space.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    generic_occupied_space.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    generic_occupied_space.set_usages(usages.into_iter().map(Into::into).collect());
 
     Ok(generic_occupied_space)
 }
 
 pub fn serialize_generic_occupied_space(
     generic_occupied_space: &GenericOccupiedSpace,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = serialize_abstract_occupied_space(
-        generic_occupied_space.abstract_occupied_space(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_generic_occupied_space_attributes(generic_occupied_space);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Generics,
+        CityGmlElement::GenericOccupiedSpace,
+        attributes,
     )?;
 
-    if let Some(raw) = serialize_inner(
-        GmlGenericOccupiedSpace::from(generic_occupied_space),
-        formatting,
-    )? {
-        parts.content.push(XmlNodeContent::Raw(raw));
+    serialize_abstract_occupied_space(
+        generic_occupied_space.abstract_occupied_space(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = generic_occupied_space.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Generics,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::GenericOccupiedSpace.into(),
-        parts,
-    ))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlGenericOccupiedSpace {
-    #[serde(
-        rename(serialize = "gen:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "gen:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "gen:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-}
-
-impl From<&GenericOccupiedSpace> for GmlGenericOccupiedSpace {
-    fn from(item: &GenericOccupiedSpace) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(GenericOccupiedSpaceClassValue::code)
-                .map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(GenericOccupiedSpaceFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(GenericOccupiedSpaceUsageValue::code)
-                .map(Into::into)
-                .collect(),
-        }
+    for function in generic_occupied_space.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Generics,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
+
+    for usage in generic_occupied_space.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Generics,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Generics,
+        CityGmlElement::GenericOccupiedSpace,
+    )?;
+
+    Ok(())
+}
+
+pub fn serialize_generic_occupied_space_attributes(
+    generic_occupied_space: &GenericOccupiedSpace,
+) -> Vec<(String, String)> {
+    serialize_abstract_occupied_space_attributes(generic_occupied_space.abstract_occupied_space())
 }

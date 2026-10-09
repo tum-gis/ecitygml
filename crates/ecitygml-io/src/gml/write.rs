@@ -10,13 +10,13 @@ use std::path::Path;
 /// `GmlWriter` writes CityGML datasets.
 ///
 #[derive(Debug, Clone)]
-pub struct GmlWriter<W: Write> {
+pub struct GmlWriter<W: Write + Sync> {
     writer: W,
     format: CitygmlFormat,
     formatting: Formatting,
 }
 
-impl<W: Write> GmlWriter<W> {
+impl<W: Write + Sync> GmlWriter<W> {
     pub fn new(writer: W, format: CitygmlFormat) -> Self {
         Self {
             writer,
@@ -30,16 +30,31 @@ impl<W: Write> GmlWriter<W> {
         self
     }
 
-    pub fn finish(self, city_model: CityModel) -> Result<(), Error> {
+    pub fn finish(self, city_model: &CityModel) -> Result<(), Error> {
         match self.format {
             CitygmlFormat::Gml => {
                 let mut w = BufWriter::new(self.writer);
                 serialize(&mut w, city_model, self.formatting)?;
             }
+            #[cfg(not(target_arch = "wasm32"))]
             CitygmlFormat::GmlZst => {
                 let mut encoder = zstd::Encoder::new(BufWriter::new(self.writer), 9)?;
                 serialize(&mut encoder, city_model, self.formatting)?;
                 encoder.finish()?;
+            }
+            // Pure-Rust encoder (zstd's C code isn't built for WebAssembly). It implements only its fastest
+            // level (about zstd level 1) and compresses from a reader, so the GML is serialized first.
+            #[cfg(target_arch = "wasm32")]
+            CitygmlFormat::GmlZst => {
+                let mut content = Vec::new();
+                serialize(&mut content, city_model, self.formatting)?;
+                let compressed = ruzstd::encoding::compress_to_vec(
+                    content.as_slice(),
+                    ruzstd::encoding::CompressionLevel::Fastest,
+                );
+                let mut w = BufWriter::new(self.writer);
+                w.write_all(&compressed)?;
+                w.flush()?;
             }
             CitygmlFormat::GmlGz => {
                 let mut encoder = flate2::write::GzEncoder::new(

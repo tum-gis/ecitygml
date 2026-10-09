@@ -1,3 +1,5 @@
+pub mod enums;
+
 mod abstract_transportation_space;
 mod abstract_transportation_space_kind;
 mod auxiliary_traffic_area;
@@ -5,7 +7,6 @@ mod auxiliary_traffic_space;
 mod auxiliary_traffic_space_property;
 mod clearance_space;
 mod clearance_space_property;
-mod granularity_value;
 mod hole;
 mod hole_property;
 mod hole_surface;
@@ -20,7 +21,6 @@ mod section_property;
 mod square;
 mod track;
 mod traffic_area;
-mod traffic_direction_value;
 mod traffic_space;
 mod traffic_space_property;
 mod waterway;

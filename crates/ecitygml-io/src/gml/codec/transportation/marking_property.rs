@@ -1,60 +1,73 @@
 use crate::Error;
 use crate::gml::codec::transportation::{deserialize_marking, serialize_marking};
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::transportation::MarkingProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_marking_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<MarkingProperty, Error> {
-    let parsed: GmlMarkingProperty = de::from_reader(xml_document)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
     let mut object = None;
 
-    if let Some(span) = spans.first(CityGmlElement::Marking.into()) {
-        object = Some(deserialize_marking(&xml_document[span.start..span.end])?);
+    if let Some(index) = index.first(CityGmlElement::Marking.into()) {
+        object = Some(deserialize_marking(
+            &xml_document[index.range()],
+            index,
+            config,
+        )?);
     }
 
-    Ok(MarkingProperty::new(
-        object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
-    ))
+    Ok(MarkingProperty::new(object, association, ownership))
 }
 
 pub fn serialize_marking_property(
     marking_property: &MarkingProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-    parts.attributes.extend(serialize_association_attributes(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
         marking_property.association(),
-    ));
-    parts
-        .attributes
-        .extend(serialize_ownership_attributes(marking_property.ownership()));
-    if let Some(object) = marking_property.object() {
-        parts.content.push(XmlNodeContent::Child(serialize_marking(
-            object, formatting,
-        )?));
-    }
-    Ok(XmlNode::new(CityGmlElement::MarkingProperty.into(), parts))
-}
+        marking_property.ownership(),
+    );
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlMarkingProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    match marking_property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::MarkingProperty,
+                attributes,
+            )?;
+            serialize_marking(object, xml_fragment_writer)?;
+            xml_fragment_writer.write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::MarkingProperty,
+            )?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::MarkingProperty,
+                attributes,
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -65,13 +78,13 @@ mod tests {
 
     #[test]
     fn test_deserialize_basic_href_marking_property() {
-        use egml::io::util::extract_xml_element_spans;
         let xml_document =
             b"<tran:marking xlink:href=\"#DEBY_LOD2_59772_4becb506-d53b-44ca-a483-e6a3d238b4c2\" />";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
         let marking_property =
-            deserialize_marking_property(xml_document, &spans).expect("should work");
+            deserialize_marking_property(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
         assert_eq!(
             marking_property.href().expect("should exist"),
@@ -81,7 +94,6 @@ mod tests {
 
     #[test]
     fn test_deserialize_basic_marking_property() {
-        use egml::io::util::extract_xml_element_spans;
         let xml_document =
             b"<tran:marking>
             <tran:Marking gml:id=\"UUID_caee8e69-7e58-373d-8851-18733ef1bd09\">
@@ -98,9 +110,10 @@ mod tests {
             </tran:Marking>
           </tran:marking>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
         let marking_property =
-            deserialize_marking_property(xml_document, &spans).expect("should work");
+            deserialize_marking_property(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
         assert!(marking_property.object().is_some());
     }

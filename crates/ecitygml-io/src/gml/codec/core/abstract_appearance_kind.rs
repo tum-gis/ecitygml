@@ -1,15 +1,16 @@
 use crate::Error;
 use crate::gml::codec::appearance::{deserialize_appearance, serialize_appearance};
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{CityGmlElement, CombinedCityGmlElement, DeserializationConfig};
 use ecitygml_core::model::core::AbstractAppearanceKind;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
 pub fn deserialize_abstract_appearance_kind(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<Option<AbstractAppearanceKind>, Error> {
-    if let Some(span) = spans.first(CityGmlElement::Appearance.into()) {
-        let appearance = deserialize_appearance(&xml_document[span.start..span.end])?;
+    if let Some(index) = index.first(CityGmlElement::Appearance.into()) {
+        let appearance = deserialize_appearance(&xml_document[index.range()], index, config)?;
         return Ok(Some(appearance.into()));
     }
 
@@ -18,9 +19,9 @@ pub fn deserialize_abstract_appearance_kind(
 
 pub fn serialize_abstract_appearance_kind(
     abstract_appearance_kind: &AbstractAppearanceKind,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
     match abstract_appearance_kind {
-        AbstractAppearanceKind::Appearance(x) => serialize_appearance(x, formatting),
+        AbstractAppearanceKind::Appearance(x) => serialize_appearance(x, xml_fragment_writer),
     }
 }

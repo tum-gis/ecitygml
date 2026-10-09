@@ -16,6 +16,8 @@ mod door;
 mod door_surface;
 mod floor_surface;
 mod ground_surface;
+mod height;
+mod height_property;
 mod interior_wall_surface;
 mod outer_ceiling_surface;
 mod outer_floor_surface;

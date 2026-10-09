@@ -23,7 +23,7 @@ impl AbstractFeature {
     }
 }
 
-pub trait AsAbstractFeature {
+pub trait AsAbstractFeature: egml::model::feature::AsAbstractFeature {
     fn abstract_feature(&self) -> &AbstractFeature;
 
     fn feature_id(&self) -> &Id {
@@ -35,7 +35,9 @@ pub trait AsAbstractFeature {
     }
 }
 
-pub trait AsAbstractFeatureMut: AsAbstractFeature {
+pub trait AsAbstractFeatureMut:
+    AsAbstractFeature + egml::model::feature::AsAbstractFeatureMut
+{
     fn abstract_feature_mut(&mut self) -> &mut AbstractFeature;
 }
 

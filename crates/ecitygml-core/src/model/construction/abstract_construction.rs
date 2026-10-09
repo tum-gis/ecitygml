@@ -1,20 +1,22 @@
 use crate::model::common::{ForEachFeatureMut, IterFeatures};
+use crate::model::construction::height::Height;
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
 use crate::model::core::{
     AbstractOccupiedSpace, AsAbstractOccupiedSpace, AsAbstractOccupiedSpaceMut, Occupancy,
 };
-use chrono::NaiveDate;
 use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;
+use egml::model::xs::Date;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AbstractConstruction {
     pub(crate) abstract_occupied_space: AbstractOccupiedSpace,
-    date_of_construction: Option<NaiveDate>,
-    date_of_demolition: Option<NaiveDate>,
+    date_of_construction: Option<Date>,
+    date_of_demolition: Option<Date>,
+    heights: Vec<Height>,
     occupancies: Vec<Occupancy>,
 }
 
@@ -28,6 +30,7 @@ impl AbstractConstruction {
             abstract_occupied_space,
             date_of_construction: None,
             date_of_demolition: None,
+            heights: Vec::new(),
             occupancies: Vec::new(),
         }
     }
@@ -36,12 +39,16 @@ impl AbstractConstruction {
 pub trait AsAbstractConstruction: AsAbstractOccupiedSpace {
     fn abstract_construction(&self) -> &AbstractConstruction;
 
-    fn date_of_construction(&self) -> Option<&NaiveDate> {
+    fn date_of_construction(&self) -> Option<&Date> {
         self.abstract_construction().date_of_construction.as_ref()
     }
 
-    fn date_of_demolition(&self) -> Option<&NaiveDate> {
+    fn date_of_demolition(&self) -> Option<&Date> {
         self.abstract_construction().date_of_demolition.as_ref()
+    }
+
+    fn heights(&self) -> &[Height] {
+        self.abstract_construction().heights.as_ref()
     }
 
     fn occupancies(&self) -> &[Occupancy] {
@@ -52,12 +59,28 @@ pub trait AsAbstractConstruction: AsAbstractOccupiedSpace {
 pub trait AsAbstractConstructionMut: AsAbstractOccupiedSpaceMut + AsAbstractConstruction {
     fn abstract_construction_mut(&mut self) -> &mut AbstractConstruction;
 
-    fn set_date_of_construction(&mut self, date_of_construction: Option<NaiveDate>) {
+    fn set_date_of_construction(&mut self, date_of_construction: Option<Date>) {
         self.abstract_construction_mut().date_of_construction = date_of_construction;
     }
 
-    fn set_date_of_demolition(&mut self, date_of_demolition: Option<NaiveDate>) {
+    fn set_date_of_demolition(&mut self, date_of_demolition: Option<Date>) {
         self.abstract_construction_mut().date_of_demolition = date_of_demolition;
+    }
+
+    fn heights_mut(&mut self) -> &mut Vec<Height> {
+        &mut self.abstract_construction_mut().heights
+    }
+
+    fn set_heights(&mut self, values: Vec<Height>) {
+        self.abstract_construction_mut().heights = values;
+    }
+
+    fn push_height(&mut self, height: Height) {
+        self.abstract_construction_mut().heights.push(height);
+    }
+
+    fn extend_heights(&mut self, heights: impl IntoIterator<Item = Height>) {
+        self.abstract_construction_mut().heights.extend(heights);
     }
 
     fn occupancies_mut(&mut self) -> &mut Vec<Occupancy> {

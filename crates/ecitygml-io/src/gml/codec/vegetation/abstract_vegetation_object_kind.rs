@@ -3,22 +3,23 @@ use crate::gml::codec::vegetation::{
     deserialize_plant_cover, deserialize_solitary_vegetation_object, serialize_plant_cover,
     serialize_solitary_vegetation_object,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{CityGmlElement, CombinedCityGmlElement, DeserializationConfig};
 use ecitygml_core::model::vegetation::AbstractVegetationObjectKind;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
 pub fn deserialize_abstract_vegetation_object_kind(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<Option<AbstractVegetationObjectKind>, Error> {
-    if let Some(span) = spans.first(CityGmlElement::PlantCover.into()) {
-        let plant_cover = deserialize_plant_cover(&xml_document[span.start..span.end])?;
+    if let Some(index) = index.first(CityGmlElement::PlantCover.into()) {
+        let plant_cover = deserialize_plant_cover(&xml_document[index.range()], index, config)?;
         return Ok(Some(plant_cover.into()));
     }
 
-    if let Some(span) = spans.first(CityGmlElement::SolitaryVegetationObject.into()) {
+    if let Some(index) = index.first(CityGmlElement::SolitaryVegetationObject.into()) {
         let solitary_vegetation_object =
-            deserialize_solitary_vegetation_object(&xml_document[span.start..span.end])?;
+            deserialize_solitary_vegetation_object(&xml_document[index.range()], index, config)?;
         return Ok(Some(solitary_vegetation_object.into()));
     }
 
@@ -27,12 +28,14 @@ pub fn deserialize_abstract_vegetation_object_kind(
 
 pub fn serialize_abstract_vegetation_object_kind(
     abstract_vegetation_object_kind: &AbstractVegetationObjectKind,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
     match abstract_vegetation_object_kind {
-        AbstractVegetationObjectKind::PlantCover(x) => serialize_plant_cover(x, formatting),
+        AbstractVegetationObjectKind::PlantCover(x) => {
+            serialize_plant_cover(x, xml_fragment_writer)
+        }
         AbstractVegetationObjectKind::SolitaryVegetationObject(x) => {
-            serialize_solitary_vegetation_object(x, formatting)
+            serialize_solitary_vegetation_object(x, xml_fragment_writer)
         }
     }
 }

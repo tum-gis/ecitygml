@@ -1,130 +1,131 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_thematic_surface, serialize_abstract_thematic_surface,
+    serialize_abstract_thematic_surface_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::AsAbstractThematicSurface;
 use ecitygml_core::model::transportation::TrafficArea;
-use ecitygml_core::model::transportation::values::{
-    SurfaceMaterialValue, TrafficAreaClassValue, TrafficAreaFunctionValue, TrafficAreaUsageValue,
-};
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
-pub fn deserialize_traffic_area(xml_document: &[u8]) -> Result<TrafficArea, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let (abstract_thematic_surface_result, parsed_result) = rayon::join(
-        || deserialize_abstract_thematic_surface(xml_document, &spans),
-        || de::from_reader::<_, GmlTrafficArea>(xml_document).map_err(Error::from),
-    );
-    let abstract_thematic_surface = abstract_thematic_surface_result?;
-    let parsed = parsed_result?;
+pub fn deserialize_traffic_area(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<TrafficArea, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_thematic_surface =
+        deserialize_abstract_thematic_surface(xml_document, index, config)?;
     let mut traffic_area = TrafficArea::from_abstract_thematic_surface(abstract_thematic_surface);
 
-    traffic_area.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(TrafficAreaClassValue::from),
-    );
-    traffic_area.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(TrafficAreaFunctionValue::from)
-            .collect(),
-    );
-    traffic_area.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(TrafficAreaUsageValue::from)
-            .collect(),
-    );
-    traffic_area.set_surface_material_opt(
-        parsed
-            .surface_material
-            .map(Code::from)
-            .map(SurfaceMaterialValue::from),
-    );
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    traffic_area.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    traffic_area.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    traffic_area.set_usages(usages.into_iter().map(Into::into).collect());
+
+    let surface_material: Option<Code> = index
+        .first(CityGmlElement::SurfaceMaterialProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    traffic_area.set_surface_material_opt(surface_material.map(Into::into));
 
     Ok(traffic_area)
 }
 
 pub fn serialize_traffic_area(
     traffic_area: &TrafficArea,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts =
-        serialize_abstract_thematic_surface(traffic_area.abstract_thematic_surface(), formatting)?;
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_traffic_area_attributes(traffic_area);
 
-    if let Some(raw) = serialize_inner(GmlTrafficArea::from(traffic_area), formatting)? {
-        parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::TrafficArea,
+        attributes,
+    )?;
+
+    serialize_abstract_thematic_surface(
+        traffic_area.abstract_thematic_surface(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = traffic_area.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(CityGmlElement::TrafficArea.into(), parts))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlTrafficArea {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "tran:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "tran:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-
-    #[serde(
-        rename(serialize = "tran:surfaceMaterial", deserialize = "surfaceMaterial"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub surface_material: Option<GmlCode>,
-}
-
-impl From<&TrafficArea> for GmlTrafficArea {
-    fn from(item: &TrafficArea) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(TrafficAreaClassValue::code)
-                .map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(TrafficAreaFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(TrafficAreaUsageValue::code)
-                .map(Into::into)
-                .collect(),
-            surface_material: item
-                .surface_material()
-                .map(SurfaceMaterialValue::code)
-                .map(Into::into),
-        }
+    for function in traffic_area.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
+
+    for usage in traffic_area.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    if let Some(surface_material) = traffic_area.surface_material() {
+        serialize_code(
+            surface_material.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::SurfaceMaterialProperty,
+        )?;
+    }
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::TrafficArea,
+    )?;
+
+    Ok(())
+}
+
+pub fn serialize_traffic_area_attributes(traffic_area: &TrafficArea) -> Vec<(String, String)> {
+    serialize_abstract_thematic_surface_attributes(traffic_area.abstract_thematic_surface())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ecitygml_core::model::core::{
-        AsAbstractCityObject, AsAbstractFeature, AsAbstractOccupiedSpace, AsAbstractThematicSurface,
+        AsAbstractCityObject, AsAbstractFeature, AsAbstractThematicSurface,
     };
     use egml::model::base::Id;
 
@@ -144,7 +145,12 @@ mod tests {
                   <tran:surfaceMaterial>1</tran:surfaceMaterial>
                 </tran:TrafficArea>";
 
-        let traffic_area = deserialize_traffic_area(xml_document).expect("should work");
+        let traffic_area = deserialize_traffic_area(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             traffic_area.feature_id(),

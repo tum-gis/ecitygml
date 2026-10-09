@@ -4,7 +4,7 @@ use crate::model::core::refs::AbstractFeatureKindRefMut;
 use crate::model::core::{
     AbstractUnoccupiedSpace, AsAbstractUnoccupiedSpace, AsAbstractUnoccupiedSpaceMut,
 };
-use crate::model::transportation::GranularityValue;
+use crate::model::transportation::enums::GranularityValue;
 use crate::model::transportation::values::{
     AuxiliaryTrafficSpaceClassValue, AuxiliaryTrafficSpaceFunctionValue,
     AuxiliaryTrafficSpaceUsageValue,

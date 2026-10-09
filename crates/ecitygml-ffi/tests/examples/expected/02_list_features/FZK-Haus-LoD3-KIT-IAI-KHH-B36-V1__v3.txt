@@ -1,0 +1,12 @@
+Feature type              Count
+CityModel                     1
+Building                      1
+WallSurface                   4
+WindowSurface                11
+DoorSurface                   2
+RoofSurface                   2
+GroundSurface                 1
+Total                        22
+
+Buildings:
+  UUID_d281adfc-4901-0f52-540b-4cc1a9325f82

@@ -1,0 +1,19 @@
+# diplomat-tool configuration (read from this directory)
+
+[nanobind]
+# Name of the Python extension module. Only nanobind needs it; set globally it would also wrap the C++ API in an
+# extra namespace.
+lib-name = "ecitygml"
+
+[kotlin]
+# Package: `<domain>.<lib-name>` = space.envis.ecitygml
+lib-name = "ecitygml"
+domain = "space.envis"
+# The JVM loads libecitygml_ffi (JNA, `jna.library.path`).
+dylib-name = "ecitygml_ffi"
+
+[dotnet]
+# C#: namespace `Envis.Ecitygml` (Diplomat's .NET backend puts every type into one namespace).
+namespace = "Envis.Ecitygml"
+# The native library loaded at runtime (libecitygml_ffi).
+dylib_name = "ecitygml_ffi"

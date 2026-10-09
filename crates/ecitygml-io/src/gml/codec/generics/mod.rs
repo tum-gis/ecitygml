@@ -1,7 +1,7 @@
 mod abstract_generic_attribute;
 mod double_attribute;
 mod generic_attribute_property;
-mod generic_attribute_set;
+pub(crate) mod generic_attribute_set;
 mod generic_occupied_space;
 mod generic_thematic_surface;
 mod int_attribute;

@@ -17,12 +17,12 @@ use std::collections::HashMap;
 pub struct AbstractThematicSurface {
     pub(crate) abstract_space_boundary: AbstractSpaceBoundary,
     areas: Vec<QualifiedArea>,
-    lod0_multi_curve: Option<MultiCurveProperty>,
-    lod0_multi_surface: Option<MultiSurfaceProperty>,
-    lod1_multi_surface: Option<MultiSurfaceProperty>,
-    lod2_multi_surface: Option<MultiSurfaceProperty>,
-    lod3_multi_surface: Option<MultiSurfaceProperty>,
-    point_cloud: Option<AbstractPointCloudProperty>,
+    lod0_multi_curve: Option<Box<MultiCurveProperty>>,
+    lod0_multi_surface: Option<Box<MultiSurfaceProperty>>,
+    lod1_multi_surface: Option<Box<MultiSurfaceProperty>>,
+    lod2_multi_surface: Option<Box<MultiSurfaceProperty>>,
+    lod3_multi_surface: Option<Box<MultiSurfaceProperty>>,
+    point_cloud: Option<Box<AbstractPointCloudProperty>>,
 }
 
 impl AbstractThematicSurface {
@@ -52,27 +52,35 @@ pub trait AsAbstractThematicSurface: AsAbstractSpaceBoundary {
     }
 
     fn lod0_multi_curve(&self) -> Option<&MultiCurveProperty> {
-        self.abstract_thematic_surface().lod0_multi_curve.as_ref()
+        self.abstract_thematic_surface().lod0_multi_curve.as_deref()
     }
 
     fn lod0_multi_surface(&self) -> Option<&MultiSurfaceProperty> {
-        self.abstract_thematic_surface().lod0_multi_surface.as_ref()
+        self.abstract_thematic_surface()
+            .lod0_multi_surface
+            .as_deref()
     }
 
     fn lod1_multi_surface(&self) -> Option<&MultiSurfaceProperty> {
-        self.abstract_thematic_surface().lod1_multi_surface.as_ref()
+        self.abstract_thematic_surface()
+            .lod1_multi_surface
+            .as_deref()
     }
 
     fn lod2_multi_surface(&self) -> Option<&MultiSurfaceProperty> {
-        self.abstract_thematic_surface().lod2_multi_surface.as_ref()
+        self.abstract_thematic_surface()
+            .lod2_multi_surface
+            .as_deref()
     }
 
     fn lod3_multi_surface(&self) -> Option<&MultiSurfaceProperty> {
-        self.abstract_thematic_surface().lod3_multi_surface.as_ref()
+        self.abstract_thematic_surface()
+            .lod3_multi_surface
+            .as_deref()
     }
 
     fn point_cloud(&self) -> Option<&AbstractPointCloudProperty> {
-        self.abstract_thematic_surface().point_cloud.as_ref()
+        self.abstract_thematic_surface().point_cloud.as_deref()
     }
 
     fn multi_surfaces_by_lod(&self) -> HashMap<LevelOfDetail, &MultiSurfaceProperty> {
@@ -115,61 +123,63 @@ pub trait AsAbstractThematicSurfaceMut:
     }
 
     fn set_lod0_multi_curve(&mut self, value: Option<MultiCurveProperty>) {
-        self.abstract_thematic_surface_mut().lod0_multi_curve = value;
+        self.abstract_thematic_surface_mut().lod0_multi_curve = value.map(Box::new);
     }
 
     fn set_lod0_multi_surface(&mut self, value: Option<MultiSurfaceProperty>) {
-        self.abstract_thematic_surface_mut().lod0_multi_surface = value;
+        self.abstract_thematic_surface_mut().lod0_multi_surface = value.map(Box::new);
     }
 
     fn set_lod1_multi_surface(&mut self, value: Option<MultiSurfaceProperty>) {
-        self.abstract_thematic_surface_mut().lod1_multi_surface = value;
+        self.abstract_thematic_surface_mut().lod1_multi_surface = value.map(Box::new);
     }
 
     fn set_lod2_multi_surface(&mut self, value: Option<MultiSurfaceProperty>) {
-        self.abstract_thematic_surface_mut().lod2_multi_surface = value;
+        self.abstract_thematic_surface_mut().lod2_multi_surface = value.map(Box::new);
     }
 
     fn set_lod3_multi_surface(&mut self, value: Option<MultiSurfaceProperty>) {
-        self.abstract_thematic_surface_mut().lod3_multi_surface = value;
+        self.abstract_thematic_surface_mut().lod3_multi_surface = value.map(Box::new);
     }
 
     fn set_point_cloud(&mut self, value: Option<AbstractPointCloudProperty>) {
-        self.abstract_thematic_surface_mut().point_cloud = value;
+        self.abstract_thematic_surface_mut().point_cloud = value.map(Box::new);
     }
 
     fn lod0_multi_curve_mut(&mut self) -> Option<&mut MultiCurveProperty> {
         self.abstract_thematic_surface_mut()
             .lod0_multi_curve
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn lod0_multi_surface_mut(&mut self) -> Option<&mut MultiSurfaceProperty> {
         self.abstract_thematic_surface_mut()
             .lod0_multi_surface
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn lod1_multi_surface_mut(&mut self) -> Option<&mut MultiSurfaceProperty> {
         self.abstract_thematic_surface_mut()
             .lod1_multi_surface
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn lod2_multi_surface_mut(&mut self) -> Option<&mut MultiSurfaceProperty> {
         self.abstract_thematic_surface_mut()
             .lod2_multi_surface
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn lod3_multi_surface_mut(&mut self) -> Option<&mut MultiSurfaceProperty> {
         self.abstract_thematic_surface_mut()
             .lod3_multi_surface
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn point_cloud_mut(&mut self) -> Option<&mut AbstractPointCloudProperty> {
-        self.abstract_thematic_surface_mut().point_cloud.as_mut()
+        self.abstract_thematic_surface_mut()
+            .point_cloud
+            .as_deref_mut()
     }
 }
 

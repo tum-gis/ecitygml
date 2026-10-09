@@ -1,0 +1,71 @@
+package space.envis.ecitygml;
+import com.sun.jna.Callback
+import com.sun.jna.Library
+import com.sun.jna.Native
+import com.sun.jna.Pointer
+import com.sun.jna.Structure
+
+internal interface AbstractSurfacePropertyIteratorLib: Library {
+    fun ecitygml_AbstractSurfacePropertyIterator_destroy(handle: Pointer)
+    fun ecitygml_AbstractSurfacePropertyIterator_next(handle: Pointer): Pointer?
+}
+typealias AbstractSurfacePropertyIteratorIteratorItem = AbstractSurfaceProperty?
+/** Iterates over curve properties, borrowed from a city model.
+*/
+class AbstractSurfacePropertyIterator internal constructor (
+    internal val handle: Pointer,
+    // These ensure that anything that is borrowed is kept alive and not cleaned
+    // up by the garbage collector.
+    internal val selfEdges: List<Any>,
+    internal val aEdges: List<Any?>,
+    internal var owned: Boolean,
+): Iterator<AbstractSurfaceProperty?> {
+
+    init {
+        if (this.owned) {
+            this.registerCleaner()
+        }
+    }
+
+    private class AbstractSurfacePropertyIteratorCleaner(val handle: Pointer, val lib: AbstractSurfacePropertyIteratorLib) : Runnable {
+        override fun run() {
+            lib.ecitygml_AbstractSurfacePropertyIterator_destroy(handle)
+        }
+    }
+    private fun registerCleaner() {
+        CLEANER.register(this, AbstractSurfacePropertyIterator.AbstractSurfacePropertyIteratorCleaner(handle, AbstractSurfacePropertyIterator.lib));
+    }
+
+    companion object {
+        internal val libClass: Class<AbstractSurfacePropertyIteratorLib> = AbstractSurfacePropertyIteratorLib::class.java
+        internal val lib: AbstractSurfacePropertyIteratorLib = Native.load("ecitygml_ffi", libClass)
+    }
+    
+    internal fun nextInternal(): AbstractSurfaceProperty? {
+        // This lifetime edge depends on lifetimes: 'a
+        val aEdges: MutableList<Any> = mutableListOf(this);
+        
+        val returnVal = lib.ecitygml_AbstractSurfacePropertyIterator_next(handle);
+        val selfEdges: List<Any> = listOf(this)
+        val handle = returnVal ?: return null
+        val returnOpaque = AbstractSurfaceProperty(handle, selfEdges, false)
+        return returnOpaque
+    }
+
+    var iterVal = nextInternal()
+
+    override fun hasNext(): Boolean {
+       return iterVal != null
+    }
+
+    override fun next(): AbstractSurfaceProperty?{
+        val returnVal = iterVal
+        if (returnVal == null) {
+            throw NoSuchElementException()
+        } else {
+            iterVal = nextInternal()
+            return returnVal
+        }
+    }
+
+}

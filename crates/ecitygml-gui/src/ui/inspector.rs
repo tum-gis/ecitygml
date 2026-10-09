@@ -163,13 +163,20 @@ fn attribute_row(ui: &mut egui::Ui, name: &str, value: &str) {
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(name).strong());
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(value);
+            truncated_value(ui, value);
         });
     });
 }
 
 fn row(ui: &mut egui::Ui, label: &str, value: &str) {
     ui.label(egui::RichText::new(label).strong());
-    ui.label(value);
+    truncated_value(ui, value);
     ui.end_row();
+}
+
+/// Renders `value` truncated to the available width so long values never
+/// force the Inspector panel to grow; the full text is shown on hover.
+fn truncated_value(ui: &mut egui::Ui, value: &str) {
+    ui.add(egui::Label::new(value).truncate())
+        .on_hover_text(value);
 }

@@ -14,14 +14,23 @@ use ecitygml_core::store::CityModelGraphicsStore;
 use ecitygml_core::store::ImplicitGeometryStore;
 use egml::model::base::Id;
 use egml::model::geometry::Envelope;
-use nalgebra::{Point3, Vector3};
+use nalgebra::Point3;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use three_d::{
     AmbientLight, Camera, ClearState, Context, CpuMaterial, CpuMesh, DepthTest, DirectionalLight,
-    Gm, Indices, InstancedMesh, Instances, Mat4, Mesh, PhysicalMaterial, PhysicalPoint, Positions,
-    RenderStates, Srgba, Vec3, WriteMask,
+    Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, PhysicalMaterial, PhysicalPoint,
+    Positions, RenderStates, Srgba, Vec3, WriteMask,
 };
+
+/// Clear color used for the interactive viewport. Screenshot export uses its own
+/// (white) background instead — see `screenshot::BACKGROUND` — so the two are
+/// deliberately kept independent rather than sharing one constant.
+pub const VIEWPORT_BACKGROUND: ClearState = ClearState::color_and_depth(0.9, 0.9, 0.9, 1.0, 1.0);
+
+/// Vertical field of view the camera is constructed with in `main.rs`. `fit_camera` needs this
+/// to compute a distance that frames the whole model, so it's shared rather than duplicated.
+pub const CAMERA_FOV_Y_DEGREES: f32 = 45.0;
 
 pub struct SceneEntry {
     pub id: Id,
@@ -175,6 +184,7 @@ impl Scene {
         target: &three_d::RenderTarget,
         camera: &Camera,
         hidden: &HashSet<FeatureType>,
+        clear: ClearState,
     ) {
         let lights: &[&dyn three_d::Light] = &[&self.ambient, &self.sun];
         let visible: Vec<&Gm<Mesh, PhysicalMaterial>> = self
@@ -190,9 +200,7 @@ impl Scene {
             .map(|(_, gm)| gm)
             .collect();
 
-        target
-            .clear(ClearState::color_and_depth(0.9, 0.9, 0.9, 1.0, 1.0))
-            .render(camera, visible, lights);
+        target.clear(clear).render(camera, visible, lights);
         target.render(camera, visible_instanced, lights);
 
         if let Some(overlay) = &self.selected_overlay {
@@ -248,8 +256,8 @@ impl Scene {
         let dir = camera.view_direction_at_pixel(pixel);
 
         let ray = Ray::new(
-            Point3::new(origin.x, origin.y, origin.z),
-            Vector3::new(dir.x, dir.y, dir.z),
+            [origin.x, origin.y, origin.z].into(),
+            [dir.x, dir.y, dir.z].into(),
         );
         let inv = [1.0 / dir.x, 1.0 / dir.y, 1.0 / dir.z];
         let o = [origin.x, origin.y, origin.z];
@@ -274,13 +282,37 @@ impl Scene {
             .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
     }
 
+    /// Frames the whole model, not just a fixed-size neighborhood of the origin: distance is
+    /// derived from the actual bounding box of every entry so both small fixtures and
+    /// city-scale datasets end up fully visible after load or on "recenter".
     pub fn fit_camera(&self, camera: &mut Camera) {
-        if self.entries.is_empty() {
+        let overall = self
+            .entries
+            .iter()
+            .filter_map(|e| e.bounds)
+            .fold(Aabb::empty(), |acc, b| acc.join(&b));
+        if overall.is_empty() {
             return;
         }
+
+        let center = overall.center();
+        let size = overall.size();
+        let radius = (size.x * size.x + size.y * size.y + size.z * size.z).sqrt() * 0.5;
+        let radius = radius.max(1.0);
+
+        let half_fov_y = (CAMERA_FOV_Y_DEGREES / 2.0).to_radians();
+        let half_fov_x = (half_fov_y.tan() * camera.viewport().aspect()).atan();
+        let half_fov = half_fov_y.min(half_fov_x);
+        // 1.15x padding so the model doesn't touch the viewport edges exactly.
+        let distance = radius / half_fov.tan() * 1.0;
+
+        // Camera sits south of and above the target, at a 45° tilt, so the initial view looks
+        // north — the CRS convention assumed here is X = easting, Y = northing, Z = height.
+        let direction = Vec3::new(0.0, -1.0, 1.0).normalize();
+        let target = Vec3::new(center.x, center.y, center.z);
         camera.set_view(
-            Vec3::new(200.0, -200.0, 200.0),
-            Vec3::new(0.0, 0.0, 0.0),
+            target + direction * distance,
+            target,
             Vec3::new(0.0, 0.0, 1.0),
         );
     }
@@ -423,16 +455,18 @@ fn build_bounds(
     let env = egml::model::feature::AsAbstractFeature::bounded_by(city_object)
         .and_then(|x| x.envelope())?;
     Some(Aabb::with_bounds(
-        Point3::new(
+        [
             (env.lower_corner().x() - center.x) as f32,
             (env.lower_corner().y() - center.y) as f32,
             (env.lower_corner().z() - center.z) as f32,
-        ),
-        Point3::new(
+        ]
+        .into(),
+        [
             (env.upper_corner().x() - center.x) as f32,
             (env.upper_corner().y() - center.y) as f32,
             (env.upper_corner().z() - center.z) as f32,
-        ),
+        ]
+        .into(),
     ))
 }
 

@@ -10,6 +10,7 @@ use crate::model::construction::{
     AbstractConstruction, AsAbstractConstruction, AsAbstractConstructionMut,
 };
 
+use crate::model::core::AddressProperty;
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
 use egml::model::base::Id;
@@ -30,6 +31,7 @@ pub struct AbstractBuilding {
     building_installations: Vec<BuildingInstallationProperty>,
     building_rooms: Vec<BuildingRoomProperty>,
     building_subdivisions: Vec<AbstractBuildingSubdivisionProperty>,
+    addresses: Vec<AddressProperty>,
 }
 
 impl AbstractBuilding {
@@ -50,6 +52,7 @@ impl AbstractBuilding {
             building_installations: Vec::new(),
             building_rooms: Vec::new(),
             building_subdivisions: Vec::new(),
+            addresses: Vec::new(),
         }
     }
 }
@@ -123,6 +126,10 @@ pub trait AsAbstractBuilding: AsAbstractConstruction {
 
     fn building_subdivisions(&self) -> &[AbstractBuildingSubdivisionProperty] {
         &self.abstract_building().building_subdivisions
+    }
+
+    fn addresses(&self) -> &[AddressProperty] {
+        &self.abstract_building().addresses
     }
 }
 
@@ -326,6 +333,22 @@ pub trait AsAbstractBuildingMut: AsAbstractConstructionMut + AsAbstractBuilding 
         self.abstract_building_mut()
             .building_subdivisions
             .extend(subdivisions);
+    }
+
+    fn addresses_mut(&mut self) -> &mut [AddressProperty] {
+        &mut self.abstract_building_mut().addresses
+    }
+
+    fn set_addresses(&mut self, addresses: Vec<AddressProperty>) {
+        self.abstract_building_mut().addresses = addresses;
+    }
+
+    fn push_address(&mut self, address: AddressProperty) {
+        self.abstract_building_mut().addresses.push(address);
+    }
+
+    fn extend_addresses(&mut self, addresses: impl IntoIterator<Item = AddressProperty>) {
+        self.abstract_building_mut().addresses.extend(addresses);
     }
 }
 

@@ -1,0 +1,19 @@
+{
+  "name": "ecitygml",
+  "version": "0.0.1-alpha.206",
+  "description": "TypeScript/JavaScript bindings for ecitygml (WebAssembly), generated with Diplomat.",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.mjs"
+    }
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

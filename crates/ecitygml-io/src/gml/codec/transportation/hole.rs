@@ -1,62 +1,70 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_unoccupied_space, serialize_abstract_unoccupied_space,
+    serialize_abstract_unoccupied_space_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::AsAbstractUnoccupiedSpace;
 use ecitygml_core::model::transportation::Hole;
-use ecitygml_core::model::transportation::values::HoleClassValue;
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
-pub fn deserialize_hole(xml_document: &[u8]) -> Result<Hole, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let (abstract_unoccupied_space_result, parsed_result) = rayon::join(
-        || deserialize_abstract_unoccupied_space(xml_document, &spans),
-        || de::from_reader::<_, GmlHole>(xml_document).map_err(Error::from),
-    );
-    let abstract_unoccupied_space = abstract_unoccupied_space_result?;
-    let parsed = parsed_result?;
+pub fn deserialize_hole(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Hole, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_unoccupied_space =
+        deserialize_abstract_unoccupied_space(xml_document, index, config)?;
 
     let mut hole = Hole::from_abstract_unoccupied_space(abstract_unoccupied_space);
 
-    hole.set_class_opt(parsed.class.map(Code::from).map(HoleClassValue::from));
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    hole.set_class_opt(class.map(Into::into));
 
     Ok(hole)
 }
 
-pub fn serialize_hole(hole: &Hole, formatting: Formatting) -> Result<XmlNode, Error> {
-    let mut xml_node_parts =
-        serialize_abstract_unoccupied_space(hole.abstract_unoccupied_space(), formatting)?;
+pub fn serialize_hole(
+    hole: &Hole,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_hole_attributes(hole);
 
-    if let Some(raw) = serialize_inner(GmlHole::from(hole), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::Hole,
+        attributes,
+    )?;
+
+    serialize_abstract_unoccupied_space(hole.abstract_unoccupied_space(), xml_fragment_writer)?;
+
+    if let Some(class) = hole.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::ClearanceSpace.into(),
-        xml_node_parts,
-    ))
+    xml_fragment_writer.write_end_event(CityGmlNamespace::Transportation, CityGmlElement::Hole)?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlHole {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-}
-
-impl From<&Hole> for GmlHole {
-    fn from(item: &Hole) -> Self {
-        Self {
-            class: item.class().map(HoleClassValue::code).map(Into::into),
-        }
-    }
+pub fn serialize_hole_attributes(hole: &Hole) -> Vec<(String, String)> {
+    serialize_abstract_unoccupied_space_attributes(hole.abstract_unoccupied_space())
 }

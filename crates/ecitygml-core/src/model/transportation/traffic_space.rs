@@ -3,12 +3,12 @@ use crate::model::core::refs::{AbstractFeatureKindRef, AbstractFeatureKindRefMut
 use crate::model::core::{
     AbstractUnoccupiedSpace, AsAbstractUnoccupiedSpace, AsAbstractUnoccupiedSpaceMut, Occupancy,
 };
+use crate::model::transportation::ClearanceSpaceProperty;
 use crate::model::transportation::TrafficSpaceReference;
-use crate::model::transportation::granularity_value::GranularityValue;
+use crate::model::transportation::enums::{GranularityValue, TrafficDirectionValue};
 use crate::model::transportation::values::{
     TrafficSpaceClassValue, TrafficSpaceFunctionValue, TrafficSpaceUsageValue,
 };
-use crate::model::transportation::{ClearanceSpaceProperty, TrafficDirectionValue};
 use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;

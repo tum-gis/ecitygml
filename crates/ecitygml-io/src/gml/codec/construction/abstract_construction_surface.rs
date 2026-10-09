@@ -4,27 +4,33 @@ use crate::gml::codec::construction::abstract_filling_surface_property::{
 };
 use crate::gml::codec::core::{
     deserialize_abstract_thematic_surface, serialize_abstract_thematic_surface,
+    serialize_abstract_thematic_surface_attributes,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{CityGmlElement, CombinedCityGmlElement, DeserializationConfig};
 use ecitygml_core::model::construction::{
     AbstractConstructionSurface, AsAbstractConstructionSurface, AsAbstractConstructionSurfaceMut,
 };
 use ecitygml_core::model::core::AsAbstractThematicSurface;
-use egml::io::util::collect_children;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNodeContent, XmlNodeParts, serialize_inner};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter, collect_children};
 
 pub fn deserialize_abstract_construction_surface(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractConstructionSurface, Error> {
+    debug_assert!(
+        !index.is_truncated(),
+        "deserialize_abstract_construction_surface received a truncated index — caller must scan to sufficient depth"
+    );
+
     let (abstract_thematic_surface_result, filling_surfaces_result) = rayon::join(
-        || deserialize_abstract_thematic_surface(xml_document, spans),
+        || deserialize_abstract_thematic_surface(xml_document, index, config),
         || {
             collect_children(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::AbstractFillingSurfaceProperty.into(),
+                config,
                 deserialize_abstract_filling_surface_property,
             )
         },
@@ -41,38 +47,24 @@ pub fn deserialize_abstract_construction_surface(
 
 pub fn serialize_abstract_construction_surface(
     abstract_construction_surface: &AbstractConstructionSurface,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
-    let mut xml_node_parts = serialize_abstract_thematic_surface(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    serialize_abstract_thematic_surface(
         abstract_construction_surface.abstract_thematic_surface(),
-        formatting,
+        xml_fragment_writer,
     )?;
 
-    if let Some(raw) = serialize_inner(
-        GmlAbstractConstructionSurface::from(abstract_construction_surface),
-        formatting,
-    )? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    for prop in abstract_construction_surface.filling_surfaces() {
+        serialize_abstract_filling_surface_property(prop, xml_fragment_writer)?;
     }
 
-    xml_node_parts.content.extend(
-        abstract_construction_surface
-            .filling_surfaces()
-            .iter()
-            .map(|x| {
-                serialize_abstract_filling_surface_property(x, formatting).map(XmlNodeContent::from)
-            })
-            .collect::<Result<Vec<_>, _>>()?,
-    );
-
-    Ok(xml_node_parts)
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractConstructionSurface {}
-
-impl From<&AbstractConstructionSurface> for GmlAbstractConstructionSurface {
-    fn from(_item: &AbstractConstructionSurface) -> Self {
-        Self {}
-    }
+pub fn serialize_abstract_construction_surface_attributes(
+    abstract_construction_surface: &AbstractConstructionSurface,
+) -> Vec<(String, String)> {
+    serialize_abstract_thematic_surface_attributes(
+        abstract_construction_surface.abstract_thematic_surface(),
+    )
 }

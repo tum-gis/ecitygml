@@ -2,58 +2,68 @@ use crate::Error;
 use crate::gml::codec::construction::{
     deserialize_abstract_filling_element_kind, serialize_abstract_filling_element_kind,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::construction::AbstractFillingElementProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_abstract_filling_element_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractFillingElementProperty, Error> {
-    let parsed: GmlFillingElementProperty = de::from_reader(xml_document)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
-    let object = deserialize_abstract_filling_element_kind(xml_document, spans)?;
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
+    let object = deserialize_abstract_filling_element_kind(xml_document, index, config)?;
 
     Ok(AbstractFillingElementProperty::new(
         object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
+        association,
+        ownership,
     ))
 }
 
 pub fn serialize_abstract_filling_element_property(
     abstract_filling_element_property: &AbstractFillingElementProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-    parts.attributes.extend(serialize_association_attributes(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
         abstract_filling_element_property.association(),
-    ));
-    parts.attributes.extend(serialize_ownership_attributes(
         abstract_filling_element_property.ownership(),
-    ));
-    if let Some(object) = abstract_filling_element_property.object() {
-        parts.content.push(XmlNodeContent::Child(
-            serialize_abstract_filling_element_kind(object, formatting)?,
-        ));
-    }
-    Ok(XmlNode::new(
-        CityGmlElement::AbstractFillingElementProperty.into(),
-        parts,
-    ))
-}
+    );
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlFillingElementProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    match abstract_filling_element_property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Core,
+                CityGmlElement::AbstractFillingElementProperty,
+                attributes,
+            )?;
+            serialize_abstract_filling_element_kind(object, xml_fragment_writer)?;
+            xml_fragment_writer.write_end_event(
+                CityGmlNamespace::Core,
+                CityGmlElement::AbstractFillingElementProperty,
+            )?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Core,
+                CityGmlElement::AbstractFillingElementProperty,
+                attributes,
+            )?;
+        }
+    }
+
+    Ok(())
 }

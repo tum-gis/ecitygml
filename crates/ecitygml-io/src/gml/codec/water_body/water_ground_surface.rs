@@ -1,16 +1,27 @@
 use crate::Error;
 use crate::gml::codec::water_body::abstract_water_boundary_surface::{
     deserialize_abstract_water_boundary_surface, serialize_abstract_water_boundary_surface,
+    serialize_abstract_water_boundary_surface_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::water_body::{AsAbstractWaterBoundarySurface, WaterGroundSurface};
-use egml::io::util::{Formatting, XmlNode, extract_xml_element_spans};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
-pub fn deserialize_water_ground_surface(xml_document: &[u8]) -> Result<WaterGroundSurface, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_water_ground_surface(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<WaterGroundSurface, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
     let abstract_water_boundary_surface =
-        deserialize_abstract_water_boundary_surface(xml_document, &spans)?;
+        deserialize_abstract_water_boundary_surface(xml_document, index, config)?;
     let water_ground_surface =
         WaterGroundSurface::from_abstract_water_boundary_surface(abstract_water_boundary_surface);
 
@@ -19,24 +30,33 @@ pub fn deserialize_water_ground_surface(xml_document: &[u8]) -> Result<WaterGrou
 
 pub fn serialize_water_ground_surface(
     water_ground_surface: &WaterGroundSurface,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let xml_node_parts = serialize_abstract_water_boundary_surface(
-        water_ground_surface.abstract_water_boundary_surface(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_water_ground_surface_attributes(water_ground_surface);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::WaterBody,
+        CityGmlElement::WaterGroundSurface,
+        attributes,
     )?;
 
-    Ok(XmlNode::new(
-        CityGmlElement::WaterGroundSurface.into(),
-        xml_node_parts,
-    ))
+    serialize_abstract_water_boundary_surface(
+        water_ground_surface.abstract_water_boundary_surface(),
+        xml_fragment_writer,
+    )?;
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::WaterBody,
+        CityGmlElement::WaterGroundSurface,
+    )?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlWaterGroundSurface {}
-
-impl From<&WaterGroundSurface> for GmlWaterGroundSurface {
-    fn from(_item: &WaterGroundSurface) -> Self {
-        Self {}
-    }
+pub fn serialize_water_ground_surface_attributes(
+    water_ground_surface: &WaterGroundSurface,
+) -> Vec<(String, String)> {
+    serialize_abstract_water_boundary_surface_attributes(
+        water_ground_surface.abstract_water_boundary_surface(),
+    )
 }

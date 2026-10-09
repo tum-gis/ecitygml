@@ -4,9 +4,10 @@ use crate::model::core::refs::AbstractFeatureKindRefMut;
 use crate::model::core::{
     AbstractUnoccupiedSpace, AsAbstractUnoccupiedSpace, AsAbstractUnoccupiedSpaceMut, Occupancy,
 };
+use crate::model::transportation::enums::TrafficDirectionValue;
 use crate::model::transportation::marking_property::MarkingProperty;
 use crate::model::transportation::{
-    AuxiliaryTrafficSpaceProperty, HoleProperty, TrafficDirectionValue, TrafficSpaceProperty,
+    AuxiliaryTrafficSpaceProperty, HoleProperty, TrafficSpaceProperty,
 };
 use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};

@@ -1,79 +1,144 @@
 use crate::Error;
+use crate::gml::util::{CityGmlElement, CityGmlNamespace};
 use ecitygml_core::model::core::TransformationMatrix4x4;
-use egml::io::util::serde_helpers::{
-    deserialize_space_separated_f64, serialize_space_separated_f64,
-};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlFragmentWriter};
+use quick_xml::Reader;
+use quick_xml::events::Event;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlTransformationMatrix4x4 {
-    #[serde(
-        rename = "$value",
-        deserialize_with = "deserialize_space_separated_f64",
-        serialize_with = "serialize_space_separated_f64"
-    )]
-    pub values: Vec<f64>,
-}
+pub fn deserialize_transformation_matrix_4x4(
+    xml_document: &[u8],
+) -> Result<TransformationMatrix4x4, Error> {
+    let mut reader = Reader::from_reader(xml_document);
+    reader.config_mut().trim_text(true);
 
-impl TryFrom<GmlTransformationMatrix4x4> for TransformationMatrix4x4 {
-    type Error = Error;
-
-    fn try_from(item: GmlTransformationMatrix4x4) -> Result<Self, Self::Error> {
-        Ok(TransformationMatrix4x4::try_from_row_major(item.values)?)
-    }
-}
-
-impl From<TransformationMatrix4x4> for GmlTransformationMatrix4x4 {
-    fn from(item: TransformationMatrix4x4) -> Self {
-        Self {
-            values: item.to_row_major(),
+    loop {
+        match reader.read_event()? {
+            Event::Text(text) => {
+                let value = text.as_ref();
+                return transformation_matrix_4x4_from_str(value);
+            }
+            Event::CData(cdata) => {
+                let value = cdata.as_ref();
+                return transformation_matrix_4x4_from_str(value);
+            }
+            Event::Eof => {
+                return Err(Error::ElementNotFound(
+                    "transformationMatrix text content".to_string(),
+                ));
+            }
+            _ => {}
         }
     }
+}
+
+pub fn serialize_transformation_matrix_4x4(
+    matrix: &TransformationMatrix4x4,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+    target_xml_namespace: CityGmlNamespace,
+    target_xml_element: CityGmlElement,
+) -> Result<(), Error> {
+    let value = matrix
+        .to_row_major()
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    xml_fragment_writer.write_leaf_element(target_xml_namespace, target_xml_element, &value)?;
+
+    Ok(())
+}
+
+fn transformation_matrix_4x4_from_str(value: &str) -> Result<TransformationMatrix4x4, Error> {
+    let values: Vec<f64> = value
+        .split_whitespace()
+        .filter_map(|v| v.parse().ok())
+        .collect();
+
+    Ok(TransformationMatrix4x4::try_from_row_major(values)?)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use quick_xml::de;
-    use quick_xml::se::to_string;
+    use egml::io::util::Formatting;
 
     #[test]
-    fn test_deserialize_transformation_matrix_4x4_basic() {
+    fn test_deserialize_transformation_matrix_4x4() {
         let xml_document = b"<transformationMatrix>-0.5894514707536183 -0.8078037903020735 0.0 0.0 0.8078037903020735 -0.5894514707536183 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0</transformationMatrix>";
 
-        let gml: GmlTransformationMatrix4x4 =
-            de::from_reader(xml_document.as_ref()).expect("should deserialize");
-        assert_eq!(gml.values.len(), 16);
+        let matrix = deserialize_transformation_matrix_4x4(xml_document).expect("should work");
+
+        assert_eq!(matrix.matrix()[(0, 1)], -0.8078037903020735);
     }
 
     #[test]
-    fn test_try_from_valid() {
-        let values: Vec<f64> = vec![
-            -0.589, -0.808, 0.0, 0.0, 0.808, -0.589, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-            1.0,
-        ];
-        let gml = GmlTransformationMatrix4x4 { values };
-        let matrix: TransformationMatrix4x4 = gml.try_into().expect("should convert");
-        assert_eq!(matrix.matrix()[(0, 1)], -0.808);
-    }
+    fn test_deserialize_transformation_matrix_4x4_rejects_wrong_count() {
+        let xml_document = b"<transformationMatrix>1.0 2.0 3.0</transformationMatrix>";
 
-    #[test]
-    fn test_try_from_wrong_count() {
-        let gml = GmlTransformationMatrix4x4 {
-            values: vec![1.0; 9],
-        };
-        let result = TransformationMatrix4x4::try_from(gml);
+        let result = deserialize_transformation_matrix_4x4(xml_document);
+
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_roundtrip() {
-        let xml_document = b"<transformationMatrix>1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0</transformationMatrix>";
-        let gml: GmlTransformationMatrix4x4 =
-            de::from_reader(xml_document.as_ref()).expect("deserialize");
-        let matrix: TransformationMatrix4x4 = gml.try_into().expect("convert");
-        let gml2 = GmlTransformationMatrix4x4::from(matrix);
-        let xml_out = to_string(&gml2).expect("serialize");
-        assert!(xml_out.contains("1 0 0 0"));
+    fn test_serialize_transformation_matrix_4x4() {
+        let matrix = TransformationMatrix4x4::try_from_row_major(vec![
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ])
+        .expect("should build");
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_transformation_matrix_4x4(
+            &matrix,
+            &mut xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::TransformationMatrixProperty,
+        )
+        .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        assert_eq!(
+            xml,
+            "<transformationMatrix>1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1</transformationMatrix>"
+        );
+    }
+
+    #[test]
+    fn test_round_trip_transformation_matrix_4x4() {
+        let xml_document = b"<transformationMatrix>10.289999999999994 0.0 0.0 0.0 0.0 10.289999999999994 0.0 0.0 0.0 0.0 10.289999999999994 0.0 0.0 0.0 0.0 1.0</transformationMatrix>";
+
+        let matrix = deserialize_transformation_matrix_4x4(xml_document).expect("should work");
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_transformation_matrix_4x4(
+            &matrix,
+            &mut xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::TransformationMatrixProperty,
+        )
+        .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        let round_tripped =
+            deserialize_transformation_matrix_4x4(xml.as_bytes()).expect("should work");
+
+        assert_eq!(matrix, round_tripped);
     }
 }

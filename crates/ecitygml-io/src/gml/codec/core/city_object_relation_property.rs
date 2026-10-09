@@ -2,68 +2,72 @@ use crate::Error;
 use crate::gml::codec::core::city_object_relation::{
     deserialize_city_object_relation, serialize_city_object_relation,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::CityObjectRelationProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_city_object_relation_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<CityObjectRelationProperty, Error> {
-    let parsed: GmlCityObjectRelationProperty = de::from_reader(xml_document)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
     let mut object = None;
-    if let Some(span) = spans.first(CityGmlElement::CityObjectRelation.into()) {
+
+    if let Some(index) = index.first(CityGmlElement::CityObjectRelation.into()) {
         object = Some(deserialize_city_object_relation(
-            &xml_document[span.start..span.end],
+            &xml_document[index.range()],
         )?);
     }
 
     Ok(CityObjectRelationProperty::new(
         object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
+        association,
+        ownership,
     ))
 }
 
 pub fn serialize_city_object_relation_property(
     city_object_relation_property: &CityObjectRelationProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-
-    parts.attributes.extend(serialize_association_attributes(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
         city_object_relation_property.association(),
-    ));
-    parts.attributes.extend(serialize_ownership_attributes(
         city_object_relation_property.ownership(),
-    ));
+    );
 
-    if let Some(object) = city_object_relation_property.object() {
-        parts
-            .content
-            .push(XmlNodeContent::Child(serialize_city_object_relation(
-                object, formatting,
-            )?));
+    match city_object_relation_property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Core,
+                CityGmlElement::RelatedToProperty,
+                attributes,
+            )?;
+            serialize_city_object_relation(object, xml_fragment_writer)?;
+            xml_fragment_writer
+                .write_end_event(CityGmlNamespace::Core, CityGmlElement::RelatedToProperty)?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Core,
+                CityGmlElement::RelatedToProperty,
+                attributes,
+            )?;
+        }
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::RelatedToProperty.into(),
-        parts,
-    ))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlCityObjectRelationProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    Ok(())
 }

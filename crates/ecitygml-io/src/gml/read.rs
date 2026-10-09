@@ -1,5 +1,6 @@
 use crate::error::Error;
 use crate::gml::read_impl::deserialize;
+use crate::gml::util::DeserializationConfig;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
@@ -14,6 +15,7 @@ use std::path::Path;
 pub struct GmlReader<R: Read> {
     reader: R,
     format: CitygmlFormat,
+    config: DeserializationConfig,
     rebuild_object_bounds: bool,
 }
 
@@ -23,6 +25,7 @@ impl<R: Read> GmlReader<R> {
         Self {
             reader,
             format,
+            config: DeserializationConfig::default(),
             rebuild_object_bounds: true,
         }
     }
@@ -34,8 +37,16 @@ impl<R: Read> GmlReader<R> {
             CitygmlFormat::Gml => {
                 BufReader::new(self.reader).read_to_end(&mut content)?;
             }
+            #[cfg(not(target_arch = "wasm32"))]
             CitygmlFormat::GmlZst => {
                 zstd::Decoder::new(BufReader::new(self.reader))?.read_to_end(&mut content)?;
+            }
+            // Pure-Rust decoder (zstd's C code isn't built for WebAssembly).
+            #[cfg(target_arch = "wasm32")]
+            CitygmlFormat::GmlZst => {
+                ruzstd::decoding::StreamingDecoder::new(BufReader::new(self.reader))
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+                    .read_to_end(&mut content)?;
             }
             CitygmlFormat::GmlGz => {
                 flate2::read::GzDecoder::new(BufReader::new(self.reader))
@@ -53,7 +64,8 @@ impl<R: Read> GmlReader<R> {
 
     pub fn finish(self) -> Result<CityModel, Error> {
         let rebuild_object_bounds = self.rebuild_object_bounds;
-        let mut city_model = deserialize(self.read()?)?;
+        let deserialization_config = self.config;
+        let mut city_model = deserialize(self.read()?, &deserialization_config)?;
 
         if rebuild_object_bounds {
             city_model.recompute_child_bounding_shapes();

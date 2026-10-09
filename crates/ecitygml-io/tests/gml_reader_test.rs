@@ -5,7 +5,6 @@ use ecitygml_core::model::construction::{
 };
 use ecitygml_core::model::construction::{
     AbstractFillingSurfaceKind, AsAbstractConstructionSurface, DoorSurface, GroundSurface,
-    WindowSurface,
 };
 use ecitygml_core::model::core::enums::RelativeToTerrain;
 use ecitygml_core::model::core::{

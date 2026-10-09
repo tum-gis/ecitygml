@@ -2,75 +2,109 @@ use crate::Error;
 use crate::gml::codec::core::abstract_feature::{
     deserialize_abstract_feature, serialize_abstract_feature,
 };
-use crate::gml::util::CombinedCityGmlElement;
-use chrono::{DateTime, FixedOffset};
+use crate::gml::codec::core::serialize_abstract_feature_attributes;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::{
     AbstractFeatureWithLifespan, AsAbstractFeature, AsAbstractFeatureWithLifespan,
     AsAbstractFeatureWithLifespanMut,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNodeContent, XmlNodeParts, serialize_inner};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
+use egml::io::codec::xs::{deserialize_date_time, serialize_date_time};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
+use egml::model::xs::DateTime;
 
 pub fn deserialize_abstract_feature_with_lifespan(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractFeatureWithLifespan, Error> {
-    let abstract_feature = deserialize_abstract_feature(xml_document, spans)?;
-    let gml =
-        de::from_reader::<_, GmlAbstractFeatureWithLifespan>(xml_document).map_err(Error::from)?;
+    debug_assert!(
+        !index.is_truncated(),
+        "deserialize_abstract_feature_with_lifespan received a truncated index — caller must scan to sufficient depth"
+    );
 
+    let abstract_feature = deserialize_abstract_feature(xml_document, index, config)?;
     let mut abstract_feature_with_lifespan =
         AbstractFeatureWithLifespan::from_abstract_feature(abstract_feature);
-    abstract_feature_with_lifespan.set_creation_date(gml.creation_date);
-    abstract_feature_with_lifespan.set_termination_date(gml.termination_date);
-    abstract_feature_with_lifespan.set_valid_from(gml.valid_from);
-    abstract_feature_with_lifespan.set_valid_to(gml.valid_to);
+
+    let creation_date: Option<DateTime> = index
+        .first(CityGmlElement::CreationDateProperty.into())
+        .map(|x| deserialize_date_time(xml_document[x.range()].as_ref(), config.gml_config()))
+        .transpose()?;
+    abstract_feature_with_lifespan.set_creation_date(creation_date);
+
+    let termination_date: Option<DateTime> = index
+        .first(CityGmlElement::TerminationDateProperty.into())
+        .map(|x| deserialize_date_time(xml_document[x.range()].as_ref(), config.gml_config()))
+        .transpose()?;
+    abstract_feature_with_lifespan.set_termination_date(termination_date);
+
+    let valid_from: Option<DateTime> = index
+        .first(CityGmlElement::ValidFromProperty.into())
+        .map(|x| deserialize_date_time(xml_document[x.range()].as_ref(), config.gml_config()))
+        .transpose()?;
+    abstract_feature_with_lifespan.set_valid_from(valid_from);
+
+    let valid_to: Option<DateTime> = index
+        .first(CityGmlElement::ValidToProperty.into())
+        .map(|x| deserialize_date_time(xml_document[x.range()].as_ref(), config.gml_config()))
+        .transpose()?;
+    abstract_feature_with_lifespan.set_valid_to(valid_to);
 
     Ok(abstract_feature_with_lifespan)
 }
 
 pub fn serialize_abstract_feature_with_lifespan(
     abstract_feature_with_lifespan: &AbstractFeatureWithLifespan,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
-    let mut xml_node_parts = serialize_abstract_feature(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    serialize_abstract_feature(
         abstract_feature_with_lifespan.abstract_feature(),
-        formatting,
+        xml_fragment_writer,
     )?;
 
-    if let Some(raw) = serialize_inner(
-        GmlAbstractFeatureWithLifespan::from(abstract_feature_with_lifespan),
-        formatting,
-    )? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    if let Some(creation_date) = abstract_feature_with_lifespan.creation_date() {
+        serialize_date_time(
+            *creation_date,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::CreationDateProperty,
+        )?;
     }
 
-    Ok(xml_node_parts)
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractFeatureWithLifespan {
-    #[serde(rename = "creationDate", skip_serializing_if = "Option::is_none")]
-    pub creation_date: Option<DateTime<FixedOffset>>,
-
-    #[serde(rename = "terminationDate", skip_serializing_if = "Option::is_none")]
-    pub termination_date: Option<DateTime<FixedOffset>>,
-
-    #[serde(rename = "validFrom", skip_serializing_if = "Option::is_none")]
-    pub valid_from: Option<DateTime<FixedOffset>>,
-
-    #[serde(rename = "validTo", skip_serializing_if = "Option::is_none")]
-    pub valid_to: Option<DateTime<FixedOffset>>,
-}
-
-impl From<&AbstractFeatureWithLifespan> for GmlAbstractFeatureWithLifespan {
-    fn from(item: &AbstractFeatureWithLifespan) -> Self {
-        Self {
-            creation_date: item.creation_date().copied(),
-            termination_date: item.termination_date().copied(),
-            valid_from: item.valid_from().copied(),
-            valid_to: item.valid_to().copied(),
-        }
+    if let Some(termination_date) = abstract_feature_with_lifespan.termination_date() {
+        serialize_date_time(
+            *termination_date,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::TerminationDateProperty,
+        )?;
     }
+
+    if let Some(valid_from) = abstract_feature_with_lifespan.valid_from() {
+        serialize_date_time(
+            *valid_from,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::ValidFromProperty,
+        )?;
+    }
+
+    if let Some(valid_to) = abstract_feature_with_lifespan.valid_to() {
+        serialize_date_time(
+            *valid_to,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::ValidToProperty,
+        )?;
+    }
+
+    Ok(())
+}
+
+pub fn serialize_abstract_feature_with_lifespan_attributes(
+    abstract_feature_with_lifespan: &AbstractFeatureWithLifespan,
+) -> Vec<(String, String)> {
+    serialize_abstract_feature_attributes(abstract_feature_with_lifespan.abstract_feature())
 }

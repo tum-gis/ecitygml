@@ -111,7 +111,7 @@ fn pick_best_surface(
 }
 
 fn triangulate_solid(solid: &Solid) -> Option<Triangulation> {
-    let shell = solid.exterior().and_then(|sp| sp.object())?;
+    let shell = solid.exterior()?;
     shell.triangulate().ok()
 }
 

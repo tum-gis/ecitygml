@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn trait_implementation_macro_test() {
         let abstract_city_object =
-            AbstractCityObject::new(egml::model::base::Id::generate_uuid_v4());
+            AbstractCityObject::new(egml::model::base::Id::try_from("CO_1").expect("valid id"));
         abstract_city_object.feature_id();
     }
 }

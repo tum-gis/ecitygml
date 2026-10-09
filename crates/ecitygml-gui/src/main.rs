@@ -2,6 +2,7 @@ mod app;
 mod color;
 mod mesh;
 mod scene;
+mod screenshot;
 mod ui;
 
 use anyhow::Result;
@@ -9,8 +10,8 @@ use app::AppState;
 use scene::Scene;
 use three_d::egui;
 use three_d::{
-    Camera, ClearState, Event, FrameOutput, GUI, InnerSpace, MouseButton, OrbitControl,
-    PhysicalPoint, Viewport, Window, WindowSettings, degrees, vec3,
+    Camera, Event, FrameOutput, GUI, InnerSpace, MouseButton, OrbitControl, PhysicalPoint,
+    Viewport, Window, WindowSettings, degrees, vec3,
 };
 
 /// Number of idle frames before the selection overlay is rebuilt.
@@ -30,10 +31,10 @@ fn main() -> Result<()> {
 
     let mut camera = Camera::new_perspective(
         Viewport::new_at_origo(1, 1),
-        vec3(200.0, -200.0, 200.0),
+        vec3(0.0, -283.0, 283.0),
         vec3(0.0, 0.0, 0.0),
         vec3(0.0, 0.0, 1.0),
-        degrees(45.0),
+        degrees(scene::CAMERA_FOV_Y_DEGREES),
         0.1,
         100_000.0,
     );
@@ -52,6 +53,7 @@ fn main() -> Result<()> {
         {
             let new_scene = Scene::from_store(&context, graphics);
             new_scene.fit_camera(&mut camera);
+            orbit.target = camera.target();
             scene = Some(new_scene);
             idle_frames = IDLE_FRAMES;
         }
@@ -80,6 +82,9 @@ fn main() -> Result<()> {
         let mut toolbar_action = ui::toolbar::ToolbarAction {
             open_file: None,
             recenter: false,
+            screenshot: false,
+            toggle_sidebar: false,
+            toggle_inspector: false,
         };
 
         // Rect actually left over for the 3D viewport after toolbar/sidebar/inspector have
@@ -95,8 +100,12 @@ fn main() -> Result<()> {
             |ui| {
                 let ctx = ui.ctx().clone();
                 toolbar_action = ui::toolbar::show(&ctx, &state);
-                sidebar_action = ui::sidebar::show(&ctx, &state);
-                ui::inspector::show(&ctx, &state);
+                if state.show_sidebar {
+                    sidebar_action = ui::sidebar::show(&ctx, &state);
+                }
+                if state.show_inspector {
+                    ui::inspector::show(&ctx, &state);
+                }
                 // `available_rect` is deprecated in favor of `viewport_rect`/`content_rect`,
                 // but those never shrink as panels are added — `available_rect` is the only
                 // one that actually reflects space left after `Panel::show` calls.
@@ -188,7 +197,15 @@ fn main() -> Result<()> {
             && let Some(s) = &scene
         {
             s.fit_camera(&mut camera);
-            orbit.target = vec3(0.0, 0.0, 0.0);
+            orbit.target = camera.target();
+        }
+
+        if toolbar_action.toggle_sidebar {
+            state.show_sidebar = !state.show_sidebar;
+        }
+
+        if toolbar_action.toggle_inspector {
+            state.show_inspector = !state.show_inspector;
         }
 
         if let Some(ft) = sidebar_action.toggled_type {
@@ -218,11 +235,33 @@ fn main() -> Result<()> {
             s.set_selected(hit.as_ref());
         }
 
+        // Rendered into its own off-screen target (see `screenshot::capture_and_save`)
+        // rather than read back from `screen` below, so the white export background
+        // never touches — or flashes on — the interactive viewport.
+        if toolbar_action.screenshot
+            && let Some(s) = &scene
+            && let Some(status) = screenshot::capture_and_save(
+                &context,
+                s,
+                &camera,
+                &state.hidden_feature_types,
+                frame_input.viewport.width,
+                frame_input.viewport.height,
+            )
+        {
+            state.screenshot_status = Some(status);
+        }
+
         let screen = frame_input.screen();
         if let Some(s) = &scene {
-            s.render(&screen, &camera, &state.hidden_feature_types);
+            s.render(
+                &screen,
+                &camera,
+                &state.hidden_feature_types,
+                scene::VIEWPORT_BACKGROUND,
+            );
         } else {
-            screen.clear(ClearState::color_and_depth(0.9, 0.9, 0.9, 1.0, 1.0));
+            screen.clear(scene::VIEWPORT_BACKGROUND);
         }
         screen.write(|| gui.render()).unwrap();
 

@@ -1,4 +1,5 @@
 use crate::impl_try_from_occupied_space_kind_ref_mut_for_enum;
+use crate::model::bridge::BridgeConstructiveElement;
 use crate::model::building::BuildingConstructiveElement;
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
@@ -6,11 +7,14 @@ use crate::model::construction::{
     AbstractConstructiveElement, AbstractConstructiveElementKind, AsAbstractConstructiveElement,
     AsAbstractConstructiveElementMut,
 };
+use crate::model::tunnel::TunnelConstructiveElement;
 use egml::model::common::RecomputeBoundingShape;
 
 #[derive(Debug)]
 pub enum AbstractConstructiveElementKindRefMut<'a> {
     BuildingConstructiveElement(&'a mut BuildingConstructiveElement),
+    BridgeConstructiveElement(&'a mut BridgeConstructiveElement),
+    TunnelConstructiveElement(&'a mut TunnelConstructiveElement),
 }
 
 impl<'a> From<&'a mut AbstractConstructiveElementKind>
@@ -21,6 +25,12 @@ impl<'a> From<&'a mut AbstractConstructiveElementKind>
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
                 Self::BuildingConstructiveElement(x)
             }
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+                Self::BridgeConstructiveElement(x)
+            }
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
+                Self::TunnelConstructiveElement(x)
+            }
         }
     }
 }
@@ -29,6 +39,8 @@ impl<'a> AsAbstractConstructiveElement for AbstractConstructiveElementKindRefMut
     fn abstract_constructive_element(&self) -> &AbstractConstructiveElement {
         match self {
             Self::BuildingConstructiveElement(x) => x.abstract_constructive_element(),
+            Self::BridgeConstructiveElement(x) => x.abstract_constructive_element(),
+            Self::TunnelConstructiveElement(x) => x.abstract_constructive_element(),
         }
     }
 }
@@ -37,6 +49,8 @@ impl<'a> AsAbstractConstructiveElementMut for AbstractConstructiveElementKindRef
     fn abstract_constructive_element_mut(&mut self) -> &mut AbstractConstructiveElement {
         match self {
             Self::BuildingConstructiveElement(x) => x.abstract_constructive_element_mut(),
+            Self::BridgeConstructiveElement(x) => x.abstract_constructive_element_mut(),
+            Self::TunnelConstructiveElement(x) => x.abstract_constructive_element_mut(),
         }
     }
 }
@@ -47,6 +61,8 @@ impl<'a> HasFeatureType for AbstractConstructiveElementKindRefMut<'a> {
     fn feature_type(&self) -> FeatureType {
         match self {
             Self::BuildingConstructiveElement(x) => x.feature_type(),
+            Self::BridgeConstructiveElement(x) => x.feature_type(),
+            Self::TunnelConstructiveElement(x) => x.feature_type(),
         }
     }
 }
@@ -67,6 +83,8 @@ macro_rules! impl_from_constructive_element_kind_ref_mut {
     };
 }
 impl_from_constructive_element_kind_ref_mut!(BuildingConstructiveElement);
+impl_from_constructive_element_kind_ref_mut!(BridgeConstructiveElement);
+impl_from_constructive_element_kind_ref_mut!(TunnelConstructiveElement);
 
 #[macro_export]
 macro_rules! impl_try_from_constructive_element_kind_ref_mut {
@@ -91,6 +109,8 @@ macro_rules! impl_try_from_constructive_element_kind_ref_mut {
     };
 }
 impl_try_from_constructive_element_kind_ref_mut!(BuildingConstructiveElement);
+impl_try_from_constructive_element_kind_ref_mut!(BridgeConstructiveElement);
+impl_try_from_constructive_element_kind_ref_mut!(TunnelConstructiveElement);
 impl_try_from_occupied_space_kind_ref_mut_for_enum!(
     AbstractConstructiveElementKind,
     AbstractConstructiveElementKindRefMut
@@ -100,6 +120,8 @@ impl<'a> RecomputeBoundingShape for AbstractConstructiveElementKindRefMut<'a> {
     fn recompute_bounding_shape(&mut self) {
         match self {
             Self::BuildingConstructiveElement(x) => x.recompute_bounding_shape(),
+            Self::BridgeConstructiveElement(x) => x.recompute_bounding_shape(),
+            Self::TunnelConstructiveElement(x) => x.recompute_bounding_shape(),
         }
     }
 }

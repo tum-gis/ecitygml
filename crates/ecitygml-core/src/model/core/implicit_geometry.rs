@@ -13,7 +13,7 @@ pub struct ImplicitGeometry {
     mime_type: Option<MimeTypeValue>,
     library_object: Option<String>,
     reference_point: PointProperty,
-    relative_geometry: Option<AbstractGeometryProperty>,
+    relative_geometry: Option<Box<AbstractGeometryProperty>>,
     appearances: Vec<AbstractAppearanceProperty>,
 }
 
@@ -95,22 +95,22 @@ impl ImplicitGeometry {
     }
 
     pub fn relative_geometry(&self) -> Option<&AbstractGeometryProperty> {
-        self.relative_geometry.as_ref()
+        self.relative_geometry.as_deref()
     }
 
     pub fn relative_geometry_mut(&mut self) -> Option<&mut AbstractGeometryProperty> {
-        self.relative_geometry.as_mut()
+        self.relative_geometry.as_deref_mut()
     }
 
     pub fn set_relative_geometry(&mut self, relative_geometry: AbstractGeometryProperty) {
-        self.relative_geometry = Some(relative_geometry);
+        self.relative_geometry = Some(Box::new(relative_geometry));
     }
 
     pub fn set_relative_geometry_opt(
         &mut self,
         relative_geometry: Option<AbstractGeometryProperty>,
     ) {
-        self.relative_geometry = relative_geometry;
+        self.relative_geometry = relative_geometry.map(Box::new);
     }
 
     pub fn clear_relative_geometry(&mut self) {

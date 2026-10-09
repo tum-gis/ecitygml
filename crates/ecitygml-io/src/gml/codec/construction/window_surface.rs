@@ -1,15 +1,27 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_filling_surface, serialize_abstract_filling_surface,
+    serialize_abstract_filling_surface_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::construction::{AsAbstractFillingSurface, WindowSurface};
-use egml::io::util::{Formatting, XmlNode, extract_xml_element_spans};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
-pub fn deserialize_window_surface(xml_document: &[u8]) -> Result<WindowSurface, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let abstract_filling_surface = deserialize_abstract_filling_surface(xml_document, &spans)?;
+pub fn deserialize_window_surface(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<WindowSurface, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_filling_surface =
+        deserialize_abstract_filling_surface(xml_document, index, config)?;
     let window_surface = WindowSurface::from_abstract_filling_surface(abstract_filling_surface);
 
     Ok(window_surface)
@@ -17,34 +29,43 @@ pub fn deserialize_window_surface(xml_document: &[u8]) -> Result<WindowSurface, 
 
 pub fn serialize_window_surface(
     window_surface: &WindowSurface,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let xml_node_parts =
-        serialize_abstract_filling_surface(window_surface.abstract_filling_surface(), formatting)?;
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_window_surface_attributes(window_surface);
 
-    Ok(XmlNode::new(
-        CityGmlElement::WindowSurface.into(),
-        xml_node_parts,
-    ))
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Construction,
+        CityGmlElement::WindowSurface,
+        attributes,
+    )?;
+
+    serialize_abstract_filling_surface(
+        window_surface.abstract_filling_surface(),
+        xml_fragment_writer,
+    )?;
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Construction,
+        CityGmlElement::WindowSurface,
+    )?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlWindowSurface {}
-
-impl From<&WindowSurface> for GmlWindowSurface {
-    fn from(_item: &WindowSurface) -> Self {
-        Self {}
-    }
+pub fn serialize_window_surface_attributes(
+    window_surface: &WindowSurface,
+) -> Vec<(String, String)> {
+    serialize_abstract_filling_surface_attributes(window_surface.abstract_filling_surface())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ecitygml_core::model::core::{AsAbstractFeature, AsAbstractThematicSurface};
+    use egml::io::util::{Formatting, XmlFragmentWriter};
     use egml::model::base::{AsAbstractGml, Id};
     use egml::model::basic_types::Code;
     use itertools::Itertools;
-    use quick_xml::{DeError, de};
 
     #[test]
     fn test_serialize_round_trip() {
@@ -70,11 +91,23 @@ mod tests {
               </lod3MultiSurface>
             </con:WindowSurface>";
 
-        let window_surface = deserialize_window_surface(xml_document).unwrap();
-        let xml_output = serialize_window_surface(&window_surface, Formatting::default())
-            .unwrap()
-            .to_string(Formatting::default())
-            .unwrap();
+        let window_surface = deserialize_window_surface(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::default());
+        serialize_window_surface(&window_surface, &mut xml_fragment_writer).unwrap();
+        let xml_output = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
 
         assert!(xml_output.contains("con:WindowSurface"));
         assert!(xml_output.contains("gml:id=\"GML_d0f329f3-5b05-428d-87c3-945b3868337f\""));
@@ -113,11 +146,23 @@ mod tests {
               </lod2MultiSurface>
             </con:WindowSurface>";
 
-        let window_surface = deserialize_window_surface(xml_document).unwrap();
-        let xml_output = serialize_window_surface(&window_surface, Formatting::default())
-            .unwrap()
-            .to_string(Formatting::default())
-            .unwrap();
+        let window_surface = deserialize_window_surface(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::default());
+        serialize_window_surface(&window_surface, &mut xml_fragment_writer).unwrap();
+        let xml_output = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
 
         assert!(xml_output.contains("genericAttribute"));
         assert!(xml_output.contains("material"));
@@ -149,7 +194,12 @@ mod tests {
               </lod3MultiSurface>
             </con:WindowSurface>";
 
-        let window_surface = deserialize_window_surface(xml_document).unwrap();
+        let window_surface = deserialize_window_surface(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .unwrap();
 
         assert_eq!(
             window_surface.feature_id(),

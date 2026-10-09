@@ -1,3 +1,4 @@
+pub mod enums;
 pub mod refs;
 pub mod values;
 
@@ -20,6 +21,7 @@ mod door;
 mod door_surface;
 mod floor_surface;
 mod ground_surface;
+mod height;
 mod interior_wall_surface;
 mod outer_ceiling_surface;
 mod outer_floor_surface;
@@ -47,6 +49,7 @@ pub use door::*;
 pub use door_surface::*;
 pub use floor_surface::*;
 pub use ground_surface::*;
+pub use height::*;
 pub use interior_wall_surface::*;
 pub use outer_ceiling_surface::*;
 pub use outer_floor_surface::*;

@@ -2,25 +2,33 @@ use crate::Error;
 use crate::gml::codec::core::abstract_point_cloud_property::{
     deserialize_abstract_point_cloud_property, serialize_abstract_point_cloud_property,
 };
-use crate::gml::codec::core::{deserialize_abstract_space, serialize_abstract_space};
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement, collect_gml_child_lenient};
+use crate::gml::codec::core::{
+    deserialize_abstract_space, serialize_abstract_space, serialize_abstract_space_attributes,
+};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+    collect_gml_child_lenient,
+};
 use ecitygml_core::model::core::{
     AbstractPhysicalSpace, AsAbstractPhysicalSpace, AsAbstractPhysicalSpaceMut, AsAbstractSpace,
 };
 use egml::io::codec::geometry::aggregates::{
     deserialize_multi_curve_property, serialize_multi_curve_property,
 };
-use egml::io::util::collect_child;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNodeContent, XmlNodeParts, serialize_inner};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, collect_child};
+use egml::io::util::{XmlDocumentIndex, XmlFragmentWriter};
 
 pub fn deserialize_abstract_physical_space(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractPhysicalSpace, Error> {
+    debug_assert!(
+        !index.is_truncated(),
+        "deserialize_abstract_physical_space received a truncated index — caller must scan to sufficient depth"
+    );
+
     let mut abstract_space_result = None;
-    let mut _parsed_result = None;
     let mut lod1_terrain_intersection_curve_result = None;
     let mut lod2_terrain_intersection_curve_result = None;
     let mut lod3_terrain_intersection_curve_result = None;
@@ -28,132 +36,110 @@ pub fn deserialize_abstract_physical_space(
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            abstract_space_result = Some(deserialize_abstract_space(xml_document, spans));
-        });
-        s.spawn(|_| {
-            _parsed_result = Some(
-                de::from_reader::<_, GmlAbstractPhysicalSpace>(xml_document).map_err(Error::from),
-            );
+            abstract_space_result = Some(deserialize_abstract_space(xml_document, index, config));
         });
         s.spawn(|_| {
             lod1_terrain_intersection_curve_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod1TerrainIntersectionCurveProperty.into(),
+                config.gml_config(),
                 deserialize_multi_curve_property,
             ));
         });
         s.spawn(|_| {
             lod2_terrain_intersection_curve_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod2TerrainIntersectionCurveProperty.into(),
+                config.gml_config(),
                 deserialize_multi_curve_property,
             ));
         });
         s.spawn(|_| {
             lod3_terrain_intersection_curve_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod3TerrainIntersectionCurveProperty.into(),
+                config.gml_config(),
                 deserialize_multi_curve_property,
             ));
         });
         s.spawn(|_| {
             point_cloud_result = Some(collect_child(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::AbstractPointCloudProperty.into(),
+                config,
                 deserialize_abstract_point_cloud_property,
             ));
         });
     });
 
-    let abstract_space =
-        abstract_space_result.expect("rayon::scope guarantees all spawns complete")?;
-    let _parsed = _parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let lod1_terrain_intersection_curve = lod1_terrain_intersection_curve_result
-        .expect("rayon::scope guarantees all spawns complete");
-    let lod2_terrain_intersection_curve = lod2_terrain_intersection_curve_result
-        .expect("rayon::scope guarantees all spawns complete");
-    let lod3_terrain_intersection_curve = lod3_terrain_intersection_curve_result
-        .expect("rayon::scope guarantees all spawns complete");
-    let point_cloud = point_cloud_result.expect("rayon::scope guarantees all spawns complete")?;
-
-    let mut abstract_physical_space = AbstractPhysicalSpace::from_abstract_space(abstract_space);
-    abstract_physical_space.set_lod1_terrain_intersection_curve(lod1_terrain_intersection_curve);
-    abstract_physical_space.set_lod2_terrain_intersection_curve(lod2_terrain_intersection_curve);
-    abstract_physical_space.set_lod3_terrain_intersection_curve(lod3_terrain_intersection_curve);
-    abstract_physical_space.set_point_cloud(point_cloud);
+    let mut abstract_physical_space = AbstractPhysicalSpace::from_abstract_space(
+        abstract_space_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
+    abstract_physical_space.set_lod1_terrain_intersection_curve(
+        lod1_terrain_intersection_curve_result
+            .expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_physical_space.set_lod2_terrain_intersection_curve(
+        lod2_terrain_intersection_curve_result
+            .expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_physical_space.set_lod3_terrain_intersection_curve(
+        lod3_terrain_intersection_curve_result
+            .expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_physical_space
+        .set_point_cloud(point_cloud_result.expect("rayon::scope guarantees all spawns complete")?);
 
     Ok(abstract_physical_space)
 }
 
 pub fn serialize_abstract_physical_space(
     abstract_physical_space: &AbstractPhysicalSpace,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
-    let mut xml_node_parts =
-        serialize_abstract_space(abstract_physical_space.abstract_space(), formatting)?;
-
-    if let Some(raw) = serialize_inner(
-        GmlAbstractPhysicalSpace::from(abstract_physical_space),
-        formatting,
-    )? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
-    }
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    serialize_abstract_space(
+        abstract_physical_space.abstract_space(),
+        xml_fragment_writer,
+    )?;
 
     if let Some(prop) = abstract_physical_space.lod1_terrain_intersection_curve() {
-        xml_node_parts.content.push(
-            serialize_multi_curve_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod1TerrainIntersectionCurveProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_curve_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod1TerrainIntersectionCurveProperty,
+        )?;
     }
     if let Some(prop) = abstract_physical_space.lod2_terrain_intersection_curve() {
-        xml_node_parts.content.push(
-            serialize_multi_curve_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod2TerrainIntersectionCurveProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_curve_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod2TerrainIntersectionCurveProperty,
+        )?;
     }
     if let Some(prop) = abstract_physical_space.lod3_terrain_intersection_curve() {
-        xml_node_parts.content.push(
-            serialize_multi_curve_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod3TerrainIntersectionCurveProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_curve_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod3TerrainIntersectionCurveProperty,
+        )?;
     }
-    xml_node_parts.content.extend(
-        abstract_physical_space
-            .point_cloud()
-            .iter()
-            .map(|x| {
-                serialize_abstract_point_cloud_property(x, formatting).map(XmlNodeContent::from)
-            })
-            .collect::<Result<Vec<_>, _>>()?,
-    );
 
-    Ok(xml_node_parts)
+    if let Some(prop) = abstract_physical_space.point_cloud() {
+        serialize_abstract_point_cloud_property(prop, xml_fragment_writer)?;
+    }
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractPhysicalSpace {}
-
-impl From<&AbstractPhysicalSpace> for GmlAbstractPhysicalSpace {
-    fn from(_item: &AbstractPhysicalSpace) -> Self {
-        Self {}
-    }
+pub fn serialize_abstract_physical_space_attributes(
+    abstract_physical_space: &AbstractPhysicalSpace,
+) -> Vec<(String, String)> {
+    serialize_abstract_space_attributes(abstract_physical_space.abstract_space())
 }

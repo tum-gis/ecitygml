@@ -2,9 +2,8 @@ mod cli;
 mod commands;
 mod error;
 
-use anyhow::Result;
-
 use crate::cli::{Cli, Commands};
+use anyhow::Result;
 use clap::Parser;
 
 fn main() -> Result<()> {

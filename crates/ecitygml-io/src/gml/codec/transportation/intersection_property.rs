@@ -1,65 +1,71 @@
 use crate::Error;
 use crate::gml::codec::transportation::{deserialize_intersection, serialize_intersection};
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::transportation::IntersectionProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_intersection_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<IntersectionProperty, Error> {
-    let parsed: GmlIntersectionProperty = de::from_reader(xml_document)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
     let mut object = None;
 
-    if let Some(span) = spans.first(CityGmlElement::Intersection.into()) {
+    if let Some(index) = index.first(CityGmlElement::Intersection.into()) {
         object = Some(deserialize_intersection(
-            &xml_document[span.start..span.end],
+            &xml_document[index.range()],
+            index,
+            config,
         )?);
     }
 
-    Ok(IntersectionProperty::new(
-        object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
-    ))
+    Ok(IntersectionProperty::new(object, association, ownership))
 }
 
 pub fn serialize_intersection_property(
     intersection_property: &IntersectionProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-    parts.attributes.extend(serialize_association_attributes(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
         intersection_property.association(),
-    ));
-    parts.attributes.extend(serialize_ownership_attributes(
         intersection_property.ownership(),
-    ));
-    if let Some(object) = intersection_property.object() {
-        parts
-            .content
-            .push(XmlNodeContent::Child(serialize_intersection(
-                object, formatting,
-            )?));
-    }
-    Ok(XmlNode::new(
-        CityGmlElement::IntersectionProperty.into(),
-        parts,
-    ))
-}
+    );
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlIntersectionProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    match intersection_property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::IntersectionProperty,
+                attributes,
+            )?;
+            serialize_intersection(object, xml_fragment_writer)?;
+            xml_fragment_writer.write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::IntersectionProperty,
+            )?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::IntersectionProperty,
+                attributes,
+            )?;
+        }
+    }
+
+    Ok(())
 }

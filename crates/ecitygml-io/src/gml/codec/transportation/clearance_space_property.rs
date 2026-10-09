@@ -2,66 +2,73 @@ use crate::Error;
 use crate::gml::codec::transportation::clearance_space::{
     deserialize_clearance_space, serialize_clearance_space,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::transportation::ClearanceSpaceProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_clearance_space_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<ClearanceSpaceProperty, Error> {
-    let parsed: GmlClearanceSpaceProperty = de::from_reader(xml_document)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
 
     let mut object = None;
 
-    if let Some(span) = spans.first(CityGmlElement::ClearanceSpace.into()) {
+    if let Some(index) = index.first(CityGmlElement::ClearanceSpace.into()) {
         object = Some(deserialize_clearance_space(
-            &xml_document[span.start..span.end],
+            &xml_document[index.range()],
+            index,
+            config,
         )?);
     }
 
-    Ok(ClearanceSpaceProperty::new(
-        object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
-    ))
+    Ok(ClearanceSpaceProperty::new(object, association, ownership))
 }
 
 pub fn serialize_clearance_space_property(
     clearance_space_property: &ClearanceSpaceProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-    parts.attributes.extend(serialize_association_attributes(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
         clearance_space_property.association(),
-    ));
-    parts.attributes.extend(serialize_ownership_attributes(
         clearance_space_property.ownership(),
-    ));
-    if let Some(object) = clearance_space_property.object() {
-        parts
-            .content
-            .push(XmlNodeContent::Child(serialize_clearance_space(
-                object, formatting,
-            )?));
-    }
-    Ok(XmlNode::new(
-        CityGmlElement::ClearanceSpaceProperty.into(),
-        parts,
-    ))
-}
+    );
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlClearanceSpaceProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    match clearance_space_property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::ClearanceSpaceProperty,
+                attributes,
+            )?;
+            serialize_clearance_space(object, xml_fragment_writer)?;
+            xml_fragment_writer.write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::ClearanceSpaceProperty,
+            )?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::ClearanceSpaceProperty,
+                attributes,
+            )?;
+        }
+    }
+
+    Ok(())
 }

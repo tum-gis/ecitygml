@@ -1,6 +1,7 @@
 use crate::Error;
 use crate::gml::codec::transportation::abstract_transportation_space::{
     deserialize_abstract_transportation_space, serialize_abstract_transportation_space,
+    serialize_abstract_transportation_space_attributes,
 };
 use crate::gml::codec::transportation::intersection_property::{
     deserialize_intersection_property, serialize_intersection_property,
@@ -8,24 +9,29 @@ use crate::gml::codec::transportation::intersection_property::{
 use crate::gml::codec::transportation::section_property::{
     deserialize_section_property, serialize_section_property,
 };
-use crate::gml::util::CityGmlElement;
-use ecitygml_core::model::transportation::values::{
-    WaterwayClassValue, WaterwayFunctionValue, WaterwayUsageValue,
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
 };
 use ecitygml_core::model::transportation::{AsAbstractTransportationSpace, Waterway};
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::collect_children;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlFragmentWriter};
+use egml::io::util::{XmlDocumentIndex, collect_children};
 use egml::model::basic_types::Code;
-use serde::{Deserialize, Serialize};
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 
-pub fn deserialize_waterway(xml_document: &[u8]) -> Result<Waterway, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_waterway(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Waterway, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
     let mut abstract_transportation_space_result = None;
-    let mut parsed_result = None;
     let mut sections_result = None;
     let mut intersections_result = None;
 
@@ -33,122 +39,141 @@ pub fn deserialize_waterway(xml_document: &[u8]) -> Result<Waterway, Error> {
         s.spawn(|_| {
             abstract_transportation_space_result = Some(deserialize_abstract_transportation_space(
                 xml_document,
-                &spans,
+                index,
+                config,
             ))
-        });
-        s.spawn(|_| {
-            parsed_result = Some(
-                quick_xml::de::from_reader::<_, GmlWaterway>(xml_document).map_err(Error::from),
-            );
         });
         s.spawn(|_| {
             sections_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::SectionProperty.into(),
+                config,
                 deserialize_section_property,
             ));
         });
         s.spawn(|_| {
             intersections_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::IntersectionProperty.into(),
+                config,
                 deserialize_intersection_property,
             ));
         });
     });
 
-    let abstract_transportation_space = abstract_transportation_space_result
-        .expect("rayon::scope guarantees all spawns complete")?;
-    let parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let sections = sections_result.expect("rayon::scope guarantees all spawns complete")?;
-    let intersections =
-        intersections_result.expect("rayon::scope guarantees all spawns complete")?;
+    let mut waterway = Waterway::from_abstract_transportation_space(
+        abstract_transportation_space_result
+            .expect("rayon::scope guarantees all spawns complete")?,
+    );
 
-    let mut waterway = Waterway::from_abstract_transportation_space(abstract_transportation_space);
-    waterway.set_class_opt(parsed.class.map(Code::from).map(WaterwayClassValue::from));
-    waterway.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(WaterwayFunctionValue::from)
-            .collect(),
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    waterway.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    waterway.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    waterway.set_usages(usages.into_iter().map(Into::into).collect());
+
+    waterway.set_sections(sections_result.expect("rayon::scope guarantees all spawns complete")?);
+    waterway.set_intersections(
+        intersections_result.expect("rayon::scope guarantees all spawns complete")?,
     );
-    waterway.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(WaterwayUsageValue::from)
-            .collect(),
-    );
-    waterway.set_sections(sections);
-    waterway.set_intersections(intersections);
 
     Ok(waterway)
 }
 
-pub fn serialize_waterway(waterway: &Waterway, formatting: Formatting) -> Result<XmlNode, Error> {
-    let mut xml_node_parts = serialize_abstract_transportation_space(
-        waterway.abstract_transportation_space(),
-        formatting,
+pub fn serialize_waterway(
+    waterway: &Waterway,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_waterway_attributes(waterway);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::Waterway,
+        attributes,
     )?;
 
-    if let Some(raw) = serialize_inner(GmlWaterway::from(waterway), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    serialize_abstract_transportation_space(
+        waterway.abstract_transportation_space(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = waterway.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    for section_property in waterway.sections() {
-        let node = serialize_section_property(section_property, formatting)?;
-        xml_node_parts.content.push(XmlNodeContent::Child(node));
+    for function in waterway.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
 
-    for intersection_property in waterway.intersections() {
-        let node = serialize_intersection_property(intersection_property, formatting)?;
-        xml_node_parts.content.push(XmlNodeContent::Child(node));
+    for usage in waterway.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::UsageProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::Waterway.into(),
-        xml_node_parts,
-    ))
+    let xml_fragments = waterway
+        .sections()
+        .par_iter()
+        .map(|x| {
+            let mut xml_fragment_writer = xml_fragment_writer.spawn_child();
+            serialize_section_property(x, &mut xml_fragment_writer)?;
+            Ok(xml_fragment_writer)
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    for fragment in xml_fragments {
+        xml_fragment_writer.merge_chunked(fragment);
+    }
+
+    let xml_fragments = waterway
+        .intersections()
+        .par_iter()
+        .map(|x| {
+            let mut xml_fragment_writer = xml_fragment_writer.spawn_child();
+            serialize_intersection_property(x, &mut xml_fragment_writer)?;
+            Ok(xml_fragment_writer)
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    for fragment in xml_fragments {
+        xml_fragment_writer.merge_chunked(fragment);
+    }
+
+    xml_fragment_writer
+        .write_end_event(CityGmlNamespace::Transportation, CityGmlElement::Waterway)?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlWaterway {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "tran:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "tran:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-}
-
-impl From<&Waterway> for GmlWaterway {
-    fn from(item: &Waterway) -> Self {
-        Self {
-            class: item.class().map(WaterwayClassValue::code).map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(WaterwayFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(WaterwayUsageValue::code)
-                .map(Into::into)
-                .collect(),
-        }
-    }
+pub fn serialize_waterway_attributes(waterway: &Waterway) -> Vec<(String, String)> {
+    serialize_abstract_transportation_space_attributes(waterway.abstract_transportation_space())
 }
 
 #[cfg(test)]
@@ -173,7 +198,12 @@ mod tests {
       </tran:section>
     </tran:Waterway>";
 
-        let waterway = deserialize_waterway(xml_document).expect("should work");
+        let waterway = deserialize_waterway(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             waterway.feature_id(),

@@ -1,112 +1,109 @@
 use crate::Error;
 use crate::gml::codec::construction::{
     deserialize_abstract_installation, serialize_abstract_installation,
+    serialize_abstract_installation_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::building::BuildingInstallation;
-use ecitygml_core::model::building::values::{
-    BuildingInstallationClassValue, BuildingInstallationFunctionValue,
-    BuildingInstallationUsageValue,
-};
 use ecitygml_core::model::construction::AsAbstractInstallation;
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_building_installation(
     xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<BuildingInstallation, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let abstract_installation = deserialize_abstract_installation(xml_document, &spans)?;
-    let parsed =
-        de::from_reader::<_, GmlBuildingInstallation>(xml_document).map_err(Error::from)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_installation = deserialize_abstract_installation(xml_document, index, config)?;
     let mut building_installation =
         BuildingInstallation::from_abstract_installation(abstract_installation);
 
-    building_installation.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(BuildingInstallationClassValue::from),
-    );
-    building_installation.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(BuildingInstallationFunctionValue::from)
-            .collect(),
-    );
-    building_installation.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(BuildingInstallationUsageValue::from)
-            .collect(),
-    );
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    building_installation.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    building_installation.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    building_installation.set_usages(usages.into_iter().map(Into::into).collect());
 
     Ok(building_installation)
 }
 
 pub fn serialize_building_installation(
     building_installation: &BuildingInstallation,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut xml_node_parts =
-        serialize_abstract_installation(building_installation.abstract_installation(), formatting)?;
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_building_installation_attributes(building_installation);
 
-    if let Some(raw) = serialize_inner(
-        GmlBuildingInstallation::from(building_installation),
-        formatting,
-    )? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Building,
+        CityGmlElement::BuildingInstallation,
+        attributes,
+    )?;
+
+    serialize_abstract_installation(
+        building_installation.abstract_installation(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = building_installation.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Building,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::BuildingInstallation.into(),
-        xml_node_parts,
-    ))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlBuildingInstallation {
-    #[serde(
-        rename(serialize = "bldg:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "bldg:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "bldg:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-}
-
-impl From<&BuildingInstallation> for GmlBuildingInstallation {
-    fn from(item: &BuildingInstallation) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(BuildingInstallationClassValue::code)
-                .map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(BuildingInstallationFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(BuildingInstallationUsageValue::code)
-                .map(Into::into)
-                .collect(),
-        }
+    for function in building_installation.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Building,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
+
+    for usage in building_installation.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Building,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Building,
+        CityGmlElement::BuildingInstallation,
+    )?;
+
+    Ok(())
+}
+
+pub fn serialize_building_installation_attributes(
+    building_installation: &BuildingInstallation,
+) -> Vec<(String, String)> {
+    serialize_abstract_installation_attributes(building_installation.abstract_installation())
 }

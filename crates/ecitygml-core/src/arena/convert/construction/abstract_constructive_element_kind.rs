@@ -1,5 +1,7 @@
 use crate::arena::city_model_arena::CityModelArena;
+use crate::arena::convert::bridge::flatten_bridge_constructive_element;
 use crate::arena::convert::building::flatten_building_constructive_element;
+use crate::arena::convert::tunnel::flatten_tunnel_constructive_element;
 use crate::model::common::arena::InternalKey;
 use crate::model::construction::AbstractConstructiveElementKind;
 
@@ -10,6 +12,12 @@ pub fn flatten_abstract_constructive_element_kind(
     match abstract_constructive_element_kind {
         AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
             flatten_building_constructive_element(x, city_model_arena)
+        }
+        AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+            flatten_bridge_constructive_element(x, city_model_arena)
+        }
+        AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
+            flatten_tunnel_constructive_element(x, city_model_arena)
         }
     }
 }

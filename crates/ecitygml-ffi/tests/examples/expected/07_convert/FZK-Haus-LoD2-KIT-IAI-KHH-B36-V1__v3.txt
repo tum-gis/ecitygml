@@ -1,0 +1,3 @@
+Read: 1 city object members, 8 city objects
+Wrote: gzip-compressed CityGML, indented by 2 spaces
+Read back: 1 city object members, 8 city objects

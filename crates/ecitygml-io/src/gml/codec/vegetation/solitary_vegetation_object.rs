@@ -1,174 +1,214 @@
 use crate::Error;
 use crate::gml::codec::vegetation::abstract_vegetation_object::{
     deserialize_abstract_vegetation_object, serialize_abstract_vegetation_object,
+    serialize_abstract_vegetation_object_attributes,
 };
-use crate::gml::util::CityGmlElement;
-use ecitygml_core::model::vegetation::values::{
-    SolitaryVegetationObjectClassValue, SolitaryVegetationObjectFunctionValue,
-    SolitaryVegetationObjectUsageValue, SpeciesValue,
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
 };
 use ecitygml_core::model::vegetation::{AsAbstractVegetationObject, SolitaryVegetationObject};
-use egml::io::codec::basic::{GmlCode, GmlMeasure};
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
+use egml::io::codec::basic::{
+    deserialize_code, deserialize_measure, serialize_code, serialize_measure,
 };
-use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
+use egml::model::basic_types::{Code, Measure};
 
 pub fn deserialize_solitary_vegetation_object(
     xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<SolitaryVegetationObject, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let abstract_vegetation_object = deserialize_abstract_vegetation_object(xml_document, &spans)?;
-    let parsed =
-        de::from_reader::<_, GmlSolitaryVegetationObject>(xml_document).map_err(Error::from)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_vegetation_object =
+        deserialize_abstract_vegetation_object(xml_document, index, config)?;
     let mut solitary_vegetation_object =
         SolitaryVegetationObject::from_abstract_vegetation_object(abstract_vegetation_object);
 
-    solitary_vegetation_object.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(SolitaryVegetationObjectClassValue::from),
-    );
-    solitary_vegetation_object.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(SolitaryVegetationObjectFunctionValue::from)
-            .collect(),
-    );
-    solitary_vegetation_object.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(SolitaryVegetationObjectUsageValue::from)
-            .collect(),
-    );
-    solitary_vegetation_object
-        .set_species_opt(parsed.species.map(Code::from).map(SpeciesValue::from));
-    solitary_vegetation_object.set_height_opt(parsed.height.map(Into::into));
-    solitary_vegetation_object.set_trunk_diameter_opt(parsed.trunk_diameter.map(Into::into));
-    solitary_vegetation_object.set_crown_diameter_opt(parsed.crown_diameter.map(Into::into));
-    solitary_vegetation_object
-        .set_root_ball_diameter_opt(parsed.root_ball_diameter.map(Into::into));
-    solitary_vegetation_object
-        .set_max_root_ball_depth_opt(parsed.max_root_ball_depth.map(Into::into));
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    solitary_vegetation_object.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    solitary_vegetation_object.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    solitary_vegetation_object.set_usages(usages.into_iter().map(Into::into).collect());
+
+    let species: Option<Code> = index
+        .first(CityGmlElement::SpeciesProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    solitary_vegetation_object.set_species_opt(species.map(Into::into));
+
+    let height: Option<Measure> = index
+        .first(CityGmlElement::HeightProperty.into())
+        .map(|x| deserialize_measure(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    solitary_vegetation_object.set_height_opt(height);
+
+    let trunk_diameter: Option<Measure> = index
+        .first(CityGmlElement::TrunkDiameterProperty.into())
+        .map(|x| deserialize_measure(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    solitary_vegetation_object.set_trunk_diameter_opt(trunk_diameter);
+
+    let crown_diameter: Option<Measure> = index
+        .first(CityGmlElement::CrownDiameterProperty.into())
+        .map(|x| deserialize_measure(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    solitary_vegetation_object.set_crown_diameter_opt(crown_diameter);
+
+    let root_ball_diameter: Option<Measure> = index
+        .first(CityGmlElement::RootBallDiameterProperty.into())
+        .map(|x| deserialize_measure(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    solitary_vegetation_object.set_root_ball_diameter_opt(root_ball_diameter);
+
+    let max_root_ball_depth: Option<Measure> = index
+        .first(CityGmlElement::MaxRootBallDepthProperty.into())
+        .map(|x| deserialize_measure(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    solitary_vegetation_object.set_max_root_ball_depth_opt(max_root_ball_depth);
 
     Ok(solitary_vegetation_object)
 }
 
 pub fn serialize_solitary_vegetation_object(
     solitary_vegetation_object: &SolitaryVegetationObject,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = serialize_abstract_vegetation_object(
-        solitary_vegetation_object.abstract_vegetation_object(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_solitary_vegetation_object_attributes(solitary_vegetation_object);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Vegetation,
+        CityGmlElement::SolitaryVegetationObject,
+        attributes,
     )?;
 
-    if let Some(raw) = serialize_inner(
-        GmlSolitaryVegetationObject::from(solitary_vegetation_object),
-        formatting,
-    )? {
-        parts.content.push(XmlNodeContent::Raw(raw));
+    serialize_abstract_vegetation_object(
+        solitary_vegetation_object.abstract_vegetation_object(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = solitary_vegetation_object.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::SolitaryVegetationObject.into(),
-        parts,
-    ))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlSolitaryVegetationObject {
-    #[serde(
-        rename(serialize = "veg:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "veg:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "veg:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-
-    #[serde(
-        rename(serialize = "veg:species", deserialize = "species"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub species: Option<GmlCode>,
-
-    #[serde(
-        rename(serialize = "veg:height", deserialize = "height"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub height: Option<GmlMeasure>,
-
-    #[serde(
-        rename(serialize = "veg:trunkDiameter", deserialize = "trunkDiameter"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub trunk_diameter: Option<GmlMeasure>,
-
-    #[serde(
-        rename(serialize = "veg:crownDiameter", deserialize = "crownDiameter"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub crown_diameter: Option<GmlMeasure>,
-
-    #[serde(
-        rename(serialize = "veg:rootBallDiameter", deserialize = "rootBallDiameter"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub root_ball_diameter: Option<GmlMeasure>,
-
-    #[serde(
-        rename(serialize = "veg:maxRootBallDepth", deserialize = "maxRootBallDepth"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub max_root_ball_depth: Option<GmlMeasure>,
-}
-
-impl From<&SolitaryVegetationObject> for GmlSolitaryVegetationObject {
-    fn from(item: &SolitaryVegetationObject) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(SolitaryVegetationObjectClassValue::code)
-                .map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(SolitaryVegetationObjectFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(SolitaryVegetationObjectUsageValue::code)
-                .map(Into::into)
-                .collect(),
-            species: item.species().map(SpeciesValue::code).map(Into::into),
-            height: item.height().map(Into::into),
-            trunk_diameter: item.trunk_diameter().map(Into::into),
-            crown_diameter: item.crown_diameter().map(Into::into),
-            root_ball_diameter: item.root_ball_diameter().map(Into::into),
-            max_root_ball_depth: item.max_root_ball_depth().map(Into::into),
-        }
+    for function in solitary_vegetation_object.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
+
+    for usage in solitary_vegetation_object.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    if let Some(species) = solitary_vegetation_object.species() {
+        serialize_code(
+            species.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::SpeciesProperty,
+        )?;
+    }
+
+    if let Some(height) = solitary_vegetation_object.height() {
+        serialize_measure(
+            height,
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::HeightProperty,
+        )?;
+    }
+
+    if let Some(trunk_diameter) = solitary_vegetation_object.trunk_diameter() {
+        serialize_measure(
+            trunk_diameter,
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::TrunkDiameterProperty,
+        )?;
+    }
+
+    if let Some(crown_diameter) = solitary_vegetation_object.crown_diameter() {
+        serialize_measure(
+            crown_diameter,
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::CrownDiameterProperty,
+        )?;
+    }
+
+    if let Some(root_ball_diameter) = solitary_vegetation_object.root_ball_diameter() {
+        serialize_measure(
+            root_ball_diameter,
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::RootBallDiameterProperty,
+        )?;
+    }
+
+    if let Some(max_root_ball_depth) = solitary_vegetation_object.max_root_ball_depth() {
+        serialize_measure(
+            max_root_ball_depth,
+            xml_fragment_writer,
+            CityGmlNamespace::Vegetation,
+            CityGmlElement::MaxRootBallDepthProperty,
+        )?;
+    }
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Vegetation,
+        CityGmlElement::SolitaryVegetationObject,
+    )?;
+
+    Ok(())
+}
+
+pub fn serialize_solitary_vegetation_object_attributes(
+    solitary_vegetation_object: &SolitaryVegetationObject,
+) -> Vec<(String, String)> {
+    serialize_abstract_vegetation_object_attributes(
+        solitary_vegetation_object.abstract_vegetation_object(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ecitygml_core::model::core::{
-        AsAbstractCityObject, AsAbstractFeature, AsAbstractOccupiedSpace, AsAbstractThematicSurface,
+        AsAbstractCityObject, AsAbstractFeature, AsAbstractOccupiedSpace,
     };
+    use egml::io::util::Formatting;
     use egml::model::base::Id;
 
     #[test]
@@ -194,8 +234,12 @@ mod tests {
       <veg:trunkDiameter uom=\"#m\">0.4</veg:trunkDiameter>
     </veg:SolitaryVegetationObject>";
 
-        let solitary_vegetation_object =
-            deserialize_solitary_vegetation_object(xml_document).expect("should work");
+        let solitary_vegetation_object = deserialize_solitary_vegetation_object(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             solitary_vegetation_object.feature_id(),
@@ -235,6 +279,104 @@ mod tests {
                 .expect("trunk_diameter should be read")
                 .uom,
             "#m"
+        );
+    }
+
+    #[test]
+    fn test_round_trip_solitary_vegetation_object_with_measures_and_species() {
+        let xml_document =
+            b"<veg:SolitaryVegetationObject gml:id=\"UUID_cd516eff-0302-379f-a635-791ebe618098\">
+      <veg:species>Quercus robur</veg:species>
+      <veg:height uom=\"#m\">12.1966</veg:height>
+      <veg:trunkDiameter uom=\"#m\">0.4</veg:trunkDiameter>
+      <veg:crownDiameter uom=\"#m\">5.5</veg:crownDiameter>
+      <veg:rootBallDiameter uom=\"#m\">1.2</veg:rootBallDiameter>
+      <veg:maxRootBallDepth uom=\"#m\">0.8</veg:maxRootBallDepth>
+    </veg:SolitaryVegetationObject>";
+
+        let solitary_vegetation_object = deserialize_solitary_vegetation_object(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(
+            solitary_vegetation_object
+                .species()
+                .expect("species should be read")
+                .code()
+                .value(),
+            "Quercus robur"
+        );
+        assert_eq!(
+            solitary_vegetation_object
+                .crown_diameter()
+                .expect("crown_diameter should be read")
+                .value,
+            5.5
+        );
+        assert_eq!(
+            solitary_vegetation_object
+                .root_ball_diameter()
+                .expect("root_ball_diameter should be read")
+                .value,
+            1.2
+        );
+        assert_eq!(
+            solitary_vegetation_object
+                .max_root_ball_depth()
+                .expect("max_root_ball_depth should be read")
+                .value,
+            0.8
+        );
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_solitary_vegetation_object(&solitary_vegetation_object, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        assert!(xml.contains("veg:species"));
+        assert!(xml.contains("Quercus robur"));
+        assert!(xml.contains("veg:crownDiameter"));
+        assert!(xml.contains("veg:rootBallDiameter"));
+        assert!(xml.contains("veg:maxRootBallDepth"));
+
+        let round_tripped = deserialize_solitary_vegetation_object(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(
+            solitary_vegetation_object.species(),
+            round_tripped.species()
+        );
+        assert_eq!(solitary_vegetation_object.height(), round_tripped.height());
+        assert_eq!(
+            solitary_vegetation_object.trunk_diameter(),
+            round_tripped.trunk_diameter()
+        );
+        assert_eq!(
+            solitary_vegetation_object.crown_diameter(),
+            round_tripped.crown_diameter()
+        );
+        assert_eq!(
+            solitary_vegetation_object.root_ball_diameter(),
+            round_tripped.root_ball_diameter()
+        );
+        assert_eq!(
+            solitary_vegetation_object.max_root_ball_depth(),
+            round_tripped.max_root_ball_depth()
         );
     }
 }

@@ -1,109 +1,110 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_occupied_space, serialize_abstract_occupied_space,
+    serialize_abstract_occupied_space_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::city_furniture::CityFurniture;
-use ecitygml_core::model::city_furniture::values::{
-    CityFurnitureClassValue, CityFurnitureFunctionValue, CityFurnitureUsageValue,
-};
 use ecitygml_core::model::core::AsAbstractOccupiedSpace;
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::extract_xml_element_spans;
-use egml::io::util::{Formatting, XmlNode, XmlNodeContent, serialize_inner};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
-pub fn deserialize_city_furniture(xml_document: &[u8]) -> Result<CityFurniture, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let (abstract_occupied_space_result, parsed_result) = rayon::join(
-        || deserialize_abstract_occupied_space(xml_document, &spans),
-        || de::from_reader::<_, GmlCityFurniture>(xml_document).map_err(Error::from),
-    );
-    let abstract_occupied_space = abstract_occupied_space_result?;
-    let parsed = parsed_result?;
+pub fn deserialize_city_furniture(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<CityFurniture, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_occupied_space = deserialize_abstract_occupied_space(xml_document, index, config)?;
     let mut city_furniture = CityFurniture::from_abstract_occupied_space(abstract_occupied_space);
 
-    city_furniture.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(CityFurnitureClassValue::from),
-    );
-    city_furniture.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(CityFurnitureFunctionValue::from)
-            .collect(),
-    );
-    city_furniture.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(CityFurnitureUsageValue::from)
-            .collect(),
-    );
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    city_furniture.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    city_furniture.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    city_furniture.set_usages(usages.into_iter().map(Into::into).collect());
 
     Ok(city_furniture)
 }
 
 pub fn serialize_city_furniture(
     city_furniture: &CityFurniture,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut xml_node_parts =
-        serialize_abstract_occupied_space(city_furniture.abstract_occupied_space(), formatting)?;
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_city_furniture_attributes(city_furniture);
 
-    if let Some(raw) = serialize_inner(GmlCityFurniture::from(city_furniture), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::CityFurniture,
+        CityGmlElement::CityFurniture,
+        attributes,
+    )?;
+
+    serialize_abstract_occupied_space(
+        city_furniture.abstract_occupied_space(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = city_furniture.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::CityFurniture,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::CityFurniture.into(),
-        xml_node_parts,
-    ))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlCityFurniture {
-    #[serde(
-        rename(serialize = "frn:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "frn:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "frn:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-}
-
-impl From<&CityFurniture> for GmlCityFurniture {
-    fn from(item: &CityFurniture) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(CityFurnitureClassValue::code)
-                .map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(CityFurnitureFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(CityFurnitureUsageValue::code)
-                .map(Into::into)
-                .collect(),
-        }
+    for function in city_furniture.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::CityFurniture,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
+
+    for usage in city_furniture.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::CityFurniture,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::CityFurniture,
+        CityGmlElement::CityFurniture,
+    )?;
+
+    Ok(())
+}
+
+pub fn serialize_city_furniture_attributes(
+    city_furniture: &CityFurniture,
+) -> Vec<(String, String)> {
+    serialize_abstract_occupied_space_attributes(city_furniture.abstract_occupied_space())
 }
 
 #[cfg(test)]
@@ -150,7 +151,12 @@ mod tests {
       </lod1ImplicitRepresentation>
     </frn:CityFurniture>";
 
-        let city_furniture = deserialize_city_furniture(xml_document).expect("should work");
+        let city_furniture = deserialize_city_furniture(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             city_furniture.feature_id(),

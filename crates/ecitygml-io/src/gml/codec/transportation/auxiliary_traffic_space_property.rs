@@ -2,66 +2,76 @@ use crate::Error;
 use crate::gml::codec::transportation::{
     deserialize_auxiliary_traffic_space, serialize_auxiliary_traffic_space,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::transportation::AuxiliaryTrafficSpaceProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_auxiliary_traffic_space_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AuxiliaryTrafficSpaceProperty, Error> {
-    let parsed: GmlAuxiliaryTrafficSpaceProperty = de::from_reader(xml_document)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
     let mut object = None;
 
-    if let Some(span) = spans.first(CityGmlElement::AuxiliaryTrafficSpace.into()) {
+    if let Some(index) = index.first(CityGmlElement::AuxiliaryTrafficSpace.into()) {
         object = Some(deserialize_auxiliary_traffic_space(
-            &xml_document[span.start..span.end],
+            &xml_document[index.range()],
+            index,
+            config,
         )?);
     }
 
     Ok(AuxiliaryTrafficSpaceProperty::new(
         object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
+        association,
+        ownership,
     ))
 }
 
 pub fn serialize_auxiliary_traffic_space_property(
     property: &AuxiliaryTrafficSpaceProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-    parts
-        .attributes
-        .extend(serialize_association_attributes(property.association()));
-    parts
-        .attributes
-        .extend(serialize_ownership_attributes(property.ownership()));
-    if let Some(object) = property.object() {
-        parts
-            .content
-            .push(XmlNodeContent::Child(serialize_auxiliary_traffic_space(
-                object, formatting,
-            )?));
-    }
-    Ok(XmlNode::new(
-        CityGmlElement::AuxiliaryTrafficSpaceProperty.into(),
-        parts,
-    ))
-}
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
+        property.association(),
+        property.ownership(),
+    );
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAuxiliaryTrafficSpaceProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    match property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::AuxiliaryTrafficSpaceProperty,
+                attributes,
+            )?;
+            serialize_auxiliary_traffic_space(object, xml_fragment_writer)?;
+            xml_fragment_writer.write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::AuxiliaryTrafficSpaceProperty,
+            )?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::AuxiliaryTrafficSpaceProperty,
+                attributes,
+            )?;
+        }
+    }
+
+    Ok(())
 }

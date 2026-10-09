@@ -47,7 +47,7 @@ pub fn run(
         FormattingArg::Compact => Formatting::Compact,
         FormattingArg::Newline => Formatting::NewLine,
         FormattingArg::Indent => Formatting::Indent {
-            char: '\t',
+            char: b'\t',
             size: indent_size,
         },
     };
@@ -56,7 +56,7 @@ pub fn run(
     let write_start = Instant::now();
     GmlWriter::from_path(output.as_ref())?
         .with_formatting(formatting)
-        .finish(city_model)?;
+        .finish(&city_model)?;
     info!("Written in {:.3?}", write_start.elapsed());
 
     Ok(())

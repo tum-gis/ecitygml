@@ -1,16 +1,27 @@
 use crate::Error;
 use crate::gml::codec::construction::abstract_construction_surface::{
     deserialize_abstract_construction_surface, serialize_abstract_construction_surface,
+    serialize_abstract_construction_surface_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::construction::{AsAbstractConstructionSurface, WallSurface};
-use egml::io::util::{Formatting, XmlNode, extract_xml_element_spans};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
-pub fn deserialize_wall_surface(xml_document: &[u8]) -> Result<WallSurface, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_wall_surface(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<WallSurface, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
     let abstract_construction_surface =
-        deserialize_abstract_construction_surface(xml_document, &spans)?;
+        deserialize_abstract_construction_surface(xml_document, index, config)?;
     let wall_surface =
         WallSurface::from_abstract_construction_surface(abstract_construction_surface);
 
@@ -19,42 +30,42 @@ pub fn deserialize_wall_surface(xml_document: &[u8]) -> Result<WallSurface, Erro
 
 pub fn serialize_wall_surface(
     wall_surface: &WallSurface,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let xml_node_parts = serialize_abstract_construction_surface(
-        wall_surface.abstract_construction_surface(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_wall_surface_attributes(wall_surface);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Construction,
+        CityGmlElement::WallSurface,
+        attributes,
     )?;
 
-    Ok(XmlNode::new(
-        CityGmlElement::WallSurface.into(),
-        xml_node_parts,
-    ))
+    serialize_abstract_construction_surface(
+        wall_surface.abstract_construction_surface(),
+        xml_fragment_writer,
+    )?;
+
+    xml_fragment_writer
+        .write_end_event(CityGmlNamespace::Construction, CityGmlElement::WallSurface)?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlWallSurface {}
-
-impl From<&WallSurface> for GmlWallSurface {
-    fn from(_item: &WallSurface) -> Self {
-        Self {}
-    }
+pub fn serialize_wall_surface_attributes(wall_surface: &WallSurface) -> Vec<(String, String)> {
+    serialize_abstract_construction_surface_attributes(wall_surface.abstract_construction_surface())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gml::codec::core::deserialize_abstract_thematic_surface;
+
     use ecitygml_core::model::construction::{
-        AbstractConstructionSurfaceKind, AbstractFillingSurfaceKind, AsAbstractConstructionSurface,
-        Door, DoorSurface, WindowSurface,
+        AbstractFillingSurfaceKind, AsAbstractConstructionSurface, DoorSurface, WindowSurface,
     };
     use ecitygml_core::model::core::{
-        AbstractSpaceBoundaryKind, AbstractThematicSurfaceKind, AsAbstractCityObject,
-        AsAbstractFeature, AsAbstractThematicSurface,
+        AsAbstractCityObject, AsAbstractFeature, AsAbstractThematicSurface,
     };
     use egml::model::base::Id;
-    use quick_xml::{DeError, de};
 
     #[test]
     fn test_deserialize_basic_abstract_thematic_surface() {
@@ -333,7 +344,12 @@ mod tests {
           </con:fillingSurface>
         </con:WallSurface>";
 
-        let wall_surface = deserialize_wall_surface(xml_document).expect("should work");
+        let wall_surface = deserialize_wall_surface(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             wall_surface.feature_id(),

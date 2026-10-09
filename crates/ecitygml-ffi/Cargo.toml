@@ -5,15 +5,18 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "C ABI bindings for ecitygml."
+description = "Language bindings for ecitygml."
+
+# Only the Rust sources: the generated bindings, their tests and examples (bindings/, tests/) stay out of the package.
+# The leading slashes anchor the patterns to this directory (like .gitignore, `README.md` alone matches at any depth).
+include = ["/src/**", "/Cargo.toml", "/config.toml", "/README.md"]
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 egml = { workspace = true }
-ecitygml = { version = "0.0.2-alpha.5", path = "../ecitygml" }
+ecitygml = { version = "0.0.2-alpha.6", path = "../ecitygml" }
 
-anyhow = { workspace = true }
-libc = { workspace = true }
-thiserror = { workspace = true }
+diplomat = "0.16.1"
+diplomat-runtime = "0.16.0"

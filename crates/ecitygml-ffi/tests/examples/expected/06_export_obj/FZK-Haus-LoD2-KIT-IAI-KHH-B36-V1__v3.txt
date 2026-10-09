@@ -1,0 +1,1 @@
+Wrote 48 vertices, 16 triangles, 7 groups

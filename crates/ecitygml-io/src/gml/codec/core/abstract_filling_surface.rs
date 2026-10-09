@@ -1,18 +1,25 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_thematic_surface, serialize_abstract_thematic_surface,
+    serialize_abstract_thematic_surface_attributes,
 };
-use crate::gml::util::CombinedCityGmlElement;
+use crate::gml::util::{CombinedCityGmlElement, DeserializationConfig};
 use ecitygml_core::model::construction::AbstractFillingSurface;
 use ecitygml_core::model::core::AsAbstractThematicSurface;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNodeParts};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
 pub fn deserialize_abstract_filling_surface(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractFillingSurface, Error> {
-    let abstract_thematic_surface = deserialize_abstract_thematic_surface(xml_document, spans)?;
+    debug_assert!(
+        !index.is_truncated(),
+        "deserialize_abstract_filling_surface received a truncated index — caller must scan to sufficient depth"
+    );
+
+    let abstract_thematic_surface =
+        deserialize_abstract_thematic_surface(xml_document, index, config)?;
     let abstract_filling_surface =
         AbstractFillingSurface::from_abstract_thematic_surface(abstract_thematic_surface);
 
@@ -21,21 +28,18 @@ pub fn deserialize_abstract_filling_surface(
 
 pub fn serialize_abstract_filling_surface(
     abstract_filling_surface: &AbstractFillingSurface,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
-    let xml_node_parts = serialize_abstract_thematic_surface(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    serialize_abstract_thematic_surface(
         abstract_filling_surface.abstract_thematic_surface(),
-        formatting,
-    )?;
-
-    Ok(xml_node_parts)
+        xml_fragment_writer,
+    )
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractFillingSurface {}
-
-impl From<&AbstractFillingSurface> for GmlAbstractFillingSurface {
-    fn from(_item: &AbstractFillingSurface) -> Self {
-        Self {}
-    }
+pub fn serialize_abstract_filling_surface_attributes(
+    abstract_filling_surface: &AbstractFillingSurface,
+) -> Vec<(String, String)> {
+    serialize_abstract_thematic_surface_attributes(
+        abstract_filling_surface.abstract_thematic_surface(),
+    )
 }

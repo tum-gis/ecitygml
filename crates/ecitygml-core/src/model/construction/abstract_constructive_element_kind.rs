@@ -1,5 +1,6 @@
 use crate::impl_abstract_constructive_element_mut_traits;
 use crate::impl_abstract_constructive_element_traits;
+use crate::model::bridge::BridgeConstructiveElement;
 use crate::model::building::BuildingConstructiveElement;
 use crate::model::common::{FeatureType, ForEachFeatureMut, HasFeatureType, IterFeatures};
 use crate::model::construction::{
@@ -7,6 +8,7 @@ use crate::model::construction::{
 };
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
+use crate::model::tunnel::TunnelConstructiveElement;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
@@ -14,12 +16,20 @@ use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 #[derive(Debug, Clone, PartialEq)]
 pub enum AbstractConstructiveElementKind {
     BuildingConstructiveElement(BuildingConstructiveElement),
+    BridgeConstructiveElement(BridgeConstructiveElement),
+    TunnelConstructiveElement(TunnelConstructiveElement),
 }
 
 impl AsAbstractConstructiveElement for AbstractConstructiveElementKind {
     fn abstract_constructive_element(&self) -> &AbstractConstructiveElement {
         match self {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
+                x.abstract_constructive_element()
+            }
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+                x.abstract_constructive_element()
+            }
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
                 x.abstract_constructive_element()
             }
         }
@@ -30,6 +40,12 @@ impl AsAbstractConstructiveElementMut for AbstractConstructiveElementKind {
     fn abstract_constructive_element_mut(&mut self) -> &mut AbstractConstructiveElement {
         match self {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
+                x.abstract_constructive_element_mut()
+            }
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+                x.abstract_constructive_element_mut()
+            }
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
                 x.abstract_constructive_element_mut()
             }
         }
@@ -43,6 +59,8 @@ impl HasFeatureType for AbstractConstructiveElementKind {
     fn feature_type(&self) -> FeatureType {
         match self {
             Self::BuildingConstructiveElement(x) => x.feature_type(),
+            Self::BridgeConstructiveElement(x) => x.feature_type(),
+            Self::TunnelConstructiveElement(x) => x.feature_type(),
         }
     }
 }
@@ -59,6 +77,8 @@ macro_rules! impl_from_constructive_element_kind {
     };
 }
 impl_from_constructive_element_kind!(BuildingConstructiveElement);
+impl_from_constructive_element_kind!(BridgeConstructiveElement);
+impl_from_constructive_element_kind!(TunnelConstructiveElement);
 
 #[macro_export]
 macro_rules! impl_try_from_constructive_element_kind {
@@ -81,11 +101,15 @@ macro_rules! impl_try_from_constructive_element_kind {
     };
 }
 impl_try_from_constructive_element_kind!(BuildingConstructiveElement);
+impl_try_from_constructive_element_kind!(BridgeConstructiveElement);
+impl_try_from_constructive_element_kind!(TunnelConstructiveElement);
 
 impl IterFeatures for AbstractConstructiveElementKind {
     fn iter_features(&self) -> Box<dyn Iterator<Item = AbstractFeatureKindRef<'_>> + '_> {
         match self {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => x.iter_features(),
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => x.iter_features(),
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => x.iter_features(),
         }
     }
 }
@@ -96,6 +120,12 @@ impl ForEachFeatureMut for AbstractConstructiveElementKind {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
                 x.for_each_feature_mut(f)
             }
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+                x.for_each_feature_mut(f)
+            }
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
+                x.for_each_feature_mut(f)
+            }
         }
     }
 }
@@ -104,6 +134,8 @@ impl ComputeEnvelope for AbstractConstructiveElementKind {
     fn compute_envelope(&self) -> Option<Envelope> {
         match self {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => x.compute_envelope(),
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => x.compute_envelope(),
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => x.compute_envelope(),
         }
     }
 }
@@ -112,12 +144,20 @@ impl ApplyTransform for AbstractConstructiveElementKind {
     fn apply_transform(&mut self, m: Transform3<f64>) {
         match self {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => x.apply_transform(m),
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => x.apply_transform(m),
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => x.apply_transform(m),
         }
     }
 
     fn apply_isometry(&mut self, isometry: Isometry3<f64>) {
         match self {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
+                x.apply_isometry(isometry)
+            }
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+                x.apply_isometry(isometry)
+            }
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
                 x.apply_isometry(isometry)
             }
         }
@@ -128,6 +168,12 @@ impl ApplyTransform for AbstractConstructiveElementKind {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
                 x.apply_translation(vector)
             }
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+                x.apply_translation(vector)
+            }
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
+                x.apply_translation(vector)
+            }
         }
     }
 
@@ -136,12 +182,20 @@ impl ApplyTransform for AbstractConstructiveElementKind {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
                 x.apply_rotation(rotation)
             }
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+                x.apply_rotation(rotation)
+            }
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
+                x.apply_rotation(rotation)
+            }
         }
     }
 
     fn apply_scale(&mut self, scale: Scale3<f64>) {
         match self {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => x.apply_scale(scale),
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => x.apply_scale(scale),
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => x.apply_scale(scale),
         }
     }
 }

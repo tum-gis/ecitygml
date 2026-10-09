@@ -6,169 +6,180 @@ use crate::gml::codec::core::abstract_feature_with_lifespan::deserialize_abstrac
 use crate::gml::codec::core::city_object_relation_property::{
     deserialize_city_object_relation_property, serialize_city_object_relation_property,
 };
-use crate::gml::codec::core::enums::GmlRelativeToTerrain;
-use crate::gml::codec::core::enums::GmlRelativeToWater;
-use crate::gml::codec::core::external_reference_property::GmlExternalReferenceProperty;
-use crate::gml::codec::core::serialize_abstract_feature_with_lifespan;
-use crate::gml::codec::generics::{GmlGenericAttributeKind, GmlGenericAttributeProperty};
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::codec::core::enums::deserialize_relative_to_water;
+use crate::gml::codec::core::enums::{
+    deserialize_relative_to_terrain, serialize_relative_to_terrain, serialize_relative_to_water,
+};
+use crate::gml::codec::core::{
+    deserialize_external_reference_property, serialize_external_reference_property,
+};
+use crate::gml::codec::core::{
+    serialize_abstract_feature_with_lifespan, serialize_abstract_feature_with_lifespan_attributes,
+};
+use crate::gml::codec::generics::{
+    deserialize_generic_attribute_property, serialize_generic_attribute_property,
+};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
+use ecitygml_core::model::core::enums::{RelativeToTerrain, RelativeToWater};
 use ecitygml_core::model::core::{
     AbstractCityObject, AsAbstractCityObject, AsAbstractCityObjectMut,
     AsAbstractFeatureWithLifespan,
 };
 use egml::io::util::collect_children;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNodeContent, XmlNodeParts, serialize_inner};
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
 pub fn deserialize_abstract_city_object(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractCityObject, Error> {
+    debug_assert!(
+        !index.is_truncated(),
+        "deserialize_abstract_city_object received a truncated index — caller must scan to sufficient depth"
+    );
+
     let mut abstract_feature_with_lifespan_result = None;
-    let mut parsed_result = None;
     let mut appearances_result = None;
     let mut related_to_result = None;
 
     rayon::scope(|s| {
         s.spawn(|_| {
             abstract_feature_with_lifespan_result = Some(
-                deserialize_abstract_feature_with_lifespan(xml_document, spans),
-            );
-        });
-        s.spawn(|_| {
-            parsed_result = Some(
-                quick_xml::de::from_reader::<_, GmlAbstractCityObject>(xml_document)
-                    .map_err(Error::from),
+                deserialize_abstract_feature_with_lifespan(xml_document, index, config),
             );
         });
         s.spawn(|_| {
             appearances_result = Some(collect_children(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::AbstractAppearanceProperty.into(),
+                config,
                 deserialize_abstract_appearance_property,
             ));
         });
         s.spawn(|_| {
             related_to_result = Some(collect_children(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::RelatedToProperty.into(),
+                config,
                 deserialize_city_object_relation_property,
             ));
         });
     });
 
-    let abstract_feature_with_lifespan = abstract_feature_with_lifespan_result
-        .expect("rayon::scope guarantees all spawns complete")?;
-    let parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let appearances = appearances_result.expect("rayon::scope guarantees all spawns complete")?;
-    let related_to = related_to_result.expect("rayon::scope guarantees all spawns complete")?;
+    let mut abstract_city_object = AbstractCityObject::from_abstract_feature_with_lifespan(
+        abstract_feature_with_lifespan_result
+            .expect("rayon::scope guarantees all spawns complete")?,
+    );
 
-    let convert = |items: Vec<_>| {
-        items
-            .into_iter()
-            .map(|x: GmlExternalReferenceProperty| x.content.try_into())
-            .collect::<Result<Vec<_>, _>>()
-    };
-    let convert_generic = |items: Vec<_>| {
-        items
-            .into_iter()
-            .map(|x: GmlGenericAttributeProperty| x.content.try_into())
-            .collect::<Result<Vec<_>, _>>()
-    };
+    let relative_to_terrain: Option<RelativeToTerrain> = index
+        .first(CityGmlElement::RelativeToTerrainProperty.into())
+        .map(|x| deserialize_relative_to_terrain(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    abstract_city_object.set_relative_to_terrain(relative_to_terrain);
 
-    let mut abstract_city_object =
-        AbstractCityObject::from_abstract_feature_with_lifespan(abstract_feature_with_lifespan);
-    abstract_city_object.set_relative_to_terrain(parsed.relative_to_terrain.map(Into::into));
-    abstract_city_object.set_relative_to_water(parsed.relative_to_water.map(Into::into));
-    abstract_city_object.set_external_references(convert(parsed.external_references)?);
-    abstract_city_object.set_generic_attributes(convert_generic(parsed.generic_attributes)?);
+    let relative_to_water: Option<RelativeToWater> = index
+        .first(CityGmlElement::RelativeToWaterProperty.into())
+        .map(|x| deserialize_relative_to_water(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    abstract_city_object.set_relative_to_water(relative_to_water);
 
-    abstract_city_object.set_appearances(appearances);
-    abstract_city_object.set_related_to(related_to);
+    let external_references = index
+        .get(CityGmlElement::ExternalReferenceProperty.into())
+        .iter()
+        .map(|x| deserialize_external_reference_property(&xml_document[x.range()]))
+        .collect::<Result<_, _>>()?;
+    abstract_city_object.set_external_references(external_references);
+
+    let generic_attributes = index
+        .get(CityGmlElement::GenericAttributeProperty.into())
+        .iter()
+        .map(|x| deserialize_generic_attribute_property(&xml_document[x.range()]))
+        .collect::<Result<_, _>>()?;
+    abstract_city_object.set_generic_attributes(generic_attributes);
+
+    abstract_city_object
+        .set_appearances(appearances_result.expect("rayon::scope guarantees all spawns complete")?);
+    abstract_city_object
+        .set_related_to(related_to_result.expect("rayon::scope guarantees all spawns complete")?);
 
     Ok(abstract_city_object)
 }
 
 pub fn serialize_abstract_city_object(
     abstract_city_object: &AbstractCityObject,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
-    let mut xml_node_parts = serialize_abstract_feature_with_lifespan(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    serialize_abstract_feature_with_lifespan(
         abstract_city_object.abstract_feature_with_lifespan(),
-        formatting,
+        xml_fragment_writer,
     )?;
 
-    if let Some(raw) = serialize_inner(
-        GmlAbstractCityObject::from(abstract_city_object),
-        formatting,
-    )? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    if let Some(relative_to_terrain) = abstract_city_object.relative_to_terrain() {
+        serialize_relative_to_terrain(
+            relative_to_terrain,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::RelativeToTerrainProperty,
+        )?;
+    }
+
+    if let Some(relative_to_water) = abstract_city_object.relative_to_water() {
+        serialize_relative_to_water(
+            relative_to_water,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::RelativeToWaterProperty,
+        )?;
+    }
+
+    for external_reference in abstract_city_object.external_references() {
+        serialize_external_reference_property(
+            external_reference,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::ExternalReferenceProperty,
+        )?;
+    }
+
+    for generic_attribute in abstract_city_object.generic_attributes() {
+        serialize_generic_attribute_property(
+            generic_attribute,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::GenericAttributeProperty,
+        )?;
     }
 
     for prop in abstract_city_object.appearances() {
-        xml_node_parts.content.push(XmlNodeContent::Child(
-            serialize_abstract_appearance_property(prop, formatting)?,
-        ));
+        serialize_abstract_appearance_property(prop, xml_fragment_writer)?;
     }
 
     for prop in abstract_city_object.related_to() {
-        xml_node_parts.content.push(XmlNodeContent::Child(
-            serialize_city_object_relation_property(prop, formatting)?,
-        ));
+        serialize_city_object_relation_property(prop, xml_fragment_writer)?;
     }
 
-    Ok(xml_node_parts)
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractCityObject {
-    #[serde(rename = "externalReference", default)]
-    pub external_references: Vec<GmlExternalReferenceProperty>,
-
-    #[serde(rename = "relativeToTerrain", skip_serializing_if = "Option::is_none")]
-    pub relative_to_terrain: Option<GmlRelativeToTerrain>,
-    #[serde(rename = "relativeToWater", skip_serializing_if = "Option::is_none")]
-    pub relative_to_water: Option<GmlRelativeToWater>,
-
-    #[serde(rename = "genericAttribute", default)]
-    pub generic_attributes: Vec<GmlGenericAttributeProperty>,
-}
-
-impl From<&AbstractCityObject> for GmlAbstractCityObject {
-    fn from(city_object: &AbstractCityObject) -> Self {
-        let external_references = city_object
-            .external_references()
-            .iter()
-            .map(|x| GmlExternalReferenceProperty { content: x.into() })
-            .collect();
-
-        let generic_attribute = city_object
-            .generic_attributes()
-            .iter()
-            .map(|a| GmlGenericAttributeProperty {
-                content: GmlGenericAttributeKind::from(a),
-            })
-            .collect();
-
-        Self {
-            external_references,
-            relative_to_terrain: city_object.relative_to_terrain().map(Into::into),
-            relative_to_water: city_object.relative_to_water().map(Into::into),
-            generic_attributes: generic_attribute,
-        }
-    }
+pub fn serialize_abstract_city_object_attributes(
+    abstract_city_object: &AbstractCityObject,
+) -> Vec<(String, String)> {
+    serialize_abstract_feature_with_lifespan_attributes(
+        abstract_city_object.abstract_feature_with_lifespan(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ecitygml_core::model::core::AsAbstractFeature;
-    use egml::io::util::extract_xml_element_spans;
+    use egml::io::util::{Formatting, XmlFragmentWriter};
     use egml::model::base::{AsAbstractGml, HasAssociationAttributes, Id};
     use egml::model::basic_types::Code;
-    use quick_xml::{DeError, de};
 
     #[test]
     fn test_deserialize_with_name_and_generic_attributes() {
@@ -189,9 +200,13 @@ mod tests {
       </genericAttribute>
     </con:WallSurface>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let city_object =
-            deserialize_abstract_city_object(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let city_object = deserialize_abstract_city_object(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             city_object.feature_id(),
@@ -228,9 +243,13 @@ mod tests {
       </genericAttribute>
     </bldg:Building>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let city_object =
-            deserialize_abstract_city_object(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let city_object = deserialize_abstract_city_object(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             city_object.feature_id(),
@@ -258,9 +277,13 @@ mod tests {
       </relatedTo>
     </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let city_object =
-            deserialize_abstract_city_object(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let city_object = deserialize_abstract_city_object(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(city_object.related_to().len(), 1);
 
@@ -288,23 +311,40 @@ mod tests {
       </relatedTo>
     </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let city_object =
-            deserialize_abstract_city_object(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let city_object = deserialize_abstract_city_object(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
-        let xml_node_parts =
-            serialize_abstract_city_object(&city_object, Formatting::Compact).expect("should work");
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        serialize_abstract_city_object(&city_object, &mut xml_fragment_writer)
+            .expect("should work");
+        xml_fragment_writer
+            .write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
-        let serialized = xml_node_parts
-            .content
-            .iter()
-            .find_map(|content| match content {
-                XmlNodeContent::Child(node) if node.name == "relatedTo" => Some(node),
-                _ => None,
-            })
-            .expect("relatedTo child should be present");
-
-        assert_eq!(serialized.name, "relatedTo");
+        assert!(xml.contains("relatedTo"));
     }
 
     #[test]
@@ -325,9 +365,13 @@ mod tests {
       </genericAttribute>
     </bldg:Building>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let city_object =
-            deserialize_abstract_city_object(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let city_object = deserialize_abstract_city_object(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             city_object.feature_id(),
@@ -335,5 +379,101 @@ mod tests {
         );
         assert!(city_object.names().is_empty());
         assert_eq!(city_object.generic_attributes().len(), 2);
+    }
+
+    #[test]
+    fn test_deserialize_with_external_references() {
+        let xml_document = b"
+    <bldg:Building gml:id=\"test-id\">
+      <externalReference>
+        <ExternalReference>
+          <targetResource>DEHHALKA70002P5E</targetResource>
+          <informationSystem>http://example.com</informationSystem>
+        </ExternalReference>
+      </externalReference>
+      <externalReference>
+        <ExternalReference>
+          <targetResource>DEHHALKA70002P5F</targetResource>
+        </ExternalReference>
+      </externalReference>
+    </bldg:Building>";
+
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let city_object = deserialize_abstract_city_object(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(city_object.external_references().len(), 2);
+        assert_eq!(
+            city_object.external_references()[0].target_resource,
+            "DEHHALKA70002P5E"
+        );
+        assert_eq!(
+            city_object.external_references()[0]
+                .information_system
+                .as_deref(),
+            Some("http://example.com")
+        );
+        assert_eq!(
+            city_object.external_references()[1].target_resource,
+            "DEHHALKA70002P5F"
+        );
+    }
+
+    #[test]
+    fn test_round_trip_with_external_references() {
+        let xml_document = b"
+    <bldg:Building gml:id=\"test-id\">
+      <externalReference>
+        <ExternalReference>
+          <targetResource>DEHHALKA70002P5E</targetResource>
+          <informationSystem>http://example.com</informationSystem>
+        </ExternalReference>
+      </externalReference>
+    </bldg:Building>";
+
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let city_object = deserialize_abstract_city_object(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(CityGmlNamespace::Building, CityGmlElement::Building)
+            .expect("should work");
+        serialize_abstract_city_object(&city_object, &mut xml_fragment_writer)
+            .expect("should work");
+        xml_fragment_writer
+            .write_end_event(CityGmlNamespace::Building, CityGmlElement::Building)
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        let round_tripped_index =
+            XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work");
+        let round_tripped = deserialize_abstract_city_object(
+            xml.as_bytes(),
+            &round_tripped_index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(
+            city_object.external_references(),
+            round_tripped.external_references()
+        );
     }
 }

@@ -2,73 +2,81 @@ use crate::Error;
 use crate::gml::codec::building::building_part_property::{
     deserialize_building_part_property, serialize_building_part_property,
 };
-use crate::gml::codec::building::{deserialize_abstract_building, serialize_abstract_building};
-use crate::gml::codec::transportation::GmlRoad;
-use crate::gml::util::CityGmlElement;
-use ecitygml_core::model::building::{AsAbstractBuilding, Building};
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, collect_children, extract_xml_element_spans,
+use crate::gml::codec::building::{
+    deserialize_abstract_building, serialize_abstract_building,
+    serialize_abstract_building_attributes,
 };
-use serde::{Deserialize, Serialize};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
+use ecitygml_core::model::building::{AsAbstractBuilding, Building};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter, collect_children};
 
-pub fn deserialize_building(xml_document: &[u8]) -> Result<Building, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_building(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Building, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
     let mut abstract_building_result = None;
-    let mut parsed_result = None;
     let mut building_parts_result = None;
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            abstract_building_result = Some(deserialize_abstract_building(xml_document, &spans))
-        });
-        s.spawn(|_| {
-            parsed_result =
-                Some(quick_xml::de::from_reader::<_, GmlRoad>(xml_document).map_err(Error::from));
+            abstract_building_result =
+                Some(deserialize_abstract_building(xml_document, index, config))
         });
         s.spawn(|_| {
             building_parts_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::BuildingPartProperty.into(),
+                config,
                 deserialize_building_part_property,
             ));
         });
     });
 
-    let abstract_building =
-        abstract_building_result.expect("rayon::scope guarantees all spawns complete")?;
-    let _parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let building_parts =
-        building_parts_result.expect("rayon::scope guarantees all spawns complete")?;
-
-    let mut building = Building::from_abstract_building(abstract_building);
-    building.set_building_parts(building_parts);
+    let mut building = Building::from_abstract_building(
+        abstract_building_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
+    building.set_building_parts(
+        building_parts_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
 
     Ok(building)
 }
 
-pub fn serialize_building(building: &Building, formatting: Formatting) -> Result<XmlNode, Error> {
-    let mut xml_node_parts = serialize_abstract_building(building.abstract_building(), formatting)?;
+pub fn serialize_building(
+    building: &Building,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_building_attributes(building);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Building,
+        CityGmlElement::Building,
+        attributes,
+    )?;
+
+    serialize_abstract_building(building.abstract_building(), xml_fragment_writer)?;
 
     for prop in building.building_parts() {
-        let node = serialize_building_part_property(prop, formatting)?;
-        xml_node_parts.content.push(XmlNodeContent::Child(node));
+        serialize_building_part_property(prop, xml_fragment_writer)?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::Building.into(),
-        xml_node_parts,
-    ))
+    xml_fragment_writer.write_end_event(CityGmlNamespace::Building, CityGmlElement::Building)?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlBuilding {}
-
-impl From<&Building> for GmlBuilding {
-    fn from(_item: &Building) -> Self {
-        Self {}
-    }
+pub fn serialize_building_attributes(building: &Building) -> Vec<(String, String)> {
+    serialize_abstract_building_attributes(building.abstract_building())
 }
 
 #[cfg(test)]
@@ -78,8 +86,9 @@ mod tests {
     use ecitygml_core::model::construction::{AbstractConstructionSurfaceKind, WallSurface};
     use ecitygml_core::model::core::{
         AbstractSpaceBoundaryKind, AbstractThematicSurfaceKind, AsAbstractCityObject,
-        AsAbstractFeature, AsAbstractFeatureMut, AsAbstractSpace,
+        AsAbstractFeature, AsAbstractSpace,
     };
+    use egml::io::util::Formatting;
     use egml::model::base::{AsAbstractGml, AsAbstractGmlMut, Id};
     use egml::model::basic_types::Code;
 
@@ -155,7 +164,12 @@ mod tests {
       </boundary>
     </bldg:Building>";
 
-        let building = deserialize_building(xml_document).expect("should work");
+        let building = deserialize_building(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             building.feature_id(),
@@ -235,7 +249,12 @@ mod tests {
       </bldg:address>
     </bldg:Building>";
 
-        let building = deserialize_building(xml_document).expect("should work");
+        let _building = deserialize_building(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
     }
 
     #[test]
@@ -247,8 +266,13 @@ mod tests {
         building.set_roof_type(Code::new("1000").into());
         building.set_storeys_above_ground(4);
 
-        let gml = serialize_building(&building, Formatting::Indent { char: ' ', size: 2 })
-            .expect("should work");
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Indent {
+                char: b' ',
+                size: 2,
+            });
+        let _gml = serialize_building(&building, &mut xml_fragment_writer).expect("should work");
+
         // println!("{}", String::from_utf8_lossy(&gml));
         println!("");
     }

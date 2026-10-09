@@ -1,10 +1,8 @@
 use crate::Error;
-use crate::gml::util::{CombinedCityGmlElement, filter_to_gml_element_spans};
+use crate::gml::util::{CombinedCityGmlElement, DeserializationConfig};
 use ecitygml_core::model::core::AbstractFeature;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{AsAbstractGml, AsAbstractGmlMut, Id};
-use egml::model::feature::AsAbstractFeature;
-use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
@@ -16,11 +14,18 @@ fn generate_feature_id() -> Id {
 
 pub fn deserialize_abstract_feature(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractFeature, Error> {
-    let gml_spans = filter_to_gml_element_spans(spans);
-    let mut gml_abstract_feature =
-        egml::io::codec::feature::deserialize_abstract_feature(xml_document, &gml_spans)?;
+    let gml_index = index.convert(|e| match e {
+        CombinedCityGmlElement::Gml(g) => Some(g),
+        _ => None,
+    });
+    let mut gml_abstract_feature = egml::io::codec::feature::deserialize_abstract_feature(
+        xml_document,
+        &gml_index,
+        config.gml_config(),
+    )?;
 
     if gml_abstract_feature.abstract_gml().id().is_none() {
         gml_abstract_feature
@@ -36,21 +41,20 @@ pub fn deserialize_abstract_feature(
 
 pub fn serialize_abstract_feature(
     abstract_feature: &AbstractFeature,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
-    let xml_node_parts: XmlNodeParts = egml::io::codec::feature::serialize_abstract_feature(
-        abstract_feature.abstract_feature(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    egml::io::codec::feature::serialize_abstract_feature(
+        egml::model::feature::AsAbstractFeature::abstract_feature(abstract_feature),
+        xml_fragment_writer,
     )?;
 
-    Ok(xml_node_parts)
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractFeature {}
-
-impl From<&AbstractFeature> for GmlAbstractFeature {
-    fn from(_item: &AbstractFeature) -> Self {
-        Self {}
-    }
+pub fn serialize_abstract_feature_attributes(
+    abstract_feature: &AbstractFeature,
+) -> Vec<(String, String)> {
+    egml::io::codec::feature::serialize_abstract_feature_attributes(
+        egml::model::feature::AsAbstractFeature::abstract_feature(abstract_feature),
+    )
 }

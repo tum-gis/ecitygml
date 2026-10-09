@@ -1,27 +1,28 @@
 use crate::Error;
 use crate::gml::util::CityGmlElement;
-use egml::io::util::{GmlElement, XmlElement, XmlElementSpans, extract_xml_element_spans};
-use std::collections::HashMap;
-use std::ops::Range;
+use egml::io::util::{GmlElement, XalElement, XmlDocumentIndex, XmlElement};
 use tracing::warn;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CombinedCityGmlElement {
     CityGml(CityGmlElement),
     Gml(GmlElement),
+    Xal(XalElement),
 }
 
 impl XmlElement for CombinedCityGmlElement {
-    fn from_local_name(local_name: &[u8]) -> Option<Self> {
+    fn from_local_name(local_name: &str) -> Option<Self> {
         CityGmlElement::from_local_name(local_name)
             .map(Self::CityGml)
             .or_else(|| GmlElement::from_local_name(local_name).map(Self::Gml))
+            .or_else(|| XalElement::from_local_name(local_name).map(Self::Xal))
     }
 
-    fn as_str(&self) -> &'static str {
+    fn local_name(&self) -> &'static str {
         match self {
-            Self::CityGml(e) => e.as_str(),
-            Self::Gml(e) => e.as_str(),
+            Self::CityGml(e) => e.local_name(),
+            Self::Gml(e) => e.local_name(),
+            Self::Xal(e) => e.local_name(),
         }
     }
 }
@@ -38,21 +39,60 @@ impl From<GmlElement> for CombinedCityGmlElement {
     }
 }
 
+impl From<XalElement> for CombinedCityGmlElement {
+    fn from(e: XalElement) -> Self {
+        Self::Xal(e)
+    }
+}
+
 pub fn collect_gml_child<T>(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
     element: CombinedCityGmlElement,
-    deserializer: fn(&[u8], &XmlElementSpans<GmlElement>) -> Result<T, egml::io::Error>,
+    config: &egml::io::util::DeserializationConfig,
+    deserializer: fn(
+        &[u8],
+        &XmlDocumentIndex<GmlElement>,
+        &egml::io::util::DeserializationConfig,
+    ) -> Result<T, egml::io::Error>,
 ) -> Result<Option<T>, Error> {
-    let all_spans = spans.get(element);
-    match all_spans.first() {
+    let all_matches = index.get(element);
+    match all_matches.first() {
         None => Ok(None),
-        Some(span) => {
-            let slice = &xml_document[span.start..span.end];
-            let child_spans: XmlElementSpans<CombinedCityGmlElement> =
-                extract_xml_element_spans(slice).map_err(Error::from)?;
-            let gml_spans = filter_to_gml_element_spans(&child_spans);
-            deserializer(slice, &gml_spans)
+        Some(child) => {
+            let slice = &xml_document[child.range()];
+            let filtered_child = child.convert(|e| match e {
+                CombinedCityGmlElement::Gml(g) => Some(g),
+                _ => None,
+            });
+            deserializer(slice, &filtered_child, config)
+                .map(Some)
+                .map_err(Error::from)
+        }
+    }
+}
+
+pub fn collect_xal_child<T>(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    element: CombinedCityGmlElement,
+    config: &egml::io::util::DeserializationConfig,
+    deserializer: fn(
+        &[u8],
+        &XmlDocumentIndex<XalElement>,
+        &egml::io::util::DeserializationConfig,
+    ) -> Result<T, egml::io::Error>,
+) -> Result<Option<T>, Error> {
+    let all_matches = index.get(element);
+    match all_matches.first() {
+        None => Ok(None),
+        Some(child) => {
+            let slice = &xml_document[child.range()];
+            let filtered_child = child.convert(|e| match e {
+                CombinedCityGmlElement::Xal(x) => Some(x),
+                _ => None,
+            });
+            deserializer(slice, &filtered_child, config)
                 .map(Some)
                 .map_err(Error::from)
         }
@@ -67,29 +107,20 @@ pub fn collect_gml_child<T>(
 /// without.
 pub fn collect_gml_child_lenient<T>(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
     element: CombinedCityGmlElement,
-    deserializer: fn(&[u8], &XmlElementSpans<GmlElement>) -> Result<T, egml::io::Error>,
+    config: &egml::io::util::DeserializationConfig,
+    deserializer: fn(
+        &[u8],
+        &XmlDocumentIndex<GmlElement>,
+        &egml::io::util::DeserializationConfig,
+    ) -> Result<T, egml::io::Error>,
 ) -> Option<T> {
-    match collect_gml_child(xml_document, spans, element, deserializer) {
+    match collect_gml_child(xml_document, index, element, config, deserializer) {
         Ok(value) => value,
         Err(error) => {
             warn!(?element, ?error, "dropping invalid geometry property");
             None
         }
     }
-}
-
-pub fn filter_to_gml_element_spans(
-    combined: &XmlElementSpans<CombinedCityGmlElement>,
-) -> XmlElementSpans<GmlElement> {
-    let spans: HashMap<GmlElement, Vec<Range<usize>>> = combined
-        .spans()
-        .iter()
-        .filter_map(|(k, v)| match k {
-            CombinedCityGmlElement::Gml(e) => Some((*e, v.clone())),
-            CombinedCityGmlElement::CityGml(_) => None,
-        })
-        .collect();
-    XmlElementSpans::new(spans)
 }

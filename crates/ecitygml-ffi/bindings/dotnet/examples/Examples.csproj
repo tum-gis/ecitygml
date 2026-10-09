@@ -1,0 +1,15 @@
+<!-- The examples, as one console application; run one with `dotnet run` in this directory, followed by a double dash,
+     the example's name and its arguments (see Program.cs). The tests run them too. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Envis.Ecitygml.Examples</AssemblyName>
+    <RootNamespace>Envis.Ecitygml.Examples</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Ecitygml.csproj" />
+  </ItemGroup>
+</Project>

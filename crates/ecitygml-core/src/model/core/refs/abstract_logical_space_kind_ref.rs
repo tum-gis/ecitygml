@@ -1,6 +1,7 @@
 use crate::impl_try_from_space_kind_ref_for_enum;
 use crate::model::building::AbstractBuildingSubdivisionKind;
 use crate::model::building::refs::AbstractBuildingSubdivisionKindRef;
+use crate::model::city_object_group::CityObjectGroup;
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::core::{AbstractLogicalSpace, AbstractLogicalSpaceKind, AsAbstractLogicalSpace};
@@ -8,6 +9,7 @@ use crate::model::core::{AbstractLogicalSpace, AbstractLogicalSpaceKind, AsAbstr
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractLogicalSpaceKindRef<'a> {
     AbstractBuildingSubdivisionKind(AbstractBuildingSubdivisionKindRef<'a>),
+    CityObjectGroup(&'a CityObjectGroup),
 }
 
 impl<'a> From<&'a AbstractLogicalSpaceKind> for AbstractLogicalSpaceKindRef<'a> {
@@ -16,6 +18,7 @@ impl<'a> From<&'a AbstractLogicalSpaceKind> for AbstractLogicalSpaceKindRef<'a> 
             AbstractLogicalSpaceKind::AbstractBuildingSubdivisionKind(x) => {
                 Self::AbstractBuildingSubdivisionKind(x.into())
             }
+            AbstractLogicalSpaceKind::CityObjectGroup(x) => Self::CityObjectGroup(x),
         }
     }
 }
@@ -24,6 +27,7 @@ impl<'a> AsAbstractLogicalSpace for AbstractLogicalSpaceKindRef<'a> {
     fn abstract_logical_space(&self) -> &AbstractLogicalSpace {
         match self {
             Self::AbstractBuildingSubdivisionKind(x) => x.abstract_logical_space(),
+            Self::CityObjectGroup(x) => x.abstract_logical_space(),
         }
     }
 }
@@ -33,6 +37,7 @@ impl<'a> HasFeatureType for AbstractLogicalSpaceKindRef<'a> {
     fn feature_type(&self) -> FeatureType {
         match *self {
             Self::AbstractBuildingSubdivisionKind(x) => x.feature_type(),
+            Self::CityObjectGroup(x) => x.feature_type(),
         }
     }
 }
@@ -52,6 +57,7 @@ macro_rules! impl_from_for_logical_space_kind_ref {
     };
 }
 impl_from_for_logical_space_kind_ref!(AbstractBuildingSubdivisionKind);
+impl_from_for_logical_space_kind_ref!(CityObjectGroup);
 
 #[macro_export]
 macro_rules! impl_try_from_for_logical_space_kind_ref {
@@ -73,6 +79,7 @@ macro_rules! impl_try_from_for_logical_space_kind_ref {
         $crate::impl_try_from_for_space_kind_ref!(AbstractLogicalSpaceKind, $type);
     };
 }
+impl_try_from_for_logical_space_kind_ref!(CityObjectGroup, CityObjectGroup);
 
 #[macro_export]
 macro_rules! impl_try_from_logical_space_kind_ref_for_enum {

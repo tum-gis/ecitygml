@@ -11,7 +11,7 @@ use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;
 use egml::model::geometry::aggregates::{MultiCurveProperty, MultiSurfaceProperty};
-use egml::model::geometry::primitives::SolidProperty;
+use egml::model::geometry::primitives::{PointProperty, SolidProperty};
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 use std::collections::HashMap;
 
@@ -21,15 +21,16 @@ pub struct AbstractSpace {
     space_type: Option<SpaceType>,
     volumes: Vec<QualifiedVolume>,
     areas: Vec<QualifiedArea>,
-    lod1_solid: Option<SolidProperty>,
-    lod2_solid: Option<SolidProperty>,
-    lod3_solid: Option<SolidProperty>,
-    lod0_multi_surface: Option<MultiSurfaceProperty>,
-    lod2_multi_surface: Option<MultiSurfaceProperty>,
-    lod3_multi_surface: Option<MultiSurfaceProperty>,
-    lod0_multi_curve: Option<MultiCurveProperty>,
-    lod2_multi_curve: Option<MultiCurveProperty>,
-    lod3_multi_curve: Option<MultiCurveProperty>,
+    lod1_solid: Option<Box<SolidProperty>>,
+    lod2_solid: Option<Box<SolidProperty>>,
+    lod3_solid: Option<Box<SolidProperty>>,
+    lod0_multi_surface: Option<Box<MultiSurfaceProperty>>,
+    lod2_multi_surface: Option<Box<MultiSurfaceProperty>>,
+    lod3_multi_surface: Option<Box<MultiSurfaceProperty>>,
+    lod0_multi_curve: Option<Box<MultiCurveProperty>>,
+    lod2_multi_curve: Option<Box<MultiCurveProperty>>,
+    lod3_multi_curve: Option<Box<MultiCurveProperty>>,
+    lod0_point: Option<Box<PointProperty>>,
     boundaries: Vec<AbstractSpaceBoundaryProperty>,
 }
 
@@ -53,6 +54,7 @@ impl AbstractSpace {
             lod0_multi_curve: None,
             lod2_multi_curve: None,
             lod3_multi_curve: None,
+            lod0_point: None,
             boundaries: Vec::new(),
         }
     }
@@ -74,15 +76,15 @@ pub trait AsAbstractSpace: AsAbstractCityObject {
     }
 
     fn lod1_solid(&self) -> Option<&SolidProperty> {
-        self.abstract_space().lod1_solid.as_ref()
+        self.abstract_space().lod1_solid.as_deref()
     }
 
     fn lod2_solid(&self) -> Option<&SolidProperty> {
-        self.abstract_space().lod2_solid.as_ref()
+        self.abstract_space().lod2_solid.as_deref()
     }
 
     fn lod3_solid(&self) -> Option<&SolidProperty> {
-        self.abstract_space().lod3_solid.as_ref()
+        self.abstract_space().lod3_solid.as_deref()
     }
 
     fn solids_by_lod(&self) -> HashMap<LevelOfDetail, &SolidProperty> {
@@ -99,16 +101,20 @@ pub trait AsAbstractSpace: AsAbstractCityObject {
         map
     }
 
+    fn lod0_point(&self) -> Option<&PointProperty> {
+        self.abstract_space().lod0_point.as_deref()
+    }
+
     fn lod0_multi_surface(&self) -> Option<&MultiSurfaceProperty> {
-        self.abstract_space().lod0_multi_surface.as_ref()
+        self.abstract_space().lod0_multi_surface.as_deref()
     }
 
     fn lod2_multi_surface(&self) -> Option<&MultiSurfaceProperty> {
-        self.abstract_space().lod2_multi_surface.as_ref()
+        self.abstract_space().lod2_multi_surface.as_deref()
     }
 
     fn lod3_multi_surface(&self) -> Option<&MultiSurfaceProperty> {
-        self.abstract_space().lod3_multi_surface.as_ref()
+        self.abstract_space().lod3_multi_surface.as_deref()
     }
 
     fn multi_surfaces_by_lod(&self) -> HashMap<LevelOfDetail, &MultiSurfaceProperty> {
@@ -126,15 +132,15 @@ pub trait AsAbstractSpace: AsAbstractCityObject {
     }
 
     fn lod0_multi_curve(&self) -> Option<&MultiCurveProperty> {
-        self.abstract_space().lod0_multi_curve.as_ref()
+        self.abstract_space().lod0_multi_curve.as_deref()
     }
 
     fn lod2_multi_curve(&self) -> Option<&MultiCurveProperty> {
-        self.abstract_space().lod2_multi_curve.as_ref()
+        self.abstract_space().lod2_multi_curve.as_deref()
     }
 
     fn lod3_multi_curve(&self) -> Option<&MultiCurveProperty> {
-        self.abstract_space().lod3_multi_curve.as_ref()
+        self.abstract_space().lod3_multi_curve.as_deref()
     }
 
     fn multi_curves_by_lod(&self) -> HashMap<LevelOfDetail, &MultiCurveProperty> {
@@ -159,7 +165,11 @@ pub trait AsAbstractSpace: AsAbstractCityObject {
 pub trait AsAbstractSpaceMut: AsAbstractCityObjectMut + AsAbstractSpace {
     fn abstract_space_mut(&mut self) -> &mut AbstractSpace;
 
-    fn set_space_type(&mut self, value: Option<SpaceType>) {
+    fn set_space_type(&mut self, value: SpaceType) {
+        self.abstract_space_mut().space_type = Some(value);
+    }
+
+    fn set_space_type_opt(&mut self, value: Option<SpaceType>) {
         self.abstract_space_mut().space_type = value;
     }
 
@@ -196,75 +206,83 @@ pub trait AsAbstractSpaceMut: AsAbstractCityObjectMut + AsAbstractSpace {
     }
 
     fn set_lod1_solid(&mut self, value: Option<SolidProperty>) {
-        self.abstract_space_mut().lod1_solid = value;
+        self.abstract_space_mut().lod1_solid = value.map(Box::new);
     }
 
     fn set_lod2_solid(&mut self, value: Option<SolidProperty>) {
-        self.abstract_space_mut().lod2_solid = value;
+        self.abstract_space_mut().lod2_solid = value.map(Box::new);
     }
 
     fn set_lod3_solid(&mut self, value: Option<SolidProperty>) {
-        self.abstract_space_mut().lod3_solid = value;
+        self.abstract_space_mut().lod3_solid = value.map(Box::new);
+    }
+
+    fn set_lod0_point(&mut self, value: Option<PointProperty>) {
+        self.abstract_space_mut().lod0_point = value.map(Box::new);
     }
 
     fn set_lod0_multi_surface(&mut self, value: Option<MultiSurfaceProperty>) {
-        self.abstract_space_mut().lod0_multi_surface = value;
+        self.abstract_space_mut().lod0_multi_surface = value.map(Box::new);
     }
 
     fn set_lod2_multi_surface(&mut self, value: Option<MultiSurfaceProperty>) {
-        self.abstract_space_mut().lod2_multi_surface = value;
+        self.abstract_space_mut().lod2_multi_surface = value.map(Box::new);
     }
 
     fn set_lod3_multi_surface(&mut self, value: Option<MultiSurfaceProperty>) {
-        self.abstract_space_mut().lod3_multi_surface = value;
+        self.abstract_space_mut().lod3_multi_surface = value.map(Box::new);
     }
 
     fn set_lod0_multi_curve(&mut self, value: Option<MultiCurveProperty>) {
-        self.abstract_space_mut().lod0_multi_curve = value;
+        self.abstract_space_mut().lod0_multi_curve = value.map(Box::new);
     }
 
     fn set_lod2_multi_curve(&mut self, value: Option<MultiCurveProperty>) {
-        self.abstract_space_mut().lod2_multi_curve = value;
+        self.abstract_space_mut().lod2_multi_curve = value.map(Box::new);
     }
 
     fn set_lod3_multi_curve(&mut self, value: Option<MultiCurveProperty>) {
-        self.abstract_space_mut().lod3_multi_curve = value;
+        self.abstract_space_mut().lod3_multi_curve = value.map(Box::new);
     }
 
     fn lod1_solid_mut(&mut self) -> Option<&mut SolidProperty> {
-        self.abstract_space_mut().lod1_solid.as_mut()
+        self.abstract_space_mut().lod1_solid.as_deref_mut()
     }
 
     fn lod2_solid_mut(&mut self) -> Option<&mut SolidProperty> {
-        self.abstract_space_mut().lod2_solid.as_mut()
+        self.abstract_space_mut().lod2_solid.as_deref_mut()
     }
 
     fn lod3_solid_mut(&mut self) -> Option<&mut SolidProperty> {
-        self.abstract_space_mut().lod3_solid.as_mut()
+        self.abstract_space_mut().lod3_solid.as_deref_mut()
+    }
+
+    fn lod0_point_mut(&mut self) -> Option<&mut PointProperty> {
+        self.abstract_space_mut().lod0_point.as_deref_mut()
     }
 
     fn lod0_multi_surface_mut(&mut self) -> Option<&mut MultiSurfaceProperty> {
-        self.abstract_space_mut().lod0_multi_surface.as_mut()
+        self.abstract_space_mut().lod0_multi_surface.as_deref_mut()
     }
 
     fn lod2_multi_surface_mut(&mut self) -> Option<&mut MultiSurfaceProperty> {
-        self.abstract_space_mut().lod2_multi_surface.as_mut()
+        self.abstract_space_mut().lod2_multi_surface.as_deref_mut()
     }
 
     fn lod3_multi_surface_mut(&mut self) -> Option<&mut MultiSurfaceProperty> {
-        self.abstract_space_mut().lod3_multi_surface.as_mut()
+        self.abstract_space_mut().lod3_multi_surface.as_deref_mut()
     }
 
     fn lod0_multi_curve_mut(&mut self) -> Option<&mut MultiCurveProperty> {
-        self.abstract_space_mut().lod0_multi_curve.as_mut()
+        self.abstract_space_mut().lod0_multi_curve.as_deref_mut()
     }
 
     fn lod2_multi_curve_mut(&mut self) -> Option<&mut MultiCurveProperty> {
-        self.abstract_space_mut().lod2_multi_curve.as_mut()
+        self.abstract_space_mut().lod2_multi_curve.as_deref_mut()
     }
 
     fn lod3_multi_curve_mut(&mut self) -> Option<&mut MultiCurveProperty> {
-        self.abstract_space_mut().lod3_multi_curve.as_mut()
+        self.abstract_space_mut().lod3_multi_curve.as_deref_mut()
     }
 
     fn boundaries_mut(&mut self) -> &mut Vec<AbstractSpaceBoundaryProperty> {
@@ -393,6 +411,10 @@ impl ComputeEnvelope for AbstractSpace {
                 .as_ref()
                 .and_then(|x| x.object())
                 .and_then(|x| x.compute_envelope()),
+            self.lod0_point
+                .as_ref()
+                .and_then(|x| x.object())
+                .and_then(|x| x.compute_envelope()),
         ]
         .into_iter()
         .flatten()
@@ -446,6 +468,10 @@ impl ApplyTransform for AbstractSpace {
             multi_curve.apply_transform(m);
         }
 
+        if let Some(point) = self.lod0_point.as_mut().and_then(|p| p.object_mut()) {
+            point.apply_transform(m);
+        }
+
         for prop in &mut self.boundaries {
             if let Some(x) = prop.object_mut() {
                 x.apply_transform(m);
@@ -494,6 +520,10 @@ impl ApplyTransform for AbstractSpace {
         }
         if let Some(multi_curve) = self.lod3_multi_curve.as_mut().and_then(|p| p.object_mut()) {
             multi_curve.apply_isometry(isometry);
+        }
+
+        if let Some(point) = self.lod0_point.as_mut().and_then(|p| p.object_mut()) {
+            point.apply_isometry(isometry);
         }
 
         for prop in &mut self.boundaries {
@@ -546,6 +576,10 @@ impl ApplyTransform for AbstractSpace {
             multi_curve.apply_translation(vector);
         }
 
+        if let Some(point) = self.lod0_point.as_mut().and_then(|p| p.object_mut()) {
+            point.apply_translation(vector);
+        }
+
         for prop in &mut self.boundaries {
             if let Some(x) = prop.object_mut() {
                 x.apply_translation(vector);
@@ -596,6 +630,10 @@ impl ApplyTransform for AbstractSpace {
             multi_curve.apply_rotation(rotation);
         }
 
+        if let Some(point) = self.lod0_point.as_mut().and_then(|p| p.object_mut()) {
+            point.apply_rotation(rotation);
+        }
+
         for prop in &mut self.boundaries {
             if let Some(x) = prop.object_mut() {
                 x.apply_rotation(rotation);
@@ -644,6 +682,10 @@ impl ApplyTransform for AbstractSpace {
         }
         if let Some(multi_curve) = self.lod3_multi_curve.as_mut().and_then(|p| p.object_mut()) {
             multi_curve.apply_scale(scale);
+        }
+
+        if let Some(point) = self.lod0_point.as_mut().and_then(|p| p.object_mut()) {
+            point.apply_scale(scale);
         }
 
         for prop in &mut self.boundaries {

@@ -1,6 +1,8 @@
 pub mod appearance;
+pub mod bridge;
 pub mod building;
 pub mod city_furniture;
+pub mod city_object_group;
 pub mod common;
 pub mod construction;
 pub mod core;
@@ -9,5 +11,6 @@ pub mod land_use;
 pub mod point_cloud;
 pub mod relief;
 pub mod transportation;
+pub mod tunnel;
 pub mod vegetation;
 pub mod water_body;

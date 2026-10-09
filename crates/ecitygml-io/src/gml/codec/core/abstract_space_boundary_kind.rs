@@ -6,24 +6,26 @@ use crate::gml::codec::relief::{
     deserialize_abstract_relief_component_kind, deserialize_relief_feature,
     serialize_abstract_relief_component_kind, serialize_relief_feature,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{CityGmlElement, CombinedCityGmlElement, DeserializationConfig};
 use ecitygml_core::model::core::AbstractSpaceBoundaryKind;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
 pub fn deserialize_abstract_space_boundary_kind(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<Option<AbstractSpaceBoundaryKind>, Error> {
-    if let Some(x) = deserialize_abstract_thematic_surface_kind(xml_document, spans)? {
+    if let Some(x) = deserialize_abstract_thematic_surface_kind(xml_document, index, config)? {
         return Ok(Some(x.into()));
     }
 
-    if let Some(span) = spans.first(CityGmlElement::ReliefFeature.into()) {
-        let relief_feature = deserialize_relief_feature(&xml_document[span.start..span.end])?;
+    if let Some(index) = index.first(CityGmlElement::ReliefFeature.into()) {
+        let relief_feature =
+            deserialize_relief_feature(&xml_document[index.range()], index, config)?;
         return Ok(Some(relief_feature.into()));
     }
 
-    if let Some(x) = deserialize_abstract_relief_component_kind(xml_document, spans)? {
+    if let Some(x) = deserialize_abstract_relief_component_kind(xml_document, index, config)? {
         return Ok(Some(x.into()));
     }
 
@@ -32,15 +34,17 @@ pub fn deserialize_abstract_space_boundary_kind(
 
 pub fn serialize_abstract_space_boundary_kind(
     abstract_space_boundary_kind: &AbstractSpaceBoundaryKind,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
     match abstract_space_boundary_kind {
         AbstractSpaceBoundaryKind::AbstractThematicSurfaceKind(x) => {
-            serialize_abstract_thematic_surface_kind(x, formatting)
+            serialize_abstract_thematic_surface_kind(x, xml_fragment_writer)
         }
-        AbstractSpaceBoundaryKind::ReliefFeature(x) => serialize_relief_feature(x, formatting),
+        AbstractSpaceBoundaryKind::ReliefFeature(x) => {
+            serialize_relief_feature(x, xml_fragment_writer)
+        }
         AbstractSpaceBoundaryKind::AbstractReliefComponentKind(x) => {
-            serialize_abstract_relief_component_kind(x, formatting)
+            serialize_abstract_relief_component_kind(x, xml_fragment_writer)
         }
     }
 }
@@ -49,7 +53,6 @@ pub fn serialize_abstract_space_boundary_kind(
 mod tests {
     use super::*;
     use ecitygml_core::model::core::AsAbstractFeature;
-    use egml::io::util::extract_xml_element_spans;
     use egml::model::base::{AsAbstractGml, Id};
     use egml::model::basic_types::Code;
 
@@ -80,11 +83,14 @@ mod tests {
             </con:WallSurface>
         </boundary>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space_boundary_kind =
-            deserialize_abstract_space_boundary_kind(xml_document, &spans)
-                .expect("should work")
-                .expect("should parse one space boundary kind");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space_boundary_kind = deserialize_abstract_space_boundary_kind(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work")
+        .expect("should parse one space boundary kind");
 
         assert_eq!(
             abstract_space_boundary_kind.feature_id(),

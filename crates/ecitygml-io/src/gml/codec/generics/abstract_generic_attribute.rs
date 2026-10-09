@@ -1,101 +1,85 @@
 use crate::Error;
-use crate::gml::codec::generics::GmlStringAttribute;
-use crate::gml::codec::generics::double_attribute::GmlDoubleAttribute;
-use crate::gml::codec::generics::generic_attribute_set::GmlGenericAttributeSet;
-use crate::gml::codec::generics::int_attribute::GmlIntAttribute;
-use crate::gml::codec::generics::measure_attribute::GmlMeasureAttribute;
-use ecitygml_core::model::generics::{
-    DoubleAttribute, GenericAttributeKind, GenericAttributeSet, IntAttribute, MeasureAttribute,
-    StringAttribute,
+use crate::gml::codec::generics::double_attribute::{
+    deserialize_double_attribute, serialize_double_attribute,
 };
-use quick_xml::{de, se};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum GmlGenericAttributeKind {
-    #[serde(rename(serialize = "gen:StringAttribute", deserialize = "StringAttribute"))]
-    StringAttribute(GmlStringAttribute),
-    #[serde(rename(serialize = "gen:IntAttribute", deserialize = "IntAttribute"))]
-    IntAttribute(GmlIntAttribute),
-    #[serde(rename(serialize = "gen:DoubleAttribute", deserialize = "DoubleAttribute"))]
-    DoubleAttribute(GmlDoubleAttribute),
-    #[serde(rename(serialize = "gen:MeasureAttribute", deserialize = "MeasureAttribute"))]
-    MeasureAttribute(GmlMeasureAttribute),
-    #[serde(rename(
-        serialize = "gen:GenericAttributeSet",
-        deserialize = "GenericAttributeSet"
-    ))]
-    GenericAttributeSet(GmlGenericAttributeSet),
-}
-
-impl TryFrom<GmlGenericAttributeKind> for GenericAttributeKind {
-    type Error = Error;
-
-    fn try_from(value: GmlGenericAttributeKind) -> Result<Self, Self::Error> {
-        match value {
-            GmlGenericAttributeKind::StringAttribute(x) => {
-                let core_attr = StringAttribute::try_from(x)?;
-                Ok(GenericAttributeKind::StringAttribute(core_attr))
-            }
-            GmlGenericAttributeKind::IntAttribute(x) => {
-                let core_attr = IntAttribute::try_from(x)?;
-                Ok(GenericAttributeKind::IntAttribute(core_attr))
-            }
-            GmlGenericAttributeKind::DoubleAttribute(x) => {
-                let core_attr = DoubleAttribute::try_from(x)?;
-                Ok(GenericAttributeKind::DoubleAttribute(core_attr))
-            }
-            GmlGenericAttributeKind::MeasureAttribute(x) => {
-                let core_attr = MeasureAttribute::try_from(x)?;
-                Ok(GenericAttributeKind::MeasureAttribute(core_attr))
-            }
-            GmlGenericAttributeKind::GenericAttributeSet(x) => {
-                let core_attr = GenericAttributeSet::try_from(x)?;
-                Ok(GenericAttributeKind::GenericAttributeSet(core_attr))
-            }
-        }
-    }
-}
-
-impl From<&GenericAttributeKind> for GmlGenericAttributeKind {
-    fn from(attr: &GenericAttributeKind) -> Self {
-        match attr {
-            GenericAttributeKind::StringAttribute(x) => {
-                GmlGenericAttributeKind::StringAttribute(GmlStringAttribute::from(x))
-            }
-            GenericAttributeKind::IntAttribute(x) => {
-                GmlGenericAttributeKind::IntAttribute(GmlIntAttribute::from(x))
-            }
-            GenericAttributeKind::DoubleAttribute(x) => {
-                GmlGenericAttributeKind::DoubleAttribute(GmlDoubleAttribute::from(x))
-            }
-            GenericAttributeKind::MeasureAttribute(x) => {
-                GmlGenericAttributeKind::MeasureAttribute(GmlMeasureAttribute::from(x))
-            }
-            GenericAttributeKind::GenericAttributeSet(x) => {
-                GmlGenericAttributeKind::GenericAttributeSet(GmlGenericAttributeSet::from(x))
-            }
-        }
-    }
-}
+use crate::gml::codec::generics::generic_attribute_set::{
+    deserialize_generic_attribute_set, serialize_generic_attribute_set,
+};
+use crate::gml::codec::generics::int_attribute::{
+    deserialize_int_attribute, serialize_int_attribute,
+};
+use crate::gml::codec::generics::measure_attribute::{
+    deserialize_measure_attribute, serialize_measure_attribute,
+};
+use crate::gml::codec::generics::{deserialize_string_attribute, serialize_string_attribute};
+use ecitygml_core::model::generics::GenericAttributeKind;
+use egml::io::util::{ChunkedSink, XmlFragmentWriter};
+use quick_xml::Reader;
+use quick_xml::events::Event;
 
 pub fn deserialize_generic_attribute(xml_document: &[u8]) -> Result<GenericAttributeKind, Error> {
-    let parsed_attribute: GmlGenericAttributeKind = de::from_reader(xml_document)?;
-    let attribute = GenericAttributeKind::try_from(parsed_attribute)?;
+    let mut reader = Reader::from_reader(xml_document);
+    reader.config_mut().trim_text(true);
 
-    Ok(attribute)
+    loop {
+        match reader.read_event()? {
+            Event::Start(start) => {
+                return match start.local_name().as_ref() {
+                    "StringAttribute" => Ok(GenericAttributeKind::StringAttribute(
+                        deserialize_string_attribute(xml_document)?,
+                    )),
+                    "IntAttribute" => Ok(GenericAttributeKind::IntAttribute(
+                        deserialize_int_attribute(xml_document)?,
+                    )),
+                    "DoubleAttribute" => Ok(GenericAttributeKind::DoubleAttribute(
+                        deserialize_double_attribute(xml_document)?,
+                    )),
+                    "MeasureAttribute" => Ok(GenericAttributeKind::MeasureAttribute(
+                        deserialize_measure_attribute(xml_document)?,
+                    )),
+                    "GenericAttributeSet" => Ok(GenericAttributeKind::GenericAttributeSet(
+                        deserialize_generic_attribute_set(xml_document)?,
+                    )),
+                    other => Err(Error::UnknownElementNode(other.to_string())),
+                };
+            }
+            Event::Eof => {
+                return Err(Error::ElementNotFound("generic attribute".to_string()));
+            }
+            _ => {}
+        }
+    }
 }
 
-pub fn serialize_generic_attribute(attr: &GenericAttributeKind) -> Result<String, Error> {
-    let gml = GmlGenericAttributeKind::from(attr);
-    Ok(se::to_string(&gml)?)
+pub fn serialize_generic_attribute(
+    attr: &GenericAttributeKind,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    match attr {
+        GenericAttributeKind::StringAttribute(x) => {
+            serialize_string_attribute(x, xml_fragment_writer)
+        }
+        GenericAttributeKind::IntAttribute(x) => serialize_int_attribute(x, xml_fragment_writer),
+        GenericAttributeKind::DoubleAttribute(x) => {
+            serialize_double_attribute(x, xml_fragment_writer)
+        }
+        GenericAttributeKind::MeasureAttribute(x) => {
+            serialize_measure_attribute(x, xml_fragment_writer)
+        }
+        GenericAttributeKind::GenericAttributeSet(x) => {
+            serialize_generic_attribute_set(x, xml_fragment_writer)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ecitygml_core::model::generics::{
+        DoubleAttribute, GenericAttributeSet, IntAttribute, MeasureAttribute, StringAttribute,
+    };
+    use egml::io::util::Formatting;
     use egml::model::basic_types::Measure;
-    // --- Serialization tests ---
 
     #[test]
     fn test_serialize_string_attribute() {
@@ -104,7 +88,17 @@ mod tests {
             value: "concrete".to_string(),
         });
 
-        let xml = serialize_generic_attribute(&attr).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&attr, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
 
         assert!(
             xml.contains("<gen:StringAttribute>"),
@@ -127,7 +121,17 @@ mod tests {
             value: 4,
         });
 
-        let xml = serialize_generic_attribute(&attr).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&attr, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
 
         assert!(
             xml.contains("<gen:IntAttribute>"),
@@ -150,7 +154,17 @@ mod tests {
             value: 12.5,
         });
 
-        let xml = serialize_generic_attribute(&attr).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&attr, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
 
         assert!(
             xml.contains("<gen:DoubleAttribute>"),
@@ -176,7 +190,17 @@ mod tests {
             },
         });
 
-        let xml = serialize_generic_attribute(&attr).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&attr, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
 
         assert!(
             xml.contains("<gen:MeasureAttribute>"),
@@ -201,7 +225,17 @@ mod tests {
         )
         .into();
 
-        let xml = serialize_generic_attribute(&generic_attribute_set).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&generic_attribute_set, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
 
         assert!(
             xml.contains("<gen:GenericAttributeSet>"),
@@ -225,7 +259,17 @@ mod tests {
             value: "prefab".to_string(),
         });
 
-        let xml = serialize_generic_attribute(&original).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&original, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
         let recovered = deserialize_generic_attribute(xml.as_bytes()).unwrap();
 
         assert_eq!(original, recovered);
@@ -238,7 +282,17 @@ mod tests {
             value: 7,
         });
 
-        let xml = serialize_generic_attribute(&original).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&original, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
         let recovered = deserialize_generic_attribute(xml.as_bytes()).unwrap();
 
         assert_eq!(original, recovered);
@@ -251,7 +305,17 @@ mod tests {
             value: 99.9,
         });
 
-        let xml = serialize_generic_attribute(&original).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&original, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
         let recovered = deserialize_generic_attribute(xml.as_bytes()).unwrap();
 
         assert_eq!(original, recovered);
@@ -267,7 +331,17 @@ mod tests {
             },
         });
 
-        let xml = serialize_generic_attribute(&original).unwrap();
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&original, &mut xml_fragment_writer).unwrap();
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .unwrap();
         let recovered = deserialize_generic_attribute(xml.as_bytes()).unwrap();
 
         assert_eq!(original, recovered);

@@ -1,4 +1,6 @@
 use crate::impl_try_from_occupied_space_kind_ref_for_enum;
+use crate::model::bridge::AbstractBridgeKind;
+use crate::model::bridge::refs::AbstractBridgeKindRef;
 use crate::model::building::AbstractBuildingKind;
 use crate::model::building::refs::AbstractBuildingKindRef;
 use crate::model::common::FeatureType;
@@ -6,10 +8,14 @@ use crate::model::common::HasFeatureType;
 use crate::model::construction::{
     AbstractConstruction, AbstractConstructionKind, AsAbstractConstruction,
 };
+use crate::model::tunnel::AbstractTunnelKind;
+use crate::model::tunnel::refs::AbstractTunnelKindRef;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractConstructionKindRef<'a> {
     AbstractBuildingKind(AbstractBuildingKindRef<'a>),
+    AbstractBridgeKind(AbstractBridgeKindRef<'a>),
+    AbstractTunnelKind(AbstractTunnelKindRef<'a>),
 }
 
 impl<'a> From<&'a AbstractConstructionKind> for AbstractConstructionKindRef<'a> {
@@ -18,6 +24,8 @@ impl<'a> From<&'a AbstractConstructionKind> for AbstractConstructionKindRef<'a> 
             AbstractConstructionKind::AbstractBuildingKind(x) => {
                 Self::AbstractBuildingKind(x.into())
             }
+            AbstractConstructionKind::AbstractBridgeKind(x) => Self::AbstractBridgeKind(x.into()),
+            AbstractConstructionKind::AbstractTunnelKind(x) => Self::AbstractTunnelKind(x.into()),
         }
     }
 }
@@ -26,6 +34,8 @@ impl<'a> AsAbstractConstruction for AbstractConstructionKindRef<'a> {
     fn abstract_construction(&self) -> &AbstractConstruction {
         match self {
             Self::AbstractBuildingKind(x) => x.abstract_construction(),
+            Self::AbstractBridgeKind(x) => x.abstract_construction(),
+            Self::AbstractTunnelKind(x) => x.abstract_construction(),
         }
     }
 }
@@ -35,6 +45,8 @@ impl<'a> HasFeatureType for AbstractConstructionKindRef<'a> {
     fn feature_type(&self) -> FeatureType {
         match *self {
             Self::AbstractBuildingKind(x) => x.feature_type(),
+            Self::AbstractBridgeKind(x) => x.feature_type(),
+            Self::AbstractTunnelKind(x) => x.feature_type(),
         }
     }
 }
@@ -56,6 +68,8 @@ macro_rules! impl_from_for_construction_kind_ref {
     };
 }
 impl_from_for_construction_kind_ref!(AbstractBuildingKind);
+impl_from_for_construction_kind_ref!(AbstractBridgeKind);
+impl_from_for_construction_kind_ref!(AbstractTunnelKind);
 
 #[macro_export]
 macro_rules! impl_try_from_for_construction_kind_ref {

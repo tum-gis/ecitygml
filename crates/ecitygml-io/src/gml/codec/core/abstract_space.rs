@@ -2,11 +2,17 @@ use crate::error::Error;
 use crate::gml::codec::core::abstract_space_boundary_property::{
     deserialize_abstract_space_boundary_property, serialize_abstract_space_boundary_property,
 };
-use crate::gml::codec::core::enums::GmlSpaceType;
-use crate::gml::codec::core::qualified_area_property::GmlAreaProperty;
-use crate::gml::codec::core::qualified_volume_property::GmlVolumeProperty;
-use crate::gml::codec::core::{deserialize_abstract_city_object, serialize_abstract_city_object};
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement, collect_gml_child_lenient};
+use crate::gml::codec::core::enums::{deserialize_space_type, serialize_space_type};
+use crate::gml::codec::core::{
+    deserialize_abstract_city_object, deserialize_qualified_area_property,
+    deserialize_qualified_volume_property, serialize_abstract_city_object,
+    serialize_abstract_city_object_attributes, serialize_qualified_area_property,
+    serialize_qualified_volume_property,
+};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+    collect_gml_child_lenient,
+};
 use ecitygml_core::model::core::{
     AbstractSpace, AsAbstractCityObject, AsAbstractSpace, AsAbstractSpaceMut,
 };
@@ -14,18 +20,24 @@ use egml::io::codec::geometry::aggregates::{
     deserialize_multi_curve_property, deserialize_multi_surface_property,
     serialize_multi_curve_property, serialize_multi_surface_property,
 };
-use egml::io::codec::geometry::primitives::{deserialize_solid_property, serialize_solid_property};
-use egml::io::util::collect_children;
-use egml::io::util::{Formatting, XmlElementSpans, XmlNodeContent, XmlNodeParts, serialize_inner};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
+use egml::io::codec::geometry::primitives::{
+    deserialize_point_property, deserialize_solid_property, serialize_point_property,
+    serialize_solid_property,
+};
+use egml::io::util::{ChunkedSink, collect_children};
+use egml::io::util::{XmlDocumentIndex, XmlFragmentWriter};
 
 pub fn deserialize_abstract_space(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractSpace, Error> {
+    debug_assert!(
+        !index.is_truncated(),
+        "deserialize_abstract_space received a truncated index — caller must scan to sufficient depth"
+    );
+
     let mut abstract_city_object_result = None;
-    let mut parsed_result = None;
     let mut space_boundaries_result = None;
     let mut lod1_solid_result = None;
     let mut lod2_solid_result = None;
@@ -36,268 +48,299 @@ pub fn deserialize_abstract_space(
     let mut lod0_multi_curve_result = None;
     let mut lod2_multi_curve_result = None;
     let mut lod3_multi_curve_result = None;
+    let mut lod0_point_result = None;
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            abstract_city_object_result =
-                Some(deserialize_abstract_city_object(xml_document, spans));
-        });
-        s.spawn(|_| {
-            parsed_result =
-                Some(de::from_reader::<_, GmlAbstractSpace>(xml_document).map_err(Error::from));
+            abstract_city_object_result = Some(deserialize_abstract_city_object(
+                xml_document,
+                index,
+                config,
+            ));
         });
         s.spawn(|_| {
             space_boundaries_result = Some(collect_children(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::BoundaryProperty.into(),
+                config,
                 deserialize_abstract_space_boundary_property,
             ));
         });
         s.spawn(|_| {
             lod1_solid_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod1SolidProperty.into(),
+                config.gml_config(),
                 deserialize_solid_property,
             ));
         });
         s.spawn(|_| {
             lod2_solid_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod2SolidProperty.into(),
+                config.gml_config(),
                 deserialize_solid_property,
             ));
         });
         s.spawn(|_| {
             lod3_solid_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod3SolidProperty.into(),
+                config.gml_config(),
                 deserialize_solid_property,
             ));
         });
         s.spawn(|_| {
             lod0_multi_surface_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod0MultiSurfaceProperty.into(),
+                config.gml_config(),
                 deserialize_multi_surface_property,
             ));
         });
         s.spawn(|_| {
             lod2_multi_surface_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod2MultiSurfaceProperty.into(),
+                config.gml_config(),
                 deserialize_multi_surface_property,
             ));
         });
         s.spawn(|_| {
             lod3_multi_surface_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod3MultiSurfaceProperty.into(),
+                config.gml_config(),
                 deserialize_multi_surface_property,
             ));
         });
         s.spawn(|_| {
             lod0_multi_curve_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod0MultiCurveProperty.into(),
+                config.gml_config(),
                 deserialize_multi_curve_property,
             ));
         });
         s.spawn(|_| {
             lod2_multi_curve_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod2MultiCurveProperty.into(),
+                config.gml_config(),
                 deserialize_multi_curve_property,
             ));
         });
         s.spawn(|_| {
             lod3_multi_curve_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod3MultiCurveProperty.into(),
+                config.gml_config(),
                 deserialize_multi_curve_property,
+            ));
+        });
+        s.spawn(|_| {
+            lod0_point_result = Some(collect_gml_child_lenient(
+                xml_document,
+                index,
+                CityGmlElement::Lod0PointProperty.into(),
+                config.gml_config(),
+                deserialize_point_property,
             ));
         });
     });
 
-    let abstract_city_object =
-        abstract_city_object_result.expect("rayon::scope guarantees all spawns complete")?;
-    let parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let space_boundaries =
-        space_boundaries_result.expect("rayon::scope guarantees all spawns complete")?;
-    let lod1_solid = lod1_solid_result.expect("rayon::scope guarantees all spawns complete");
-    let lod2_solid = lod2_solid_result.expect("rayon::scope guarantees all spawns complete");
-    let lod3_solid = lod3_solid_result.expect("rayon::scope guarantees all spawns complete");
-    let lod0_multi_surface =
-        lod0_multi_surface_result.expect("rayon::scope guarantees all spawns complete");
-    let lod2_multi_surface =
-        lod2_multi_surface_result.expect("rayon::scope guarantees all spawns complete");
-    let lod3_multi_surface =
-        lod3_multi_surface_result.expect("rayon::scope guarantees all spawns complete");
-    let lod0_multi_curve =
-        lod0_multi_curve_result.expect("rayon::scope guarantees all spawns complete");
-    let lod2_multi_curve =
-        lod2_multi_curve_result.expect("rayon::scope guarantees all spawns complete");
-    let lod3_multi_curve =
-        lod3_multi_curve_result.expect("rayon::scope guarantees all spawns complete");
+    let mut abstract_space = AbstractSpace::from_abstract_city_object(
+        abstract_city_object_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
 
-    let mut abstract_space = AbstractSpace::from_abstract_city_object(abstract_city_object);
-    abstract_space.set_space_type(parsed.space_type.map(Into::into));
-    abstract_space.set_volumes(parsed.volumes.into_iter().map(Into::into).collect());
-    abstract_space.set_areas(parsed.areas.into_iter().map(Into::into).collect());
-    abstract_space.set_lod1_solid(lod1_solid);
-    abstract_space.set_lod2_solid(lod2_solid);
-    abstract_space.set_lod3_solid(lod3_solid);
-    abstract_space.set_lod0_multi_surface(lod0_multi_surface);
-    abstract_space.set_lod2_multi_surface(lod2_multi_surface);
-    abstract_space.set_lod3_multi_surface(lod3_multi_surface);
-    abstract_space.set_lod0_multi_curve(lod0_multi_curve);
-    abstract_space.set_lod2_multi_curve(lod2_multi_curve);
-    abstract_space.set_lod3_multi_curve(lod3_multi_curve);
-    abstract_space.set_boundaries(space_boundaries);
+    let space_type = index
+        .first(CityGmlElement::SpaceTypeProperty.into())
+        .map(|x| deserialize_space_type(&xml_document[x.range()]))
+        .transpose()?;
+    abstract_space.set_space_type_opt(space_type);
+
+    let volumes = index
+        .get(CityGmlElement::VolumeProperty.into())
+        .iter()
+        .map(|x| deserialize_qualified_volume_property(&xml_document[x.range()]))
+        .collect::<Result<_, _>>()?;
+    abstract_space.set_volumes(volumes);
+
+    let areas = index
+        .get(CityGmlElement::AreaProperty.into())
+        .iter()
+        .map(|x| deserialize_qualified_area_property(&xml_document[x.range()]))
+        .collect::<Result<_, _>>()?;
+    abstract_space.set_areas(areas);
+
+    abstract_space
+        .set_lod1_solid(lod1_solid_result.expect("rayon::scope guarantees all spawns complete"));
+    abstract_space
+        .set_lod2_solid(lod2_solid_result.expect("rayon::scope guarantees all spawns complete"));
+    abstract_space
+        .set_lod3_solid(lod3_solid_result.expect("rayon::scope guarantees all spawns complete"));
+    abstract_space.set_lod0_multi_surface(
+        lod0_multi_surface_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_space.set_lod2_multi_surface(
+        lod2_multi_surface_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_space.set_lod3_multi_surface(
+        lod3_multi_surface_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_space.set_lod0_multi_curve(
+        lod0_multi_curve_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_space.set_lod2_multi_curve(
+        lod2_multi_curve_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_space.set_lod3_multi_curve(
+        lod3_multi_curve_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_space
+        .set_lod0_point(lod0_point_result.expect("rayon::scope guarantees all spawns complete"));
+    abstract_space.set_boundaries(
+        space_boundaries_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
 
     Ok(abstract_space)
 }
 
 pub fn serialize_abstract_space(
     abstract_space: &AbstractSpace,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
-    let mut xml_node_parts =
-        serialize_abstract_city_object(abstract_space.abstract_city_object(), formatting)?;
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    serialize_abstract_city_object(abstract_space.abstract_city_object(), xml_fragment_writer)?;
 
-    if let Some(raw) = serialize_inner(GmlAbstractSpace::from(abstract_space), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    if let Some(space_type) = abstract_space.space_type() {
+        serialize_space_type(
+            space_type,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::SpaceTypeProperty,
+        )?;
+    }
+
+    for volume in abstract_space.volumes() {
+        serialize_qualified_volume_property(
+            volume,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::VolumeProperty,
+        )?;
+    }
+
+    for area in abstract_space.areas() {
+        serialize_qualified_area_property(
+            area,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::AreaProperty,
+        )?;
     }
 
     if let Some(prop) = abstract_space.lod1_solid() {
-        xml_node_parts.content.push(
-            serialize_solid_property(prop, formatting, CityGmlElement::Lod1SolidProperty.into())
-                .map_err(Error::from)?
-                .into(),
-        );
+        serialize_solid_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod1SolidProperty,
+        )?;
     }
     if let Some(prop) = abstract_space.lod2_solid() {
-        xml_node_parts.content.push(
-            serialize_solid_property(prop, formatting, CityGmlElement::Lod2SolidProperty.into())
-                .map_err(Error::from)?
-                .into(),
-        );
+        serialize_solid_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod2SolidProperty,
+        )?;
     }
     if let Some(prop) = abstract_space.lod3_solid() {
-        xml_node_parts.content.push(
-            serialize_solid_property(prop, formatting, CityGmlElement::Lod3SolidProperty.into())
-                .map_err(Error::from)?
-                .into(),
-        );
+        serialize_solid_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod3SolidProperty,
+        )?;
     }
     if let Some(prop) = abstract_space.lod0_multi_surface() {
-        xml_node_parts.content.push(
-            serialize_multi_surface_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod0MultiSurfaceProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_surface_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod0MultiSurfaceProperty,
+        )?;
     }
     if let Some(prop) = abstract_space.lod2_multi_surface() {
-        xml_node_parts.content.push(
-            serialize_multi_surface_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod2MultiSurfaceProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_surface_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod2MultiSurfaceProperty,
+        )?;
     }
     if let Some(prop) = abstract_space.lod3_multi_surface() {
-        xml_node_parts.content.push(
-            serialize_multi_surface_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod3MultiSurfaceProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_surface_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod3MultiSurfaceProperty,
+        )?;
     }
     if let Some(prop) = abstract_space.lod0_multi_curve() {
-        xml_node_parts.content.push(
-            serialize_multi_curve_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod0MultiCurveProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_curve_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod0MultiCurveProperty,
+        )?;
     }
     if let Some(prop) = abstract_space.lod2_multi_curve() {
-        xml_node_parts.content.push(
-            serialize_multi_curve_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod2MultiCurveProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_curve_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod2MultiCurveProperty,
+        )?;
     }
     if let Some(prop) = abstract_space.lod3_multi_curve() {
-        xml_node_parts.content.push(
-            serialize_multi_curve_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod3MultiCurveProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_curve_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod3MultiCurveProperty,
+        )?;
     }
-    xml_node_parts.content.extend(
-        abstract_space
-            .boundaries()
-            .iter()
-            .map(|x| {
-                serialize_abstract_space_boundary_property(x, formatting).map(XmlNodeContent::from)
-            })
-            .collect::<Result<Vec<_>, _>>()?,
-    );
+    if let Some(prop) = abstract_space.lod0_point() {
+        serialize_point_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod0PointProperty,
+        )?;
+    }
 
-    Ok(xml_node_parts)
+    for prop in abstract_space.boundaries() {
+        serialize_abstract_space_boundary_property(prop, xml_fragment_writer)?;
+    }
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractSpace {
-    #[serde(rename = "spaceType", skip_serializing_if = "Option::is_none")]
-    pub space_type: Option<GmlSpaceType>,
-
-    #[serde(rename = "volume", default)]
-    pub volumes: Vec<GmlVolumeProperty>,
-
-    #[serde(rename = "area", default)]
-    pub areas: Vec<GmlAreaProperty>,
-}
-
-impl From<&AbstractSpace> for GmlAbstractSpace {
-    fn from(item: &AbstractSpace) -> Self {
-        Self {
-            space_type: item.space_type().map(Into::into),
-            volumes: item.volumes().iter().map(GmlVolumeProperty::from).collect(),
-            areas: item.areas().iter().map(GmlAreaProperty::from).collect(),
-        }
-    }
+pub fn serialize_abstract_space_attributes(
+    abstract_space: &AbstractSpace,
+) -> Vec<(String, String)> {
+    serialize_abstract_city_object_attributes(abstract_space.abstract_city_object())
 }
 
 #[cfg(test)]
@@ -305,7 +348,7 @@ mod tests {
     use super::*;
     use ecitygml_core::model::core::AsAbstractSpace;
     use ecitygml_core::model::core::enums::SpaceType;
-    use egml::io::util::extract_xml_element_spans;
+    use egml::io::util::{Formatting, XmlFragmentWriter};
 
     #[test]
     fn test_deserialize_abstract_space_with_solid_with_links() {
@@ -329,22 +372,17 @@ mod tests {
     </bldg:Building>
 ";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space = deserialize_abstract_space(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
         assert!(abstract_space.lod1_solid().is_none());
         assert!(abstract_space.lod2_solid().is_some());
         assert!(abstract_space.lod3_solid().is_none());
 
         let lod2_solid = abstract_space.lod2_solid().expect("should work");
-        let exterior_shell = lod2_solid
-            .object()
-            .unwrap()
-            .exterior()
-            .as_ref()
-            .unwrap()
-            .object()
-            .unwrap();
+        let exterior_shell = lod2_solid.object().unwrap().exterior().unwrap();
         assert_eq!(exterior_shell.members().len(), 7);
     }
 
@@ -442,8 +480,10 @@ mod tests {
               <tran:trafficDirection>backwards</tran:trafficDirection>
             </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space = deserialize_abstract_space(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
         assert!(abstract_space.lod1_solid().is_none());
         assert!(abstract_space.lod2_solid().is_some());
@@ -464,8 +504,10 @@ mod tests {
     </volume>
 </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space = deserialize_abstract_space(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
         assert_eq!(abstract_space.space_type(), Some(SpaceType::Open));
         assert_eq!(abstract_space.volumes().len(), 1);
@@ -489,14 +531,35 @@ mod tests {
     </volume>
 </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space = deserialize_abstract_space(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
-        let xml_node_parts = serialize_abstract_space(&abstract_space, Formatting::Compact)
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        serialize_abstract_space(&abstract_space, &mut xml_fragment_writer)
             .expect("should serialize");
-        let xml = egml::io::util::XmlNode::new("tran:TrafficSpace", xml_node_parts)
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        xml_fragment_writer
+            .write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
         assert!(xml.contains("<volume>") || xml.contains("<volume "));
         assert!(xml.contains("QualifiedVolume"));
@@ -519,18 +582,44 @@ mod tests {
     </volume>
 </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space = deserialize_abstract_space(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
-        let xml_node_parts = serialize_abstract_space(&abstract_space, Formatting::Compact)
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        serialize_abstract_space(&abstract_space, &mut xml_fragment_writer)
             .expect("should serialize");
-        let xml = egml::io::util::XmlNode::new("tran:TrafficSpace", xml_node_parts)
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        xml_fragment_writer
+            .write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
-        let round_tripped_spans = extract_xml_element_spans(xml.as_bytes()).expect("should work");
-        let round_tripped =
-            deserialize_abstract_space(xml.as_bytes(), &round_tripped_spans).expect("should work");
+        let round_tripped_index =
+            XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work");
+        let round_tripped = deserialize_abstract_space(
+            xml.as_bytes(),
+            &round_tripped_index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(abstract_space.volumes(), round_tripped.volumes());
     }
@@ -548,8 +637,10 @@ mod tests {
     </area>
 </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space = deserialize_abstract_space(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
         assert_eq!(abstract_space.space_type(), Some(SpaceType::Open));
         assert_eq!(abstract_space.areas().len(), 1);
@@ -573,14 +664,35 @@ mod tests {
     </area>
 </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space = deserialize_abstract_space(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
-        let xml_node_parts = serialize_abstract_space(&abstract_space, Formatting::Compact)
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        serialize_abstract_space(&abstract_space, &mut xml_fragment_writer)
             .expect("should serialize");
-        let xml = egml::io::util::XmlNode::new("tran:TrafficSpace", xml_node_parts)
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        xml_fragment_writer
+            .write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
         assert!(xml.contains("<area>") || xml.contains("<area "));
         assert!(xml.contains("QualifiedArea"));
@@ -603,19 +715,128 @@ mod tests {
     </area>
 </tran:TrafficSpace>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_space = deserialize_abstract_space(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
 
-        let xml_node_parts = serialize_abstract_space(&abstract_space, Formatting::Compact)
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        serialize_abstract_space(&abstract_space, &mut xml_fragment_writer)
             .expect("should serialize");
-        let xml = egml::io::util::XmlNode::new("tran:TrafficSpace", xml_node_parts)
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        xml_fragment_writer
+            .write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
-        let round_tripped_spans = extract_xml_element_spans(xml.as_bytes()).expect("should work");
-        let round_tripped =
-            deserialize_abstract_space(xml.as_bytes(), &round_tripped_spans).expect("should work");
+        let round_tripped_index =
+            XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work");
+        let round_tripped = deserialize_abstract_space(
+            xml.as_bytes(),
+            &round_tripped_index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(abstract_space.areas(), round_tripped.areas());
+    }
+
+    fn serialize_traffic_space(abstract_space: &AbstractSpace) -> String {
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        serialize_abstract_space(abstract_space, &mut xml_fragment_writer)
+            .expect("should serialize");
+        xml_fragment_writer
+            .write_end_event(
+                CityGmlNamespace::Transportation,
+                CityGmlElement::TrafficSpace,
+            )
+            .expect("should work");
+        let mut buf = Vec::new();
+        xml_fragment_writer
+            .write_to(&mut buf)
+            .expect("should flush fragments");
+        String::from_utf8(buf).expect("should convert to string")
+    }
+
+    #[test]
+    fn test_deserialize_abstract_space_with_lod0_point() {
+        let xml_document = b"\
+<tran:TrafficSpace gml:id=\"TS_1\">
+    <lod0Point>
+        <gml:Point gml:id=\"P_1\">
+            <gml:pos>1.0 2.0 3.0</gml:pos>
+        </gml:Point>
+    </lod0Point>
+</tran:TrafficSpace>";
+
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
+
+        let point = abstract_space
+            .lod0_point()
+            .and_then(|property| property.object())
+            .expect("should have a lod0 point");
+        assert_eq!(
+            (point.pos().x(), point.pos().y(), point.pos().z()),
+            (1.0, 2.0, 3.0)
+        );
+        assert!(abstract_space.lod0_multi_surface().is_none());
+    }
+
+    #[test]
+    fn test_round_trip_abstract_space_with_lod0_point() {
+        let xml_document = b"\
+<tran:TrafficSpace gml:id=\"TS_1\">
+    <lod0Point>
+        <gml:Point gml:id=\"P_1\">
+            <gml:pos>1.0 2.0 3.0</gml:pos>
+        </gml:Point>
+    </lod0Point>
+    <lod1Solid xlink:href=\"#S_1\"/>
+</tran:TrafficSpace>";
+
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_space =
+            deserialize_abstract_space(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
+
+        let xml = serialize_traffic_space(&abstract_space);
+        assert!(xml.contains("<lod0Point>"), "{xml}");
+
+        let round_tripped_index =
+            XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work");
+        let round_tripped = deserialize_abstract_space(
+            xml.as_bytes(),
+            &round_tripped_index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+        assert_eq!(abstract_space.lod0_point(), round_tripped.lod0_point());
+        assert_eq!(abstract_space.lod1_solid(), round_tripped.lod1_solid());
     }
 }

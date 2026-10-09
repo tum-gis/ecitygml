@@ -1,67 +1,80 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_thematic_surface, serialize_abstract_thematic_surface,
+    serialize_abstract_thematic_surface_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::AsAbstractThematicSurface;
 use ecitygml_core::model::transportation::Marking;
-use ecitygml_core::model::transportation::values::MarkingClassValue;
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
-pub fn deserialize_marking(xml_document: &[u8]) -> Result<Marking, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let (abstract_thematic_surface_result, parsed_result) = rayon::join(
-        || deserialize_abstract_thematic_surface(xml_document, &spans),
-        || de::from_reader::<_, GmlMarking>(xml_document).map_err(Error::from),
-    );
-    let abstract_thematic_surface = abstract_thematic_surface_result?;
-    let parsed = parsed_result?;
+pub fn deserialize_marking(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Marking, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_thematic_surface =
+        deserialize_abstract_thematic_surface(xml_document, index, config)?;
 
     let mut marking = Marking::from_abstract_thematic_surface(abstract_thematic_surface);
-    marking.set_class_opt(parsed.class.map(Code::from).map(MarkingClassValue::from));
+
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    marking.set_class_opt(class.map(Into::into));
 
     Ok(marking)
 }
 
-pub fn serialize_marking(marking: &Marking, formatting: Formatting) -> Result<XmlNode, Error> {
-    let mut parts =
-        serialize_abstract_thematic_surface(marking.abstract_thematic_surface(), formatting)?;
+pub fn serialize_marking(
+    marking: &Marking,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_marking_attributes(marking);
 
-    if let Some(raw) = serialize_inner(GmlMarking::from(marking), formatting)? {
-        parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::Marking,
+        attributes,
+    )?;
+
+    serialize_abstract_thematic_surface(marking.abstract_thematic_surface(), xml_fragment_writer)?;
+
+    if let Some(class) = marking.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(CityGmlElement::Marking.into(), parts))
+    xml_fragment_writer
+        .write_end_event(CityGmlNamespace::Transportation, CityGmlElement::Marking)?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlMarking {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-}
-
-impl From<&Marking> for GmlMarking {
-    fn from(item: &Marking) -> Self {
-        Self {
-            class: item.class().map(MarkingClassValue::code).map(Into::into),
-        }
-    }
+pub fn serialize_marking_attributes(marking: &Marking) -> Vec<(String, String)> {
+    serialize_abstract_thematic_surface_attributes(marking.abstract_thematic_surface())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ecitygml_core::model::core::{
-        AsAbstractCityObject, AsAbstractFeature, AsAbstractOccupiedSpace, AsAbstractThematicSurface,
+        AsAbstractCityObject, AsAbstractFeature, AsAbstractThematicSurface,
     };
     use egml::model::base::Id;
 
@@ -76,7 +89,12 @@ mod tests {
                   </genericAttribute>
                 </tran:Marking>";
 
-        let marking = deserialize_marking(xml_document).expect("should work");
+        let marking = deserialize_marking(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             marking.feature_id(),

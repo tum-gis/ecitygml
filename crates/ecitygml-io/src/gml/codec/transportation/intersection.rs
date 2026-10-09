@@ -1,76 +1,78 @@
 use crate::Error;
 use crate::gml::codec::transportation::abstract_transportation_space::{
     deserialize_abstract_transportation_space, serialize_abstract_transportation_space,
+    serialize_abstract_transportation_space_attributes,
 };
-use crate::gml::util::CityGmlElement;
-use ecitygml_core::model::transportation::values::IntersectionClassValue;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::transportation::{AsAbstractTransportationSpace, Intersection};
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
-pub fn deserialize_intersection(xml_document: &[u8]) -> Result<Intersection, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let (abstract_transportation_space_result, parsed_result) = rayon::join(
-        || deserialize_abstract_transportation_space(xml_document, &spans),
-        || de::from_reader::<_, GmlIntersection>(xml_document).map_err(Error::from),
-    );
-    let abstract_transportation_space = abstract_transportation_space_result?;
-    let parsed = parsed_result?;
+pub fn deserialize_intersection(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Intersection, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_transportation_space =
+        deserialize_abstract_transportation_space(xml_document, index, config)?;
 
     let mut intersection =
         Intersection::from_abstract_transportation_space(abstract_transportation_space);
-    intersection.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(IntersectionClassValue::from),
-    );
+
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    intersection.set_class_opt(class.map(Into::into));
 
     Ok(intersection)
 }
 
 pub fn serialize_intersection(
     intersection: &Intersection,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut xml_node_parts = serialize_abstract_transportation_space(
-        intersection.abstract_transportation_space(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_intersection_attributes(intersection);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::Intersection,
+        attributes,
     )?;
 
-    if let Some(raw) = serialize_inner(GmlIntersection::from(intersection), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    serialize_abstract_transportation_space(
+        intersection.abstract_transportation_space(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = intersection.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::Intersection.into(),
-        xml_node_parts,
-    ))
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::Intersection,
+    )?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlIntersection {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-}
-
-impl From<&Intersection> for GmlIntersection {
-    fn from(item: &Intersection) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(IntersectionClassValue::code)
-                .map(Into::into),
-        }
-    }
+pub fn serialize_intersection_attributes(intersection: &Intersection) -> Vec<(String, String)> {
+    serialize_abstract_transportation_space_attributes(intersection.abstract_transportation_space())
 }
 
 #[cfg(test)]
@@ -80,9 +82,8 @@ mod tests {
         AbstractSpaceBoundaryKind, AbstractThematicSurfaceKind, AsAbstractCityObject,
         AsAbstractFeature, AsAbstractSpace,
     };
-    use ecitygml_core::model::transportation::{
-        AsAbstractTransportationSpace, AuxiliaryTrafficArea, GranularityValue, TrafficArea,
-    };
+    use ecitygml_core::model::transportation::enums::GranularityValue;
+    use ecitygml_core::model::transportation::{AsAbstractTransportationSpace, TrafficArea};
     use egml::model::base::Id;
 
     #[test]
@@ -113,7 +114,12 @@ mod tests {
           </tran:trafficSpace>
         </tran:Intersection>";
 
-        let intersection = deserialize_intersection(xml_document).expect("should work");
+        let intersection = deserialize_intersection(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             intersection.feature_id(),

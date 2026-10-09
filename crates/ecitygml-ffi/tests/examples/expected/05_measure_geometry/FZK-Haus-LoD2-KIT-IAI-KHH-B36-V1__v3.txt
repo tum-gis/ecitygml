@@ -1,0 +1,7 @@
+Building UUID_d281adfc-4901-0f52-540b-4cc1a9325f82
+  WallSurface: 4, area 188.629 m^2, 10 triangles
+  RoofSurface: 2, area 138.564 m^2, 4 triangles
+  GroundSurface: 1, area 120.000 m^2, 2 triangles
+  Doors and windows: 0, area 0.000 m^2
+  LoD2 solid: 7 surfaces, 7 of them xlink:href references
+    Volume: not computable (surface member references '#PolyID7350_878_759628_120742' via xlink:href, which is not resolved)

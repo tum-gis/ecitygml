@@ -2,11 +2,15 @@ use crate::Error;
 use crate::gml::codec::core::abstract_point_cloud_property::{
     deserialize_abstract_point_cloud_property, serialize_abstract_point_cloud_property,
 };
-use crate::gml::codec::core::qualified_area_property::GmlAreaProperty;
 use crate::gml::codec::core::{
-    deserialize_abstract_space_boundary, serialize_abstract_space_boundary,
+    deserialize_abstract_space_boundary, deserialize_qualified_area_property,
+    serialize_abstract_space_boundary, serialize_abstract_space_boundary_attributes,
+    serialize_qualified_area_property,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement, collect_gml_child_lenient};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+    collect_gml_child_lenient,
+};
 use ecitygml_core::model::core::{
     AbstractThematicSurface, AsAbstractSpaceBoundary, AsAbstractThematicSurface,
     AsAbstractThematicSurfaceMut,
@@ -15,18 +19,19 @@ use egml::io::codec::geometry::aggregates::{
     deserialize_multi_curve_property, deserialize_multi_surface_property,
     serialize_multi_curve_property, serialize_multi_surface_property,
 };
-use egml::io::util::{
-    Formatting, XmlElementSpans, XmlNodeContent, XmlNodeParts, collect_child, serialize_inner,
-};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter, collect_child};
 
 pub fn deserialize_abstract_thematic_surface(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractThematicSurface, Error> {
+    debug_assert!(
+        !index.is_truncated(),
+        "deserialize_abstract_thematic_surface received a truncated index — caller must scan to sufficient depth"
+    );
+
     let mut abstract_space_boundary_result = None;
-    let mut parsed_result = None;
     let mut lod0_multi_surface_result = None;
     let mut lod1_multi_surface_result = None;
     let mut lod2_multi_surface_result = None;
@@ -36,188 +41,170 @@ pub fn deserialize_abstract_thematic_surface(
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            abstract_space_boundary_result =
-                Some(deserialize_abstract_space_boundary(xml_document, spans));
-        });
-        s.spawn(|_| {
-            parsed_result = Some(
-                de::from_reader::<_, GmlAbstractThematicSurface>(xml_document).map_err(Error::from),
-            );
+            abstract_space_boundary_result = Some(deserialize_abstract_space_boundary(
+                xml_document,
+                index,
+                config,
+            ));
         });
         s.spawn(|_| {
             lod0_multi_surface_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod0MultiSurfaceProperty.into(),
+                config.gml_config(),
                 deserialize_multi_surface_property,
             ));
         });
         s.spawn(|_| {
             lod1_multi_surface_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod1MultiSurfaceProperty.into(),
+                config.gml_config(),
                 deserialize_multi_surface_property,
             ));
         });
         s.spawn(|_| {
             lod2_multi_surface_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod2MultiSurfaceProperty.into(),
+                config.gml_config(),
                 deserialize_multi_surface_property,
             ));
         });
         s.spawn(|_| {
             lod3_multi_surface_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod3MultiSurfaceProperty.into(),
+                config.gml_config(),
                 deserialize_multi_surface_property,
             ));
         });
         s.spawn(|_| {
             lod0_multi_curve_result = Some(collect_gml_child_lenient(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::Lod0MultiCurveProperty.into(),
+                config.gml_config(),
                 deserialize_multi_curve_property,
             ));
         });
         s.spawn(|_| {
             point_cloud_result = Some(collect_child(
                 xml_document,
-                spans,
+                index,
                 CityGmlElement::AbstractPointCloudProperty.into(),
+                config,
                 deserialize_abstract_point_cloud_property,
             ));
         });
     });
 
-    let abstract_space_boundary =
-        abstract_space_boundary_result.expect("rayon::scope guarantees all spawns complete")?;
-    let parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let lod0_multi_surface =
-        lod0_multi_surface_result.expect("rayon::scope guarantees all spawns complete");
-    let lod1_multi_surface =
-        lod1_multi_surface_result.expect("rayon::scope guarantees all spawns complete");
-    let lod2_multi_surface =
-        lod2_multi_surface_result.expect("rayon::scope guarantees all spawns complete");
-    let lod3_multi_surface =
-        lod3_multi_surface_result.expect("rayon::scope guarantees all spawns complete");
-    let lod0_multi_curve =
-        lod0_multi_curve_result.expect("rayon::scope guarantees all spawns complete");
-    let point_cloud = point_cloud_result.expect("rayon::scope guarantees all spawns complete")?;
-
-    let mut abstract_thematic_surface =
-        AbstractThematicSurface::from_abstract_space_boundary(abstract_space_boundary);
-    abstract_thematic_surface.set_areas(parsed.areas.into_iter().map(Into::into).collect());
-    abstract_thematic_surface.set_lod0_multi_surface(lod0_multi_surface);
-    abstract_thematic_surface.set_lod1_multi_surface(lod1_multi_surface);
-    abstract_thematic_surface.set_lod2_multi_surface(lod2_multi_surface);
-    abstract_thematic_surface.set_lod3_multi_surface(lod3_multi_surface);
-    abstract_thematic_surface.set_lod0_multi_curve(lod0_multi_curve);
-    abstract_thematic_surface.set_point_cloud(point_cloud);
+    let mut abstract_thematic_surface = AbstractThematicSurface::from_abstract_space_boundary(
+        abstract_space_boundary_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
+    let areas = index
+        .get(CityGmlElement::AreaProperty.into())
+        .iter()
+        .map(|x| deserialize_qualified_area_property(&xml_document[x.range()]))
+        .collect::<Result<_, _>>()?;
+    abstract_thematic_surface.set_areas(areas);
+    abstract_thematic_surface.set_lod0_multi_surface(
+        lod0_multi_surface_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_thematic_surface.set_lod1_multi_surface(
+        lod1_multi_surface_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_thematic_surface.set_lod2_multi_surface(
+        lod2_multi_surface_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_thematic_surface.set_lod3_multi_surface(
+        lod3_multi_surface_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_thematic_surface.set_lod0_multi_curve(
+        lod0_multi_curve_result.expect("rayon::scope guarantees all spawns complete"),
+    );
+    abstract_thematic_surface
+        .set_point_cloud(point_cloud_result.expect("rayon::scope guarantees all spawns complete")?);
 
     Ok(abstract_thematic_surface)
 }
 
 pub fn serialize_abstract_thematic_surface(
     abstract_thematic_surface: &AbstractThematicSurface,
-    formatting: Formatting,
-) -> Result<XmlNodeParts, Error> {
-    let mut xml_node_parts = serialize_abstract_space_boundary(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    serialize_abstract_space_boundary(
         abstract_thematic_surface.abstract_space_boundary(),
-        formatting,
+        xml_fragment_writer,
     )?;
 
-    if let Some(raw) = serialize_inner(
-        GmlAbstractThematicSurface::from(abstract_thematic_surface),
-        formatting,
-    )? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    for area in abstract_thematic_surface.areas() {
+        serialize_qualified_area_property(
+            area,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::AreaProperty,
+        )?;
     }
 
     if let Some(prop) = abstract_thematic_surface.lod0_multi_surface() {
-        xml_node_parts.content.push(
-            serialize_multi_surface_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod0MultiSurfaceProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_surface_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod0MultiSurfaceProperty,
+        )?;
     }
     if let Some(prop) = abstract_thematic_surface.lod1_multi_surface() {
-        xml_node_parts.content.push(
-            serialize_multi_surface_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod1MultiSurfaceProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_surface_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod1MultiSurfaceProperty,
+        )?;
     }
     if let Some(prop) = abstract_thematic_surface.lod2_multi_surface() {
-        xml_node_parts.content.push(
-            serialize_multi_surface_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod2MultiSurfaceProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_surface_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod2MultiSurfaceProperty,
+        )?;
     }
     if let Some(prop) = abstract_thematic_surface.lod3_multi_surface() {
-        xml_node_parts.content.push(
-            serialize_multi_surface_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod3MultiSurfaceProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_surface_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod3MultiSurfaceProperty,
+        )?;
     }
     if let Some(prop) = abstract_thematic_surface.lod0_multi_curve() {
-        xml_node_parts.content.push(
-            serialize_multi_curve_property(
-                prop,
-                formatting,
-                CityGmlElement::Lod0MultiCurveProperty.into(),
-            )
-            .map_err(Error::from)?
-            .into(),
-        );
+        serialize_multi_curve_property(
+            prop,
+            xml_fragment_writer,
+            CityGmlNamespace::Core,
+            CityGmlElement::Lod0MultiCurveProperty,
+        )?;
     }
-    xml_node_parts.content.extend(
-        abstract_thematic_surface
-            .point_cloud()
-            .iter()
-            .map(|x| {
-                serialize_abstract_point_cloud_property(x, formatting).map(XmlNodeContent::from)
-            })
-            .collect::<Result<Vec<_>, _>>()?,
-    );
 
-    Ok(xml_node_parts)
+    if let Some(prop) = abstract_thematic_surface.point_cloud() {
+        serialize_abstract_point_cloud_property(prop, xml_fragment_writer)?;
+    }
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAbstractThematicSurface {
-    #[serde(rename = "area", default)]
-    pub areas: Vec<GmlAreaProperty>,
-}
-
-impl From<&AbstractThematicSurface> for GmlAbstractThematicSurface {
-    fn from(item: &AbstractThematicSurface) -> Self {
-        Self {
-            areas: item.areas().iter().map(GmlAreaProperty::from).collect(),
-        }
-    }
+pub fn serialize_abstract_thematic_surface_attributes(
+    abstract_thematic_surface: &AbstractThematicSurface,
+) -> Vec<(String, String)> {
+    serialize_abstract_space_boundary_attributes(
+        abstract_thematic_surface.abstract_space_boundary(),
+    )
 }
 
 #[cfg(test)]
@@ -226,7 +213,7 @@ mod tests {
     use ecitygml_core::model::core::{
         AsAbstractCityObject, AsAbstractFeature, AsAbstractThematicSurface,
     };
-    use egml::io::util::extract_xml_element_spans;
+    use egml::io::util::{Formatting, XmlFragmentWriter};
     use egml::model::base::Id;
 
     #[test]
@@ -254,9 +241,13 @@ mod tests {
   </lod2MultiSurface>
 </con:WallSurface>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_thematic_surface =
-            deserialize_abstract_thematic_surface(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_thematic_surface = deserialize_abstract_thematic_surface(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             abstract_thematic_surface.feature_id(),
@@ -278,9 +269,13 @@ mod tests {
   </area>
 </con:WallSurface>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_thematic_surface =
-            deserialize_abstract_thematic_surface(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_thematic_surface = deserialize_abstract_thematic_surface(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(abstract_thematic_surface.areas().len(), 1);
 
@@ -302,16 +297,32 @@ mod tests {
   </area>
 </con:WallSurface>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_thematic_surface =
-            deserialize_abstract_thematic_surface(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_thematic_surface = deserialize_abstract_thematic_surface(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
-        let xml_node_parts =
-            serialize_abstract_thematic_surface(&abstract_thematic_surface, Formatting::Compact)
-                .expect("should serialize");
-        let xml = egml::io::util::XmlNode::new("con:WallSurface", xml_node_parts)
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(CityGmlNamespace::Construction, CityGmlElement::WallSurface)
+            .expect("should work");
+        serialize_abstract_thematic_surface(&abstract_thematic_surface, &mut xml_fragment_writer)
+            .expect("should serialize");
+        xml_fragment_writer
+            .write_end_event(CityGmlNamespace::Construction, CityGmlElement::WallSurface)
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
         assert!(xml.contains("<area>") || xml.contains("<area "));
         assert!(xml.contains("QualifiedArea"));
@@ -333,21 +344,41 @@ mod tests {
   </area>
 </con:WallSurface>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
-        let abstract_thematic_surface =
-            deserialize_abstract_thematic_surface(xml_document, &spans).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_thematic_surface = deserialize_abstract_thematic_surface(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
-        let xml_node_parts =
-            serialize_abstract_thematic_surface(&abstract_thematic_surface, Formatting::Compact)
-                .expect("should serialize");
-        let xml = egml::io::util::XmlNode::new("con:WallSurface", xml_node_parts)
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(CityGmlNamespace::Construction, CityGmlElement::WallSurface)
+            .expect("should work");
+        serialize_abstract_thematic_surface(&abstract_thematic_surface, &mut xml_fragment_writer)
+            .expect("should serialize");
+        xml_fragment_writer
+            .write_end_event(CityGmlNamespace::Construction, CityGmlElement::WallSurface)
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
-        let round_tripped_spans = extract_xml_element_spans(xml.as_bytes()).expect("should work");
-        let round_tripped =
-            deserialize_abstract_thematic_surface(xml.as_bytes(), &round_tripped_spans)
-                .expect("should work");
+        let round_tripped_index =
+            XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work");
+        let round_tripped = deserialize_abstract_thematic_surface(
+            xml.as_bytes(),
+            &round_tripped_index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(abstract_thematic_surface.areas(), round_tripped.areas());
     }

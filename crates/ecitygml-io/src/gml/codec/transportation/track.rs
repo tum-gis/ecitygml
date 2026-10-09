@@ -1,6 +1,7 @@
 use crate::Error;
 use crate::gml::codec::transportation::abstract_transportation_space::{
     deserialize_abstract_transportation_space, serialize_abstract_transportation_space,
+    serialize_abstract_transportation_space_attributes,
 };
 use crate::gml::codec::transportation::intersection_property::{
     deserialize_intersection_property, serialize_intersection_property,
@@ -8,24 +9,29 @@ use crate::gml::codec::transportation::intersection_property::{
 use crate::gml::codec::transportation::section_property::{
     deserialize_section_property, serialize_section_property,
 };
-use crate::gml::util::CityGmlElement;
-use ecitygml_core::model::transportation::values::{
-    TrackClassValue, TrackFunctionValue, TrackUsageValue,
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
 };
 use ecitygml_core::model::transportation::{AsAbstractTransportationSpace, Track};
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::collect_children;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlFragmentWriter};
+use egml::io::util::{XmlDocumentIndex, collect_children};
 use egml::model::basic_types::Code;
-use serde::{Deserialize, Serialize};
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 
-pub fn deserialize_track(xml_document: &[u8]) -> Result<Track, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_track(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Track, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
     let mut abstract_transportation_space_result = None;
-    let mut parsed_result = None;
     let mut sections_result = None;
     let mut intersections_result = None;
 
@@ -33,116 +39,140 @@ pub fn deserialize_track(xml_document: &[u8]) -> Result<Track, Error> {
         s.spawn(|_| {
             abstract_transportation_space_result = Some(deserialize_abstract_transportation_space(
                 xml_document,
-                &spans,
+                index,
+                config,
             ))
-        });
-        s.spawn(|_| {
-            parsed_result =
-                Some(quick_xml::de::from_reader::<_, GmlTrack>(xml_document).map_err(Error::from));
         });
         s.spawn(|_| {
             sections_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::SectionProperty.into(),
+                config,
                 deserialize_section_property,
             ));
         });
         s.spawn(|_| {
             intersections_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::IntersectionProperty.into(),
+                config,
                 deserialize_intersection_property,
             ));
         });
     });
 
-    let abstract_transportation_space = abstract_transportation_space_result
-        .expect("rayon::scope guarantees all spawns complete")?;
-    let parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let sections = sections_result.expect("rayon::scope guarantees all spawns complete")?;
-    let intersections =
-        intersections_result.expect("rayon::scope guarantees all spawns complete")?;
+    let mut track = Track::from_abstract_transportation_space(
+        abstract_transportation_space_result
+            .expect("rayon::scope guarantees all spawns complete")?,
+    );
 
-    let mut track = Track::from_abstract_transportation_space(abstract_transportation_space);
-    track.set_class_opt(parsed.class.map(Code::from).map(TrackClassValue::from));
-    track.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(TrackFunctionValue::from)
-            .collect(),
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    track.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    track.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    track.set_usages(usages.into_iter().map(Into::into).collect());
+
+    track.set_sections(sections_result.expect("rayon::scope guarantees all spawns complete")?);
+    track.set_intersections(
+        intersections_result.expect("rayon::scope guarantees all spawns complete")?,
     );
-    track.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(TrackUsageValue::from)
-            .collect(),
-    );
-    track.set_sections(sections);
-    track.set_intersections(intersections);
 
     Ok(track)
 }
 
-pub fn serialize_track(track: &Track, formatting: Formatting) -> Result<XmlNode, Error> {
-    let mut xml_node_parts =
-        serialize_abstract_transportation_space(track.abstract_transportation_space(), formatting)?;
+pub fn serialize_track(
+    track: &Track,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_track_attributes(track);
 
-    if let Some(raw) = serialize_inner(GmlTrack::from(track), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::Track,
+        attributes,
+    )?;
+
+    serialize_abstract_transportation_space(
+        track.abstract_transportation_space(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = track.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    for section_property in track.sections() {
-        let node = serialize_section_property(section_property, formatting)?;
-        xml_node_parts.content.push(XmlNodeContent::Child(node));
+    for function in track.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
 
-    for intersection_property in track.intersections() {
-        let node = serialize_intersection_property(intersection_property, formatting)?;
-        xml_node_parts.content.push(XmlNodeContent::Child(node));
+    for usage in track.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::UsageProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(CityGmlElement::Track.into(), xml_node_parts))
+    let xml_fragments = track
+        .sections()
+        .par_iter()
+        .map(|x| {
+            let mut xml_fragment_writer = xml_fragment_writer.spawn_child();
+            serialize_section_property(x, &mut xml_fragment_writer)?;
+            Ok(xml_fragment_writer)
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    for fragment in xml_fragments {
+        xml_fragment_writer.merge_chunked(fragment);
+    }
+
+    let xml_fragments = track
+        .intersections()
+        .par_iter()
+        .map(|x| {
+            let mut xml_fragment_writer = xml_fragment_writer.spawn_child();
+            serialize_intersection_property(x, &mut xml_fragment_writer)?;
+            Ok(xml_fragment_writer)
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    for fragment in xml_fragments {
+        xml_fragment_writer.merge_chunked(fragment);
+    }
+
+    xml_fragment_writer.write_end_event(CityGmlNamespace::Transportation, CityGmlElement::Track)?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlTrack {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "tran:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "tran:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-}
-
-impl From<&Track> for GmlTrack {
-    fn from(item: &Track) -> Self {
-        Self {
-            class: item.class().map(TrackClassValue::code).map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(TrackFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(TrackUsageValue::code)
-                .map(Into::into)
-                .collect(),
-        }
-    }
+pub fn serialize_track_attributes(track: &Track) -> Vec<(String, String)> {
+    serialize_abstract_transportation_space_attributes(track.abstract_transportation_space())
 }
 
 #[cfg(test)]
@@ -167,7 +197,12 @@ mod tests {
       </tran:section>
     </tran:Track>";
 
-        let track = deserialize_track(xml_document).expect("should work");
+        let track = deserialize_track(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             track.feature_id(),

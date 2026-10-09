@@ -12,7 +12,7 @@ use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 #[derive(Debug, Clone, PartialEq)]
 pub struct TinRelief {
     pub(crate) abstract_relief_component: AbstractReliefComponent,
-    tin: Option<TinProperty>,
+    tin: Option<Box<TinProperty>>,
 }
 
 impl TinRelief {
@@ -30,15 +30,15 @@ impl TinRelief {
     }
 
     pub fn tin(&self) -> Option<&TinProperty> {
-        self.tin.as_ref()
+        self.tin.as_deref()
     }
 
     pub fn set_tin(&mut self, tin: TinProperty) {
-        self.tin = Some(tin);
+        self.tin = Some(Box::new(tin));
     }
 
     pub fn set_tin_opt(&mut self, tin: Option<TinProperty>) {
-        self.tin = tin;
+        self.tin = tin.map(Box::new);
     }
 
     pub fn clear_tin(&mut self) {

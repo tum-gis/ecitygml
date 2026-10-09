@@ -1,140 +1,146 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_unoccupied_space, serialize_abstract_unoccupied_space,
+    serialize_abstract_unoccupied_space_attributes,
 };
-use crate::gml::codec::transportation::granularity_value::GmlGranularityValue;
-use crate::gml::util::CityGmlElement;
+use crate::gml::codec::transportation::enums::{
+    deserialize_granularity_value, serialize_granularity_value,
+};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::AsAbstractUnoccupiedSpace;
 use ecitygml_core::model::transportation::AuxiliaryTrafficSpace;
-use ecitygml_core::model::transportation::values::{
-    AuxiliaryTrafficSpaceClassValue, AuxiliaryTrafficSpaceFunctionValue,
-    AuxiliaryTrafficSpaceUsageValue,
-};
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_auxiliary_traffic_space(
     xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AuxiliaryTrafficSpace, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let abstract_unoccupied_space = deserialize_abstract_unoccupied_space(xml_document, &spans)?;
-    let parsed =
-        de::from_reader::<_, GmlAuxiliaryTrafficSpace>(xml_document).map_err(Error::from)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_unoccupied_space =
+        deserialize_abstract_unoccupied_space(xml_document, index, config)?;
+
+    let granularity = index
+        .first(CityGmlElement::GranularityProperty.into())
+        .map(|x| deserialize_granularity_value(&xml_document[x.range()]))
+        .transpose()?
+        .ok_or_else(|| Error::ElementNotFound("granularity not found".into()))?;
 
     let mut traffic_space = AuxiliaryTrafficSpace::from_abstract_unoccupied_space(
         abstract_unoccupied_space,
-        parsed.granularity.into(),
+        granularity,
     );
 
-    traffic_space.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(AuxiliaryTrafficSpaceClassValue::from),
-    );
-    traffic_space.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(AuxiliaryTrafficSpaceFunctionValue::from)
-            .collect(),
-    );
-    traffic_space.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(AuxiliaryTrafficSpaceUsageValue::from)
-            .collect(),
-    );
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    traffic_space.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    traffic_space.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    traffic_space.set_usages(usages.into_iter().map(Into::into).collect());
 
     Ok(traffic_space)
 }
 
 pub fn serialize_auxiliary_traffic_space(
     auxiliary_traffic_space: &AuxiliaryTrafficSpace,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut xml_node_parts = serialize_abstract_unoccupied_space(
-        auxiliary_traffic_space.abstract_unoccupied_space(),
-        formatting,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_auxiliary_traffic_space_attributes(auxiliary_traffic_space);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::AuxiliaryTrafficSpace,
+        attributes,
     )?;
 
-    if let Some(raw) = serialize_inner(
-        GmlAuxiliaryTrafficSpace::from(auxiliary_traffic_space),
-        formatting,
-    )? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    serialize_abstract_unoccupied_space(
+        auxiliary_traffic_space.abstract_unoccupied_space(),
+        xml_fragment_writer,
+    )?;
+
+    serialize_granularity_value(
+        auxiliary_traffic_space.granularity(),
+        xml_fragment_writer,
+        CityGmlNamespace::Transportation,
+        CityGmlElement::GranularityProperty,
+    )?;
+
+    if let Some(class) = auxiliary_traffic_space.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::AuxiliaryTrafficSpace.into(),
-        xml_node_parts,
-    ))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlAuxiliaryTrafficSpace {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "tran:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "tran:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-
-    #[serde(
-        rename(serialize = "tran:granularity", deserialize = "granularity"),
-        default
-    )]
-    pub granularity: GmlGranularityValue,
-}
-
-impl From<&AuxiliaryTrafficSpace> for GmlAuxiliaryTrafficSpace {
-    fn from(item: &AuxiliaryTrafficSpace) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(AuxiliaryTrafficSpaceClassValue::code)
-                .map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(AuxiliaryTrafficSpaceFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(AuxiliaryTrafficSpaceUsageValue::code)
-                .map(Into::into)
-                .collect(),
-            granularity: item.granularity().into(),
-        }
+    for function in auxiliary_traffic_space.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
+
+    for usage in auxiliary_traffic_space.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::AuxiliaryTrafficSpace,
+    )?;
+
+    Ok(())
+}
+
+pub fn serialize_auxiliary_traffic_space_attributes(
+    auxiliary_traffic_space: &AuxiliaryTrafficSpace,
+) -> Vec<(String, String)> {
+    serialize_abstract_unoccupied_space_attributes(
+        auxiliary_traffic_space.abstract_unoccupied_space(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ecitygml_core::model::construction::{AbstractFillingSurfaceKind, WindowSurface};
+    use egml::io::util::Formatting;
+
     use ecitygml_core::model::core::{
         AbstractSpaceBoundaryKind, AbstractThematicSurfaceKind, AsAbstractCityObject,
         AsAbstractFeature, AsAbstractSpace,
     };
-    use ecitygml_core::model::transportation::{
-        AuxiliaryTrafficArea, GranularityValue, TrafficDirectionValue,
-    };
+    use ecitygml_core::model::transportation::AuxiliaryTrafficArea;
+    use ecitygml_core::model::transportation::enums::GranularityValue;
     use egml::model::base::Id;
 
     #[test]
@@ -177,8 +183,12 @@ mod tests {
               <tran:granularity>lane</tran:granularity>
             </tran:AuxiliaryTrafficSpace>";
 
-        let auxiliary_traffic_space =
-            deserialize_auxiliary_traffic_space(xml_document).expect("should work");
+        let auxiliary_traffic_space = deserialize_auxiliary_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             auxiliary_traffic_space.feature_id(),
@@ -209,5 +219,66 @@ mod tests {
             &Id::try_from("UUID_caa7268d-8c82-3595-837f-0584a6c261ec").expect("should work")
         );
         assert_eq!(traffic_area.generic_attributes().len(), 2);
+    }
+
+    #[test]
+    fn test_round_trip_auxiliary_traffic_space_with_granularity() {
+        let xml_document = b"\
+<tran:AuxiliaryTrafficSpace gml:id=\"UUID_24f88e8d-34c8-3a4f-8889-dff3a82f5121\">
+    <tran:granularity>way</tran:granularity>
+</tran:AuxiliaryTrafficSpace>";
+
+        let auxiliary_traffic_space = deserialize_auxiliary_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+        assert_eq!(
+            auxiliary_traffic_space.granularity(),
+            &GranularityValue::Way
+        );
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_auxiliary_traffic_space(&auxiliary_traffic_space, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        assert!(xml.contains("tran:granularity"));
+        assert!(xml.contains("way"));
+
+        let round_tripped = deserialize_auxiliary_traffic_space(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+        assert_eq!(
+            auxiliary_traffic_space.granularity(),
+            round_tripped.granularity()
+        );
+    }
+
+    #[test]
+    fn test_deserialize_auxiliary_traffic_space_without_granularity_returns_error() {
+        let xml_document =
+            b"<tran:AuxiliaryTrafficSpace gml:id=\"UUID_24f88e8d-34c8-3a4f-8889-dff3a82f5121\">
+            </tran:AuxiliaryTrafficSpace>";
+
+        let result = deserialize_auxiliary_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        );
+
+        assert!(result.is_err());
     }
 }

@@ -98,10 +98,10 @@ pub fn show(ctx: &Context, state: &AppState) -> SidebarAction {
 
 fn group_by_type(store: &ecitygml_core::arena::CityModelArena) -> BTreeMap<FeatureType, Vec<Id>> {
     let mut map: BTreeMap<FeatureType, Vec<Id>> = BTreeMap::new();
-    for city_object in store.iter_city_objects() {
-        map.entry(city_object.feature_type())
+    for feature in store.iter_features() {
+        map.entry(feature.feature_type())
             .or_default()
-            .push(city_object.feature_id().clone());
+            .push(feature.feature_id().clone());
     }
     map
 }

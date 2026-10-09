@@ -1,27 +1,56 @@
 use crate::Error;
 use crate::gml::codec::building::abstract_building_subdivision::{
     deserialize_abstract_building_subdivision, serialize_abstract_building_subdivision,
+    serialize_abstract_building_subdivision_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::building::{AsAbstractBuildingSubdivision, Storey};
-use egml::io::util::extract_xml_element_spans;
-use egml::io::util::{Formatting, XmlNode};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
-pub fn deserialize_storey(xml_document: &[u8]) -> Result<Storey, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_storey(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Storey, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
     let abstract_building_subdivision =
-        deserialize_abstract_building_subdivision(xml_document, &spans)?;
+        deserialize_abstract_building_subdivision(xml_document, index, config)?;
     let storey = Storey::from_abstract_building_subdivision(abstract_building_subdivision);
 
     Ok(storey)
 }
 
-pub fn serialize_storey(storey: &Storey, formatting: Formatting) -> Result<XmlNode, Error> {
-    let xml_node_parts = serialize_abstract_building_subdivision(
-        storey.abstract_building_subdivision(),
-        formatting,
+pub fn serialize_storey(
+    storey: &Storey,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_storey_attributes(storey);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Building,
+        CityGmlElement::Storey,
+        attributes,
     )?;
-    Ok(XmlNode::new(CityGmlElement::Storey.into(), xml_node_parts))
+
+    serialize_abstract_building_subdivision(
+        storey.abstract_building_subdivision(),
+        xml_fragment_writer,
+    )?;
+
+    xml_fragment_writer.write_end_event(CityGmlNamespace::Building, CityGmlElement::Storey)?;
+
+    Ok(())
+}
+
+pub fn serialize_storey_attributes(storey: &Storey) -> Vec<(String, String)> {
+    serialize_abstract_building_subdivision_attributes(storey.abstract_building_subdivision())
 }
 
 #[cfg(test)]
@@ -130,7 +159,12 @@ mod tests {
           <bldg:buildingConstructiveElement xlink:href=\"#UUID_7996a7e2-b625-437b-b5c3-f3e94b3ee7a8\"/>
         </bldg:Storey>";
 
-        let storey = deserialize_storey(xml_document).expect("should work");
+        let storey = deserialize_storey(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             storey.feature_id(),

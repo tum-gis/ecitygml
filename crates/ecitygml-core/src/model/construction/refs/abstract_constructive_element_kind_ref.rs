@@ -1,14 +1,18 @@
 use crate::impl_try_from_occupied_space_kind_ref_for_enum;
+use crate::model::bridge::BridgeConstructiveElement;
 use crate::model::building::BuildingConstructiveElement;
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::construction::{
     AbstractConstructiveElement, AbstractConstructiveElementKind, AsAbstractConstructiveElement,
 };
+use crate::model::tunnel::TunnelConstructiveElement;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractConstructiveElementKindRef<'a> {
     BuildingConstructiveElement(&'a BuildingConstructiveElement),
+    BridgeConstructiveElement(&'a BridgeConstructiveElement),
+    TunnelConstructiveElement(&'a TunnelConstructiveElement),
 }
 
 impl<'a> From<&'a AbstractConstructiveElementKind> for AbstractConstructiveElementKindRef<'a> {
@@ -16,6 +20,12 @@ impl<'a> From<&'a AbstractConstructiveElementKind> for AbstractConstructiveEleme
         match item {
             AbstractConstructiveElementKind::BuildingConstructiveElement(x) => {
                 Self::BuildingConstructiveElement(x)
+            }
+            AbstractConstructiveElementKind::BridgeConstructiveElement(x) => {
+                Self::BridgeConstructiveElement(x)
+            }
+            AbstractConstructiveElementKind::TunnelConstructiveElement(x) => {
+                Self::TunnelConstructiveElement(x)
             }
         }
     }
@@ -25,6 +35,8 @@ impl<'a> AsAbstractConstructiveElement for AbstractConstructiveElementKindRef<'a
     fn abstract_constructive_element(&self) -> &AbstractConstructiveElement {
         match self {
             Self::BuildingConstructiveElement(x) => x.abstract_constructive_element(),
+            Self::BridgeConstructiveElement(x) => x.abstract_constructive_element(),
+            Self::TunnelConstructiveElement(x) => x.abstract_constructive_element(),
         }
     }
 }
@@ -34,6 +46,8 @@ impl<'a> HasFeatureType for AbstractConstructiveElementKindRef<'a> {
     fn feature_type(&self) -> FeatureType {
         match *self {
             Self::BuildingConstructiveElement(_) => FeatureType::BuildingConstructiveElement,
+            Self::BridgeConstructiveElement(_) => FeatureType::BridgeConstructiveElement,
+            Self::TunnelConstructiveElement(_) => FeatureType::TunnelConstructiveElement,
         }
     }
 }
@@ -54,6 +68,8 @@ macro_rules! impl_from_constructive_element_kind_ref {
     };
 }
 impl_from_constructive_element_kind_ref!(BuildingConstructiveElement);
+impl_from_constructive_element_kind_ref!(BridgeConstructiveElement);
+impl_from_constructive_element_kind_ref!(TunnelConstructiveElement);
 
 #[macro_export]
 macro_rules! impl_try_from_constructive_element_kind_ref {
@@ -78,6 +94,8 @@ macro_rules! impl_try_from_constructive_element_kind_ref {
     };
 }
 impl_try_from_constructive_element_kind_ref!(BuildingConstructiveElement);
+impl_try_from_constructive_element_kind_ref!(BridgeConstructiveElement);
+impl_try_from_constructive_element_kind_ref!(TunnelConstructiveElement);
 impl_try_from_occupied_space_kind_ref_for_enum!(
     AbstractConstructiveElementKind,
     AbstractConstructiveElementKindRef

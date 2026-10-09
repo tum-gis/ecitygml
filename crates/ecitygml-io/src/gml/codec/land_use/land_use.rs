@@ -1,94 +1,102 @@
 use crate::Error;
 use crate::gml::codec::core::{
     deserialize_abstract_thematic_surface, serialize_abstract_thematic_surface,
+    serialize_abstract_thematic_surface_attributes,
 };
-use crate::gml::util::CityGmlElement;
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::core::AsAbstractThematicSurface;
 use ecitygml_core::model::land_use::LandUse;
-use ecitygml_core::model::land_use::values::{
-    LandUseClassValue, LandUseFunctionValue, LandUseUsageValue,
-};
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
-pub fn deserialize_land_use(xml_document: &[u8]) -> Result<LandUse, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
-    let (abstract_thematic_surface_result, parsed_result) = rayon::join(
-        || deserialize_abstract_thematic_surface(xml_document, &spans),
-        || de::from_reader::<_, GmlLandUse>(xml_document).map_err(Error::from),
-    );
-    let abstract_thematic_surface = abstract_thematic_surface_result?;
-    let parsed = parsed_result?;
+pub fn deserialize_land_use(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<LandUse, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
+
+    let abstract_thematic_surface =
+        deserialize_abstract_thematic_surface(xml_document, index, config)?;
 
     let mut land_use = LandUse::from_abstract_thematic_surface(abstract_thematic_surface);
-    land_use.set_class_opt(parsed.class.map(Code::from).map(LandUseClassValue::from));
-    land_use.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(LandUseFunctionValue::from)
-            .collect(),
-    );
-    land_use.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(LandUseUsageValue::from)
-            .collect(),
-    );
+
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    land_use.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    land_use.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    land_use.set_usages(usages.into_iter().map(Into::into).collect());
 
     Ok(land_use)
 }
 
-pub fn serialize_land_use(land_use: &LandUse, formatting: Formatting) -> Result<XmlNode, Error> {
-    let mut parts =
-        serialize_abstract_thematic_surface(land_use.abstract_thematic_surface(), formatting)?;
+pub fn serialize_land_use(
+    land_use: &LandUse,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_land_use_attributes(land_use);
 
-    if let Some(raw) = serialize_inner(GmlLandUse::from(land_use), formatting)? {
-        parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::LandUse,
+        CityGmlElement::LandUse,
+        attributes,
+    )?;
+
+    serialize_abstract_thematic_surface(land_use.abstract_thematic_surface(), xml_fragment_writer)?;
+
+    if let Some(class) = land_use.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::LandUse,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(CityGmlElement::LandUse.into(), parts))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlLandUse {
-    #[serde(
-        rename(serialize = "luse:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "luse:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "luse:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-}
-
-impl From<&LandUse> for GmlLandUse {
-    fn from(item: &LandUse) -> Self {
-        Self {
-            class: item.class().map(LandUseClassValue::code).map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(LandUseFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(LandUseUsageValue::code)
-                .map(Into::into)
-                .collect(),
-        }
+    for function in land_use.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::LandUse,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
+
+    for usage in land_use.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::LandUse,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    xml_fragment_writer.write_end_event(CityGmlNamespace::LandUse, CityGmlElement::LandUse)?;
+
+    Ok(())
+}
+
+pub fn serialize_land_use_attributes(land_use: &LandUse) -> Vec<(String, String)> {
+    serialize_abstract_thematic_surface_attributes(land_use.abstract_thematic_surface())
 }

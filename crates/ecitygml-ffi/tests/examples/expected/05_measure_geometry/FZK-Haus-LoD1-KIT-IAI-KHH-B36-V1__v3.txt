@@ -1,0 +1,7 @@
+Building UUID_d281adfc-4901-0f52-540b-4cc1a9325f82
+  WallSurface: 0, area 0.000 m^2, 0 triangles
+  RoofSurface: 0, area 0.000 m^2, 0 triangles
+  GroundSurface: 0, area 0.000 m^2, 0 triangles
+  Doors and windows: 0, area 0.000 m^2
+  LoD1 solid: 6 surfaces, 0 of them xlink:href references
+    Volume: 782.123 m^3

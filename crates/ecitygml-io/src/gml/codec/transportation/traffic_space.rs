@@ -1,227 +1,250 @@
 use crate::Error;
 use crate::gml::codec::core::{
-    GmlOccupancyProperty, deserialize_abstract_unoccupied_space,
-    serialize_abstract_unoccupied_space,
+    deserialize_abstract_unoccupied_space, deserialize_occupancy_property,
+    serialize_abstract_unoccupied_space, serialize_abstract_unoccupied_space_attributes,
+    serialize_occupancy_property,
 };
 use crate::gml::codec::transportation::clearance_space_property::{
     deserialize_clearance_space_property, serialize_clearance_space_property,
 };
-use crate::gml::codec::transportation::granularity_value::GmlGranularityValue;
-use crate::gml::codec::transportation::traffic_direction_value::GmlTrafficDirectionValue;
-use crate::gml::util::CityGmlElement;
-use ecitygml_core::model::core::AsAbstractUnoccupiedSpace;
-use ecitygml_core::model::transportation::values::{
-    TrafficSpaceClassValue, TrafficSpaceFunctionValue, TrafficSpaceUsageValue,
+use crate::gml::codec::transportation::enums::{
+    deserialize_granularity_value, deserialize_traffic_direction_value,
+    serialize_granularity_value, serialize_traffic_direction_value,
 };
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
+use ecitygml_core::model::core::{AsAbstractUnoccupiedSpace, Occupancy};
 use ecitygml_core::model::transportation::{TrafficSpace, TrafficSpaceReference};
-use egml::io::codec::base::GmlReference;
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::collect_children;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::base::{deserialize_reference, serialize_reference};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlFragmentWriter};
+use egml::io::util::{XmlDocumentIndex, collect_children};
 use egml::model::base::Reference;
 use egml::model::basic_types::Code;
-use serde::{Deserialize, Serialize};
 
-pub fn deserialize_traffic_space(xml_document: &[u8]) -> Result<TrafficSpace, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_traffic_space(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<TrafficSpace, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
     let mut abstract_unoccupied_space_result = None;
-    let mut parsed_result = None;
     let mut clearance_spaces_result = None;
+    let mut predecessors_result = None;
+    let mut successors_result = None;
 
     rayon::scope(|s| {
         s.spawn(|_| {
-            abstract_unoccupied_space_result =
-                Some(deserialize_abstract_unoccupied_space(xml_document, &spans));
-        });
-        s.spawn(|_| {
-            parsed_result = Some(
-                quick_xml::de::from_reader::<_, GmlTrafficSpace>(xml_document).map_err(Error::from),
-            );
+            abstract_unoccupied_space_result = Some(deserialize_abstract_unoccupied_space(
+                xml_document,
+                index,
+                config,
+            ));
         });
         s.spawn(|_| {
             clearance_spaces_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::ClearanceSpaceProperty.into(),
+                config,
                 deserialize_clearance_space_property,
             ));
         });
+        s.spawn(|_| {
+            predecessors_result = Some(
+                index
+                    .get(CityGmlElement::PredecessorProperty.into())
+                    .iter()
+                    .map(|index| deserialize_reference(&xml_document[index.range()]))
+                    .collect::<Result<Vec<Reference>, _>>()
+                    .map_err(Error::from),
+            );
+        });
+        s.spawn(|_| {
+            successors_result = Some(
+                index
+                    .get(CityGmlElement::SuccessorProperty.into())
+                    .iter()
+                    .map(|index| deserialize_reference(&xml_document[index.range()]))
+                    .collect::<Result<Vec<Reference>, _>>()
+                    .map_err(Error::from),
+            );
+        });
     });
 
-    let abstract_unoccupied_space =
-        abstract_unoccupied_space_result.expect("rayon::scope guarantees all spawns complete")?;
-    let parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let clearance_spaces =
-        clearance_spaces_result.expect("rayon::scope guarantees all spawns complete")?;
+    let granularity = index
+        .first(CityGmlElement::GranularityProperty.into())
+        .map(|x| deserialize_granularity_value(&xml_document[x.range()]))
+        .transpose()?
+        .ok_or_else(|| Error::ElementNotFound("granularity not found".into()))?;
 
     let mut traffic_space = TrafficSpace::from_abstract_unoccupied_space(
-        abstract_unoccupied_space,
-        parsed.granularity.into(),
+        abstract_unoccupied_space_result.expect("rayon::scope guarantees all spawns complete")?,
+        granularity,
     );
 
-    traffic_space.set_class_opt(
-        parsed
-            .class
-            .map(Code::from)
-            .map(TrafficSpaceClassValue::from),
-    );
-    traffic_space.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(TrafficSpaceFunctionValue::from)
-            .collect(),
-    );
-    traffic_space.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(TrafficSpaceUsageValue::from)
-            .collect(),
-    );
-    traffic_space.set_traffic_direction_opt(parsed.traffic_direction.map(Into::into));
-    traffic_space.set_occupancies(parsed.occupancies.into_iter().map(Into::into).collect());
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    traffic_space.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    traffic_space.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    traffic_space.set_usages(usages.into_iter().map(Into::into).collect());
+
+    let traffic_direction = index
+        .first(CityGmlElement::TrafficDirectionProperty.into())
+        .map(|x| deserialize_traffic_direction_value(&xml_document[x.range()]))
+        .transpose()?;
+    traffic_space.set_traffic_direction_opt(traffic_direction);
+
+    let occupancies: Vec<Occupancy> = index
+        .get(CityGmlElement::OccupancyProperty.into())
+        .iter()
+        .map(|x| deserialize_occupancy_property(&xml_document[x.range()]))
+        .collect::<Result<_, _>>()?;
+    traffic_space.set_occupancies(occupancies);
+
     traffic_space.set_predecessors(
-        parsed
-            .predecessors
-            .into_iter()
-            .map(Reference::try_from)
-            .collect::<Result<Vec<Reference>, _>>()?
+        predecessors_result
+            .expect("rayon::scope guarantees all spawns complete")?
             .into_iter()
             .map(TrafficSpaceReference::from)
             .collect(),
     );
     traffic_space.set_successors(
-        parsed
-            .successors
-            .into_iter()
-            .map(Reference::try_from)
-            .collect::<Result<Vec<Reference>, _>>()?
+        successors_result
+            .expect("rayon::scope guarantees all spawns complete")?
             .into_iter()
             .map(TrafficSpaceReference::from)
             .collect(),
     );
 
-    traffic_space.set_clearance_spaces(clearance_spaces);
+    traffic_space.set_clearance_spaces(
+        clearance_spaces_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
 
     Ok(traffic_space)
 }
 
 pub fn serialize_traffic_space(
     traffic_space: &TrafficSpace,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut xml_node_parts =
-        serialize_abstract_unoccupied_space(traffic_space.abstract_unoccupied_space(), formatting)?;
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_traffic_space_attributes(traffic_space);
 
-    if let Some(raw) = serialize_inner(GmlTrafficSpace::from(traffic_space), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::TrafficSpace,
+        attributes,
+    )?;
+
+    serialize_abstract_unoccupied_space(
+        traffic_space.abstract_unoccupied_space(),
+        xml_fragment_writer,
+    )?;
+
+    serialize_granularity_value(
+        traffic_space.granularity(),
+        xml_fragment_writer,
+        CityGmlNamespace::Transportation,
+        CityGmlElement::GranularityProperty,
+    )?;
+
+    if let Some(class) = traffic_space.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
+    }
+
+    for function in traffic_space.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::FunctionProperty,
+        )?;
+    }
+
+    for usage in traffic_space.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::UsageProperty,
+        )?;
+    }
+
+    if let Some(traffic_direction) = traffic_space.traffic_direction() {
+        serialize_traffic_direction_value(
+            &traffic_direction,
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::TrafficDirectionProperty,
+        )?;
+    }
+
+    for occupancy in traffic_space.occupancies() {
+        serialize_occupancy_property(
+            occupancy,
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::OccupancyProperty,
+        )?;
+    }
+
+    for predecessor in traffic_space.predecessors() {
+        serialize_reference(
+            &Reference::from(predecessor),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::PredecessorProperty,
+        )?;
+    }
+
+    for successor in traffic_space.successors() {
+        serialize_reference(
+            &Reference::from(successor),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::SuccessorProperty,
+        )?;
     }
 
     for prop in traffic_space.clearance_spaces() {
-        xml_node_parts
-            .content
-            .push(XmlNodeContent::Child(serialize_clearance_space_property(
-                prop, formatting,
-            )?));
+        serialize_clearance_space_property(prop, xml_fragment_writer)?;
     }
 
-    Ok(XmlNode::new(
-        CityGmlElement::TrafficSpace.into(),
-        xml_node_parts,
-    ))
+    xml_fragment_writer.write_end_event(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::TrafficSpace,
+    )?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlTrafficSpace {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "tran:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "tran:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-
-    #[serde(
-        rename(serialize = "tran:granularity", deserialize = "granularity"),
-        default
-    )]
-    pub granularity: GmlGranularityValue,
-
-    #[serde(
-        rename(serialize = "tran:trafficDirection", deserialize = "trafficDirection"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub traffic_direction: Option<GmlTrafficDirectionValue>,
-
-    #[serde(
-        rename(serialize = "tran:occupancy", deserialize = "occupancy"),
-        default
-    )]
-    pub occupancies: Vec<GmlOccupancyProperty>,
-
-    #[serde(
-        rename(serialize = "tran:predecessor", deserialize = "predecessor"),
-        default
-    )]
-    pub predecessors: Vec<GmlReference>,
-
-    #[serde(
-        rename(serialize = "tran:successor", deserialize = "successor"),
-        default
-    )]
-    pub successors: Vec<GmlReference>,
-}
-
-impl From<&TrafficSpace> for GmlTrafficSpace {
-    fn from(item: &TrafficSpace) -> Self {
-        Self {
-            class: item
-                .class()
-                .map(TrafficSpaceClassValue::code)
-                .map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(TrafficSpaceFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(TrafficSpaceUsageValue::code)
-                .map(Into::into)
-                .collect(),
-            granularity: item.granularity().into(),
-            traffic_direction: item.traffic_direction().as_ref().map(Into::into),
-            occupancies: item
-                .occupancies()
-                .iter()
-                .map(GmlOccupancyProperty::from)
-                .collect(),
-            predecessors: item
-                .predecessors()
-                .iter()
-                .map(Reference::from)
-                .map(|reference| GmlReference::from(&reference))
-                .collect(),
-            successors: item
-                .successors()
-                .iter()
-                .map(Reference::from)
-                .map(|reference| GmlReference::from(&reference))
-                .collect(),
-        }
-    }
+pub fn serialize_traffic_space_attributes(traffic_space: &TrafficSpace) -> Vec<(String, String)> {
+    serialize_abstract_unoccupied_space_attributes(traffic_space.abstract_unoccupied_space())
 }
 
 #[cfg(test)]
@@ -232,9 +255,9 @@ mod tests {
         AbstractSpaceBoundaryKind, AbstractThematicSurfaceKind, AsAbstractCityObject,
         AsAbstractFeature, AsAbstractSpace,
     };
-    use ecitygml_core::model::transportation::{
-        GranularityValue, TrafficArea, TrafficDirectionValue,
-    };
+    use ecitygml_core::model::transportation::TrafficArea;
+    use ecitygml_core::model::transportation::enums::{GranularityValue, TrafficDirectionValue};
+    use egml::io::util::Formatting;
     use egml::model::base::Id;
 
     #[test]
@@ -277,7 +300,12 @@ mod tests {
               <tran:successor xlink:href=\"#UUID_144a6807-5844-32b2-bb34-8b2671b1afaa\"/>
             </tran:TrafficSpace>";
 
-        let traffic_space = deserialize_traffic_space(xml_document).expect("should work");
+        let traffic_space = deserialize_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             traffic_space.feature_id(),
@@ -336,7 +364,12 @@ mod tests {
     </tran:occupancy>
 </tran:TrafficSpace>";
 
-        let traffic_space = deserialize_traffic_space(xml_document).expect("should work");
+        let traffic_space = deserialize_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(traffic_space.occupancies().len(), 1);
 
@@ -370,12 +403,25 @@ mod tests {
     </tran:occupancy>
 </tran:TrafficSpace>";
 
-        let traffic_space = deserialize_traffic_space(xml_document).expect("should work");
+        let traffic_space = deserialize_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
-        let xml = serialize_traffic_space(&traffic_space, Formatting::Compact)
-            .expect("should serialize")
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_traffic_space(&traffic_space, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
         assert!(xml.contains("tran:occupancy"));
         assert!(xml.contains("Occupancy"));
@@ -399,14 +445,32 @@ mod tests {
     </tran:occupancy>
 </tran:TrafficSpace>";
 
-        let traffic_space = deserialize_traffic_space(xml_document).expect("should work");
+        let traffic_space = deserialize_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
-        let xml = serialize_traffic_space(&traffic_space, Formatting::Compact)
-            .expect("should serialize")
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_traffic_space(&traffic_space, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
-        let round_tripped = deserialize_traffic_space(xml.as_bytes()).expect("should work");
+        let round_tripped = deserialize_traffic_space(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(traffic_space.occupancies(), round_tripped.occupancies());
     }
@@ -419,19 +483,37 @@ mod tests {
     <tran:predecessor xlink:href=\"#UUID_ed2149e3-421a-3dcd-9727-54637db9d9e3\"/>
 </tran:TrafficSpace>";
 
-        let traffic_space = deserialize_traffic_space(xml_document).expect("should work");
+        let traffic_space = deserialize_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(traffic_space.predecessors().len(), 1);
 
-        let xml = serialize_traffic_space(&traffic_space, Formatting::Compact)
-            .expect("should serialize")
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_traffic_space(&traffic_space, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
         assert!(xml.contains("tran:predecessor"));
         assert!(xml.contains("UUID_ed2149e3-421a-3dcd-9727-54637db9d9e3"));
 
-        let round_tripped = deserialize_traffic_space(xml.as_bytes()).expect("should work");
+        let round_tripped = deserialize_traffic_space(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(traffic_space.predecessors(), round_tripped.predecessors());
     }
@@ -444,20 +526,105 @@ mod tests {
     <tran:successor xlink:href=\"#UUID_144a6807-5844-32b2-bb34-8b2671b1afaa\"/>
 </tran:TrafficSpace>";
 
-        let traffic_space = deserialize_traffic_space(xml_document).expect("should work");
+        let traffic_space = deserialize_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(traffic_space.successors().len(), 1);
 
-        let xml = serialize_traffic_space(&traffic_space, Formatting::Compact)
-            .expect("should serialize")
-            .to_string(Formatting::Compact)
-            .expect("should convert to string");
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_traffic_space(&traffic_space, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
 
         assert!(xml.contains("tran:successor"));
         assert!(xml.contains("UUID_144a6807-5844-32b2-bb34-8b2671b1afaa"));
 
-        let round_tripped = deserialize_traffic_space(xml.as_bytes()).expect("should work");
+        let round_tripped = deserialize_traffic_space(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(traffic_space.successors(), round_tripped.successors());
+    }
+
+    #[test]
+    fn test_round_trip_traffic_space_with_granularity_and_traffic_direction() {
+        let xml_document = b"\
+<tran:TrafficSpace gml:id=\"UUID_ae81947d-a661-3678-a5ee-eed58b68694f\">
+    <tran:granularity>way</tran:granularity>
+    <tran:trafficDirection>both</tran:trafficDirection>
+</tran:TrafficSpace>";
+
+        let traffic_space = deserialize_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+        assert_eq!(traffic_space.granularity(), &GranularityValue::Way);
+        assert_eq!(
+            traffic_space.traffic_direction(),
+            Some(TrafficDirectionValue::Both)
+        );
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_traffic_space(&traffic_space, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        assert!(xml.contains("tran:granularity"));
+        assert!(xml.contains("way"));
+        assert!(xml.contains("tran:trafficDirection"));
+        assert!(xml.contains("both"));
+
+        let round_tripped = deserialize_traffic_space(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(traffic_space.granularity(), round_tripped.granularity());
+        assert_eq!(
+            traffic_space.traffic_direction(),
+            round_tripped.traffic_direction()
+        );
+    }
+
+    #[test]
+    fn test_deserialize_traffic_space_without_granularity_returns_error() {
+        let xml_document = b"\
+<tran:TrafficSpace gml:id=\"UUID_ae81947d-a661-3678-a5ee-eed58b68694f\">
+</tran:TrafficSpace>";
+
+        let result = deserialize_traffic_space(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        );
+
+        assert!(result.is_err());
     }
 }

@@ -1,5 +1,6 @@
 use crate::Error;
 use quick_xml::Reader;
+use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use std::fmt;
 
@@ -52,10 +53,10 @@ pub fn detect_citygml_version(xml_document: &[u8]) -> Result<Option<CitygmlVersi
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                 for attr in e.attributes() {
                     let attr = attr.map_err(quick_xml::Error::from)?;
-                    if !attr.key.as_ref().starts_with(b"xmlns") {
+                    if !attr.key.as_ref().starts_with("xmlns") {
                         continue;
                     }
-                    let value = attr.decode_and_unescape_value(reader.decoder())?;
+                    let value = attr.normalized_value(XmlVersion::Implicit1_0)?;
                     if let Some(version) = CitygmlVersion::from_namespace_uri(&value) {
                         return Ok(Some(version));
                     }

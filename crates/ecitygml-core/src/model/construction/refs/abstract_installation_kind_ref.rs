@@ -1,20 +1,26 @@
 use crate::impl_try_from_occupied_space_kind_ref_for_enum;
+use crate::model::bridge::BridgeInstallation;
 use crate::model::building::BuildingInstallation;
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::construction::{
     AbstractInstallation, AbstractInstallationKind, AsAbstractInstallation,
 };
+use crate::model::tunnel::TunnelInstallation;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractInstallationKindRef<'a> {
     BuildingInstallation(&'a BuildingInstallation),
+    BridgeInstallation(&'a BridgeInstallation),
+    TunnelInstallation(&'a TunnelInstallation),
 }
 
 impl<'a> From<&'a AbstractInstallationKind> for AbstractInstallationKindRef<'a> {
     fn from(item: &'a AbstractInstallationKind) -> Self {
         match item {
             AbstractInstallationKind::BuildingInstallation(x) => Self::BuildingInstallation(x),
+            AbstractInstallationKind::BridgeInstallation(x) => Self::BridgeInstallation(x),
+            AbstractInstallationKind::TunnelInstallation(x) => Self::TunnelInstallation(x),
         }
     }
 }
@@ -23,6 +29,8 @@ impl<'a> AsAbstractInstallation for AbstractInstallationKindRef<'a> {
     fn abstract_installation(&self) -> &AbstractInstallation {
         match self {
             Self::BuildingInstallation(x) => x.abstract_installation(),
+            Self::BridgeInstallation(x) => x.abstract_installation(),
+            Self::TunnelInstallation(x) => x.abstract_installation(),
         }
     }
 }
@@ -32,6 +40,8 @@ impl<'a> HasFeatureType for AbstractInstallationKindRef<'a> {
     fn feature_type(&self) -> FeatureType {
         match *self {
             Self::BuildingInstallation(_) => FeatureType::BuildingInstallation,
+            Self::BridgeInstallation(_) => FeatureType::BridgeInstallation,
+            Self::TunnelInstallation(_) => FeatureType::TunnelInstallation,
         }
     }
 }
@@ -50,6 +60,8 @@ macro_rules! impl_from_installation_kind_ref {
     };
 }
 impl_from_installation_kind_ref!(BuildingInstallation);
+impl_from_installation_kind_ref!(BridgeInstallation);
+impl_from_installation_kind_ref!(TunnelInstallation);
 
 #[macro_export]
 macro_rules! impl_try_from_installation_kind_ref {
@@ -74,6 +86,8 @@ macro_rules! impl_try_from_installation_kind_ref {
     };
 }
 impl_try_from_installation_kind_ref!(BuildingInstallation);
+impl_try_from_installation_kind_ref!(BridgeInstallation);
+impl_try_from_installation_kind_ref!(TunnelInstallation);
 impl_try_from_occupied_space_kind_ref_for_enum!(
     AbstractInstallationKind,
     AbstractInstallationKindRef

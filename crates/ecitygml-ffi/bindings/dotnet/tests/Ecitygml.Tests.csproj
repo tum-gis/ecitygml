@@ -1,0 +1,35 @@
+<!-- xUnit tests of the C# bindings and of the examples. Expects the Rust library to be built first
+     (`cargo build -p ecitygml-ffi`); `mise run test-bindings-dotnet` does both. Ecitygml.csproj copies the native
+     library next to the test assembly. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../../../../'))</RepositoryRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Ecitygml.csproj" />
+    <ProjectReference Include="../examples/Examples.csproj" />
+  </ItemGroup>
+
+  <!-- The CityGML fixtures at the repository root, and the examples' expected outputs shared by all languages. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Fixtures</_Parameter1>
+      <_Parameter2>$(RepositoryRoot)tests/fixtures</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>ExamplesExpected</_Parameter1>
+      <_Parameter2>$(RepositoryRoot)crates/ecitygml-ffi/tests/examples/expected</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

@@ -101,9 +101,15 @@ impl CityModel {
             });
     }
 
+    /// Merges the city object members of `city_models` into a new city model. Its id is derived from
+    /// the merged models' ids (SHA-256), so the same inputs always give the same id.
     pub fn from_city_models(city_models: Vec<Self>) -> Self {
+        let source_ids: Vec<&str> = city_models
+            .iter()
+            .map(|city_model| city_model.feature_id().as_str())
+            .collect();
         let abstract_feature_with_lifespan =
-            AbstractFeatureWithLifespan::new(Id::generate_uuid_v4());
+            AbstractFeatureWithLifespan::new(Id::from_hashed_string(&source_ids.join(" ")));
         let mut combined_city_model =
             CityModel::from_abstract_feature_with_lifespan(abstract_feature_with_lifespan);
 

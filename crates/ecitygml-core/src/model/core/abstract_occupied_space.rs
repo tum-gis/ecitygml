@@ -2,7 +2,8 @@ use crate::model::common::{ForEachFeatureMut, IterFeatures, LevelOfDetail};
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
 use crate::model::core::{
-    AbstractPhysicalSpace, AsAbstractSpace, AsAbstractSpaceMut, ImplicitGeometryProperty,
+    AbstractPhysicalSpace, AsAbstractPhysicalSpace, AsAbstractPhysicalSpaceMut, AsAbstractSpace,
+    ImplicitGeometryProperty,
 };
 use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
@@ -13,9 +14,9 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq)]
 pub struct AbstractOccupiedSpace {
     pub(crate) abstract_physical_space: AbstractPhysicalSpace,
-    lod1_implicit_representation: Option<ImplicitGeometryProperty>,
-    lod2_implicit_representation: Option<ImplicitGeometryProperty>,
-    lod3_implicit_representation: Option<ImplicitGeometryProperty>,
+    lod1_implicit_representation: Option<Box<ImplicitGeometryProperty>>,
+    lod2_implicit_representation: Option<Box<ImplicitGeometryProperty>>,
+    lod3_implicit_representation: Option<Box<ImplicitGeometryProperty>>,
 }
 
 impl AbstractOccupiedSpace {
@@ -33,25 +34,25 @@ impl AbstractOccupiedSpace {
     }
 }
 
-pub trait AsAbstractOccupiedSpace: AsAbstractSpace {
+pub trait AsAbstractOccupiedSpace: AsAbstractPhysicalSpace {
     fn abstract_occupied_space(&self) -> &AbstractOccupiedSpace;
 
     fn lod1_implicit_representation(&self) -> Option<&ImplicitGeometryProperty> {
         self.abstract_occupied_space()
             .lod1_implicit_representation
-            .as_ref()
+            .as_deref()
     }
 
     fn lod2_implicit_representation(&self) -> Option<&ImplicitGeometryProperty> {
         self.abstract_occupied_space()
             .lod2_implicit_representation
-            .as_ref()
+            .as_deref()
     }
 
     fn lod3_implicit_representation(&self) -> Option<&ImplicitGeometryProperty> {
         self.abstract_occupied_space()
             .lod3_implicit_representation
-            .as_ref()
+            .as_deref()
     }
 
     fn implicit_representations_by_lod(&self) -> HashMap<LevelOfDetail, &ImplicitGeometryProperty> {
@@ -69,40 +70,40 @@ pub trait AsAbstractOccupiedSpace: AsAbstractSpace {
     }
 }
 
-pub trait AsAbstractOccupiedSpaceMut: AsAbstractSpaceMut + AsAbstractOccupiedSpace {
+pub trait AsAbstractOccupiedSpaceMut: AsAbstractPhysicalSpaceMut + AsAbstractOccupiedSpace {
     fn abstract_occupied_space_mut(&mut self) -> &mut AbstractOccupiedSpace;
 
     fn set_lod1_implicit_representation(&mut self, value: Option<ImplicitGeometryProperty>) {
         self.abstract_occupied_space_mut()
-            .lod1_implicit_representation = value;
+            .lod1_implicit_representation = value.map(Box::new);
     }
 
     fn set_lod2_implicit_representation(&mut self, value: Option<ImplicitGeometryProperty>) {
         self.abstract_occupied_space_mut()
-            .lod2_implicit_representation = value;
+            .lod2_implicit_representation = value.map(Box::new);
     }
 
     fn set_lod3_implicit_representation(&mut self, value: Option<ImplicitGeometryProperty>) {
         self.abstract_occupied_space_mut()
-            .lod3_implicit_representation = value;
+            .lod3_implicit_representation = value.map(Box::new);
     }
 
     fn lod1_implicit_representation_mut(&mut self) -> Option<&mut ImplicitGeometryProperty> {
         self.abstract_occupied_space_mut()
             .lod1_implicit_representation
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn lod2_implicit_representation_mut(&mut self) -> Option<&mut ImplicitGeometryProperty> {
         self.abstract_occupied_space_mut()
             .lod2_implicit_representation
-            .as_mut()
+            .as_deref_mut()
     }
 
     fn lod3_implicit_representation_mut(&mut self) -> Option<&mut ImplicitGeometryProperty> {
         self.abstract_occupied_space_mut()
             .lod3_implicit_representation
-            .as_mut()
+            .as_deref_mut()
     }
 }
 

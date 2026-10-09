@@ -2,86 +2,95 @@ use crate::Error;
 use crate::gml::codec::building::abstract_building_subdivision_kind::{
     deserialize_abstract_building_subdivision_kind, serialize_abstract_building_subdivision_kind,
 };
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::building::AbstractBuildingSubdivisionProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
-use egml::io::util::{Formatting, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts};
+use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_abstract_building_subdivision_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<AbstractBuildingSubdivisionProperty, Error> {
-    let parsed: GmlBuildingSubdivisionProperty = de::from_reader(xml_document)?;
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
-    let object = deserialize_abstract_building_subdivision_kind(xml_document, spans)?;
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
+    let object = deserialize_abstract_building_subdivision_kind(xml_document, index, config)?;
 
     Ok(AbstractBuildingSubdivisionProperty::new(
         object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
+        association,
+        ownership,
     ))
 }
 
 pub fn serialize_abstract_building_subdivision_property(
     abstract_building_subdivision_property: &AbstractBuildingSubdivisionProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-    parts.attributes.extend(serialize_association_attributes(
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
         abstract_building_subdivision_property.association(),
-    ));
-    parts.attributes.extend(serialize_ownership_attributes(
         abstract_building_subdivision_property.ownership(),
-    ));
-    if let Some(object) = abstract_building_subdivision_property.object() {
-        parts.content.push(XmlNodeContent::Child(
-            serialize_abstract_building_subdivision_kind(object, formatting)?,
-        ));
-    }
-    Ok(XmlNode::new(
-        CityGmlElement::AbstractBuildingSubdivisionProperty.into(),
-        parts,
-    ))
-}
+    );
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlBuildingSubdivisionProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    match abstract_building_subdivision_property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Building,
+                CityGmlElement::AbstractBuildingSubdivisionProperty,
+                attributes,
+            )?;
+            serialize_abstract_building_subdivision_kind(object, xml_fragment_writer)?;
+            xml_fragment_writer.write_end_event(
+                CityGmlNamespace::Building,
+                CityGmlElement::AbstractBuildingSubdivisionProperty,
+            )?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Building,
+                CityGmlElement::AbstractBuildingSubdivisionProperty,
+                attributes,
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gml::codec::core::deserialize_abstract_thematic_surface;
-    use ecitygml_core::model::core::{
-        AsAbstractCityObject, AsAbstractFeature, AsAbstractThematicSurface,
-    };
-    use egml::model::base::{AsAbstractGml, Id};
+
+    use egml::model::base::AsAbstractGml;
     use egml::model::basic_types::Code;
-    use quick_xml::{DeError, de};
 
     #[test]
     fn test_deserialize_basic_href_boundary() {
-        use egml::io::util::extract_xml_element_spans;
         let xml_document = b"<bldg:buildingSubdivision>
             <bldg:Storey>
               <gml:name>Second Floor</gml:name>
             </bldg:Storey>
           </bldg:buildingSubdivision>";
 
-        let spans = extract_xml_element_spans(xml_document).expect("should work");
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
         let abstract_building_subdivision_property =
-            deserialize_abstract_building_subdivision_property(xml_document, &spans)
-                .expect("should work");
+            deserialize_abstract_building_subdivision_property(
+                xml_document,
+                &index,
+                &DeserializationConfig::default(),
+            )
+            .expect("should work");
         let abstract_building_subdivision_kind =
             abstract_building_subdivision_property.object().unwrap();
 

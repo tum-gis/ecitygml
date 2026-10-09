@@ -1,66 +1,76 @@
 use crate::Error;
-use crate::gml::util::{CityGmlElement, CombinedCityGmlElement};
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
+};
 use ecitygml_core::model::relief::TinProperty;
 use egml::io::codec::base::{
-    GmlAssociationAttributes, GmlOwnershipAttributes, serialize_association_attributes,
-    serialize_ownership_attributes,
+    deserialize_association_and_ownership_attributes,
+    serialize_association_and_ownership_attributes,
 };
 use egml::io::codec::geometry::primitives::{
     deserialize_triangulated_surface, serialize_triangulated_surface,
 };
-use egml::io::util::{
-    Formatting, GmlElement, XmlElementSpans, XmlNode, XmlNodeContent, XmlNodeParts,
-};
+use egml::io::util::{ChunkedSink, GmlElement, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::base::{HasAssociationAttributes, HasOwnershipAttributes};
-use quick_xml::de;
-use serde::{Deserialize, Serialize};
 
 pub fn deserialize_tin_property(
     xml_document: &[u8],
-    spans: &XmlElementSpans<CombinedCityGmlElement>,
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
 ) -> Result<TinProperty, Error> {
-    let parsed: GmlTinProperty = de::from_reader(xml_document)?;
-
-    let mut object = None;
-    if let Some(span) = spans.first(GmlElement::TriangulatedSurface.into()) {
-        let ts_slice = &xml_document[span.start..span.end];
-        object = Some(deserialize_triangulated_surface(ts_slice)?);
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
     };
 
-    Ok(TinProperty::new(
-        object,
-        parsed.association.try_into()?,
-        parsed.ownership.into(),
-    ))
+    let (association, ownership) = deserialize_association_and_ownership_attributes(xml_document)?;
+    let mut object = None;
+
+    if let Some(index) = index.first(GmlElement::TriangulatedSurface.into()) {
+        let ts_slice = &xml_document[index.range()];
+        let gml_index = index.convert(|e| match e {
+            CombinedCityGmlElement::Gml(g) => Some(g),
+            _ => None,
+        });
+        object = Some(deserialize_triangulated_surface(
+            ts_slice,
+            &gml_index,
+            config.gml_config(),
+        )?);
+    };
+
+    Ok(TinProperty::new(object, association, ownership))
 }
 
 pub fn serialize_tin_property(
     tin_property: &TinProperty,
-    formatting: Formatting,
-) -> Result<XmlNode, Error> {
-    let mut parts = XmlNodeParts::empty();
-    parts
-        .attributes
-        .extend(serialize_association_attributes(tin_property.association()));
-    parts
-        .attributes
-        .extend(serialize_ownership_attributes(tin_property.ownership()));
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_association_and_ownership_attributes(
+        tin_property.association(),
+        tin_property.ownership(),
+    );
 
-    if let Some(object) = tin_property.object() {
-        parts
-            .content
-            .push(XmlNodeContent::Child(serialize_triangulated_surface(
-                object, formatting,
-            )?));
+    match tin_property.object() {
+        Some(object) => {
+            xml_fragment_writer.write_start_event_with_attributes(
+                CityGmlNamespace::Relief,
+                CityGmlElement::TinProperty,
+                attributes,
+            )?;
+            serialize_triangulated_surface(object, xml_fragment_writer)?;
+            xml_fragment_writer
+                .write_end_event(CityGmlNamespace::Relief, CityGmlElement::TinProperty)?;
+        }
+        None => {
+            xml_fragment_writer.write_empty_element_with_attributes(
+                CityGmlNamespace::Relief,
+                CityGmlElement::TinProperty,
+                attributes,
+            )?;
+        }
     }
 
-    Ok(XmlNode::new(CityGmlElement::TinProperty.into(), parts))
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlTinProperty {
-    #[serde(flatten)]
-    pub association: GmlAssociationAttributes,
-    #[serde(flatten)]
-    pub ownership: GmlOwnershipAttributes,
+    Ok(())
 }

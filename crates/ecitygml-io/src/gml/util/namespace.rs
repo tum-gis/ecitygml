@@ -1,15 +1,15 @@
-use std::collections::HashMap;
+use egml::io::util::XmlNamespace;
 use strum::{Display, EnumIter, EnumString, IntoEnumIterator};
 
 pub fn get_namespace_pairs() -> Vec<(String, String)> {
     let mut pairs: Vec<(String, String)> = Vec::new();
 
-    for ns in CitygmlNamespace::iter() {
+    for ns in CityGmlNamespace::iter() {
         let key = match ns.default_prefix() {
             Some(prefix) => format!("xmlns:{prefix}"),
             None => "xmlns".to_string(),
         };
-        pairs.push((key, ns.url().to_string()));
+        pairs.push((key, ns.uri().to_string()));
     }
 
     for ns in GeneralNamespace::iter() {
@@ -28,7 +28,7 @@ pub fn get_namespace_pairs() -> Vec<(String, String)> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, EnumString, EnumIter)]
-pub enum CitygmlNamespace {
+pub enum CityGmlNamespace {
     Appearance,
     Bridge,
     Building,
@@ -48,8 +48,8 @@ pub enum CitygmlNamespace {
     WaterBody,
 }
 
-impl CitygmlNamespace {
-    pub fn url(&self) -> &'static str {
+impl XmlNamespace for CityGmlNamespace {
+    fn uri(&self) -> &'static str {
         match self {
             Self::Appearance => "http://www.opengis.net/citygml/appearance/3.0",
             Self::Bridge => "http://www.opengis.net/citygml/bridge/3.0",
@@ -71,7 +71,7 @@ impl CitygmlNamespace {
         }
     }
 
-    pub fn default_prefix(&self) -> Option<&'static str> {
+    fn default_prefix(&self) -> Option<&'static str> {
         match self {
             Self::Appearance => Some("app"),
             Self::Bridge => Some("brid"),
@@ -92,56 +92,58 @@ impl CitygmlNamespace {
             Self::WaterBody => Some("wtr"),
         }
     }
+}
 
+impl CityGmlNamespace {
     pub fn schema_location(&self) -> Option<&'static str> {
         match self {
-            CitygmlNamespace::Appearance => {
+            CityGmlNamespace::Appearance => {
                 Some("http://www.opengis.net/citygml/appearance/3.0/appearance.xsd")
             }
-            CitygmlNamespace::Bridge => {
+            CityGmlNamespace::Bridge => {
                 Some("http://www.opengis.net/citygml/bridge/3.0/bridge.xsd")
             }
-            CitygmlNamespace::Building => {
+            CityGmlNamespace::Building => {
                 Some("http://www.opengis.net/citygml/building/3.0/building.xsd")
             }
-            CitygmlNamespace::PointCloud => {
+            CityGmlNamespace::PointCloud => {
                 Some("http://www.opengis.net/citygml/pointcloud/3.0/pointCloud.xsd")
             }
-            CitygmlNamespace::CityFurniture => {
+            CityGmlNamespace::CityFurniture => {
                 Some("http://www.opengis.net/citygml/cityfurniture/3.0/cityFurniture.xsd")
             }
-            CitygmlNamespace::CityObjectGroup => {
+            CityGmlNamespace::CityObjectGroup => {
                 Some("http://www.opengis.net/citygml/cityobjectgroup/3.0/cityObjectGroup.xsd")
             }
-            CitygmlNamespace::Construction => {
+            CityGmlNamespace::Construction => {
                 Some("http://www.opengis.net/citygml/construction/3.0/construction.xsd")
             }
-            CitygmlNamespace::Core => None,
-            CitygmlNamespace::Dynamizer => {
+            CityGmlNamespace::Core => None,
+            CityGmlNamespace::Dynamizer => {
                 Some("http://www.opengis.net/citygml/dynamizer/3.0/dynamizer.xsd")
             }
-            CitygmlNamespace::Generics => {
+            CityGmlNamespace::Generics => {
                 Some("http://www.opengis.net/citygml/generics/3.0/generics.xsd")
             }
-            CitygmlNamespace::LandUse => {
+            CityGmlNamespace::LandUse => {
                 Some("http://www.opengis.net/citygml/landuse/3.0/landUse.xsd")
             }
-            CitygmlNamespace::Relief => {
+            CityGmlNamespace::Relief => {
                 Some("http://www.opengis.net/citygml/relief/3.0/relief.xsd")
             }
-            CitygmlNamespace::Transportation => {
+            CityGmlNamespace::Transportation => {
                 Some("http://www.opengis.net/citygml/transportation/3.0/transportation.xsd")
             }
-            CitygmlNamespace::Tunnel => {
+            CityGmlNamespace::Tunnel => {
                 Some("http://www.opengis.net/citygml/tunnel/3.0/tunnel.xsd")
             }
-            CitygmlNamespace::Vegetation => {
+            CityGmlNamespace::Vegetation => {
                 Some("http://www.opengis.net/citygml/vegetation/3.0/vegetation.xsd")
             }
-            CitygmlNamespace::Versioning => {
+            CityGmlNamespace::Versioning => {
                 Some("http://www.opengis.net/citygml/versioning/3.0/versioning.xsd")
             }
-            CitygmlNamespace::WaterBody => {
+            CityGmlNamespace::WaterBody => {
                 Some("http://www.opengis.net/citygml/waterbody/3.0/waterBody.xsd")
             }
         }
@@ -163,8 +165,8 @@ impl GeneralNamespace {
             Self::Gml => "http://www.opengis.net/gml/3.2",
             Self::Xsi => "http://www.w3.org/2001/XMLSchema-instance",
             Self::XLink => "http://www.w3.org/1999/xlink",
-            Self::Ct => "http://schemas.opengis.net/citygml/xAL/3.0/CommonTypes.xsd",
-            Self::XAl => "http://schemas.opengis.net/citygml/xAL/3.0/xAL.xsd",
+            Self::Ct => "urn:oasis:names:tc:ciq:ct:3",
+            Self::XAl => "urn:oasis:names:tc:ciq:xal:3",
         }
     }
 
@@ -181,27 +183,12 @@ impl GeneralNamespace {
 
 pub fn generate_schema_location_header_string() -> String {
     let mut schema_locations = String::new();
-    for ns in CitygmlNamespace::iter() {
+    for ns in CityGmlNamespace::iter() {
         if let Some(schema_location) = ns.schema_location() {
-            let current_schema_location_pair = format!(" {} {}", ns.url(), schema_location);
+            let current_schema_location_pair = format!(" {} {}", ns.uri(), schema_location);
             schema_locations.push_str(&current_schema_location_pair)
         }
     }
 
     schema_locations
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamespaceContext {
-    pub prefixes: HashMap<CitygmlNamespace, Option<String>>,
-}
-
-impl NamespaceContext {
-    pub fn new() -> Self {
-        let prefixes: HashMap<CitygmlNamespace, Option<String>> = CitygmlNamespace::iter()
-            .map(|ns| (ns, ns.default_prefix().as_ref().map(|x| x.to_string())))
-            .collect();
-
-        Self { prefixes }
-    }
 }

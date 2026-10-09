@@ -1,6 +1,7 @@
 use crate::Error;
 use crate::gml::codec::transportation::abstract_transportation_space::{
     deserialize_abstract_transportation_space, serialize_abstract_transportation_space,
+    serialize_abstract_transportation_space_attributes,
 };
 use crate::gml::codec::transportation::intersection_property::{
     deserialize_intersection_property, serialize_intersection_property,
@@ -8,24 +9,29 @@ use crate::gml::codec::transportation::intersection_property::{
 use crate::gml::codec::transportation::section_property::{
     deserialize_section_property, serialize_section_property,
 };
-use crate::gml::util::CityGmlElement;
-use ecitygml_core::model::transportation::values::{
-    RailwayClassValue, RailwayFunctionValue, RailwayUsageValue,
+use crate::gml::util::{
+    CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
 };
 use ecitygml_core::model::transportation::{AsAbstractTransportationSpace, Railway};
-use egml::io::codec::basic::GmlCode;
-use egml::io::util::collect_children;
-use egml::io::util::{
-    Formatting, XmlNode, XmlNodeContent, extract_xml_element_spans, serialize_inner,
-};
+use egml::io::codec::basic::{deserialize_code, serialize_code};
+use egml::io::util::{ChunkedSink, XmlFragmentWriter};
+use egml::io::util::{XmlDocumentIndex, collect_children};
 use egml::model::basic_types::Code;
-use serde::{Deserialize, Serialize};
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
 
-pub fn deserialize_railway(xml_document: &[u8]) -> Result<Railway, Error> {
-    let spans = extract_xml_element_spans(xml_document)?;
+pub fn deserialize_railway(
+    xml_document: &[u8],
+    index: &XmlDocumentIndex<CombinedCityGmlElement>,
+    config: &DeserializationConfig,
+) -> Result<Railway, Error> {
+    let index = if index.is_truncated() {
+        &XmlDocumentIndex::from_scan(xml_document, config.feature_rescan_depth())?
+    } else {
+        index
+    };
 
     let mut abstract_transportation_space_result = None;
-    let mut parsed_result = None;
     let mut sections_result = None;
     let mut intersections_result = None;
 
@@ -33,119 +39,141 @@ pub fn deserialize_railway(xml_document: &[u8]) -> Result<Railway, Error> {
         s.spawn(|_| {
             abstract_transportation_space_result = Some(deserialize_abstract_transportation_space(
                 xml_document,
-                &spans,
+                index,
+                config,
             ))
-        });
-        s.spawn(|_| {
-            parsed_result = Some(
-                quick_xml::de::from_reader::<_, GmlRailway>(xml_document).map_err(Error::from),
-            );
         });
         s.spawn(|_| {
             sections_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::SectionProperty.into(),
+                config,
                 deserialize_section_property,
             ));
         });
         s.spawn(|_| {
             intersections_result = Some(collect_children(
                 xml_document,
-                &spans,
+                index,
                 CityGmlElement::IntersectionProperty.into(),
+                config,
                 deserialize_intersection_property,
             ));
         });
     });
 
-    let abstract_transportation_space = abstract_transportation_space_result
-        .expect("rayon::scope guarantees all spawns complete")?;
-    let parsed = parsed_result.expect("rayon::scope guarantees all spawns complete")?;
-    let sections = sections_result.expect("rayon::scope guarantees all spawns complete")?;
-    let intersections =
-        intersections_result.expect("rayon::scope guarantees all spawns complete")?;
+    let mut railway = Railway::from_abstract_transportation_space(
+        abstract_transportation_space_result
+            .expect("rayon::scope guarantees all spawns complete")?,
+    );
 
-    let mut railway = Railway::from_abstract_transportation_space(abstract_transportation_space);
-    railway.set_class_opt(parsed.class.map(Code::from).map(RailwayClassValue::from));
-    railway.set_functions(
-        parsed
-            .functions
-            .into_iter()
-            .map(Code::from)
-            .map(RailwayFunctionValue::from)
-            .collect(),
+    let class: Option<Code> = index
+        .first(CityGmlElement::ClassProperty.into())
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .transpose()?;
+    railway.set_class_opt(class.map(Into::into));
+
+    let functions: Vec<Code> = index
+        .get(CityGmlElement::FunctionProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    railway.set_functions(functions.into_iter().map(Into::into).collect());
+
+    let usages: Vec<Code> = index
+        .get(CityGmlElement::UsageProperty.into())
+        .iter()
+        .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
+        .collect::<Result<_, _>>()?;
+    railway.set_usages(usages.into_iter().map(Into::into).collect());
+
+    railway.set_sections(sections_result.expect("rayon::scope guarantees all spawns complete")?);
+    railway.set_intersections(
+        intersections_result.expect("rayon::scope guarantees all spawns complete")?,
     );
-    railway.set_usages(
-        parsed
-            .usages
-            .into_iter()
-            .map(Code::from)
-            .map(RailwayUsageValue::from)
-            .collect(),
-    );
-    railway.set_sections(sections);
-    railway.set_intersections(intersections);
 
     Ok(railway)
 }
 
-pub fn serialize_railway(railway: &Railway, formatting: Formatting) -> Result<XmlNode, Error> {
-    let mut xml_node_parts = serialize_abstract_transportation_space(
-        railway.abstract_transportation_space(),
-        formatting,
+pub fn serialize_railway(
+    railway: &Railway,
+    xml_fragment_writer: &mut XmlFragmentWriter<ChunkedSink>,
+) -> Result<(), Error> {
+    let attributes = serialize_railway_attributes(railway);
+
+    xml_fragment_writer.write_start_event_with_attributes(
+        CityGmlNamespace::Transportation,
+        CityGmlElement::Railway,
+        attributes,
     )?;
 
-    if let Some(raw) = serialize_inner(GmlRailway::from(railway), formatting)? {
-        xml_node_parts.content.push(XmlNodeContent::Raw(raw));
+    serialize_abstract_transportation_space(
+        railway.abstract_transportation_space(),
+        xml_fragment_writer,
+    )?;
+
+    if let Some(class) = railway.class() {
+        serialize_code(
+            class.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::ClassProperty,
+        )?;
     }
 
-    for section_property in railway.sections() {
-        let node = serialize_section_property(section_property, formatting)?;
-        xml_node_parts.content.push(XmlNodeContent::Child(node));
+    for function in railway.functions() {
+        serialize_code(
+            function.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::FunctionProperty,
+        )?;
     }
 
-    for intersection_property in railway.intersections() {
-        let node = serialize_intersection_property(intersection_property, formatting)?;
-        xml_node_parts.content.push(XmlNodeContent::Child(node));
+    for usage in railway.usages() {
+        serialize_code(
+            usage.code(),
+            xml_fragment_writer,
+            CityGmlNamespace::Transportation,
+            CityGmlElement::UsageProperty,
+        )?;
     }
 
-    Ok(XmlNode::new(CityGmlElement::Railway.into(), xml_node_parts))
+    let xml_fragments = railway
+        .sections()
+        .par_iter()
+        .map(|x| {
+            let mut xml_fragment_writer = xml_fragment_writer.spawn_child();
+            serialize_section_property(x, &mut xml_fragment_writer)?;
+            Ok(xml_fragment_writer)
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    for fragment in xml_fragments {
+        xml_fragment_writer.merge_chunked(fragment);
+    }
+
+    let xml_fragments = railway
+        .intersections()
+        .par_iter()
+        .map(|x| {
+            let mut xml_fragment_writer = xml_fragment_writer.spawn_child();
+            serialize_intersection_property(x, &mut xml_fragment_writer)?;
+            Ok(xml_fragment_writer)
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    for fragment in xml_fragments {
+        xml_fragment_writer.merge_chunked(fragment);
+    }
+
+    xml_fragment_writer
+        .write_end_event(CityGmlNamespace::Transportation, CityGmlElement::Railway)?;
+
+    Ok(())
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct GmlRailway {
-    #[serde(
-        rename(serialize = "tran:class", deserialize = "class"),
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub class: Option<GmlCode>,
-
-    #[serde(rename(serialize = "tran:function", deserialize = "function"), default)]
-    pub functions: Vec<GmlCode>,
-
-    #[serde(rename(serialize = "tran:usage", deserialize = "usage"), default)]
-    pub usages: Vec<GmlCode>,
-}
-
-impl From<&Railway> for GmlRailway {
-    fn from(item: &Railway) -> Self {
-        Self {
-            class: item.class().map(RailwayClassValue::code).map(Into::into),
-            functions: item
-                .functions()
-                .iter()
-                .map(RailwayFunctionValue::code)
-                .map(Into::into)
-                .collect(),
-            usages: item
-                .usages()
-                .iter()
-                .map(RailwayUsageValue::code)
-                .map(Into::into)
-                .collect(),
-        }
-    }
+pub fn serialize_railway_attributes(railway: &Railway) -> Vec<(String, String)> {
+    serialize_abstract_transportation_space_attributes(railway.abstract_transportation_space())
 }
 
 #[cfg(test)]
@@ -170,7 +198,12 @@ mod tests {
       </tran:section>
     </tran:Railway>";
 
-        let railway = deserialize_railway(xml_document).expect("should work");
+        let railway = deserialize_railway(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(
             railway.feature_id(),
