@@ -9,6 +9,29 @@ description = "Library for processing CityGML data."
 
 
 [dependencies]
-ecitygml-core = { version = "0.0.2-alpha.6", path = "../ecitygml-core" }
-ecitygml-io = { version = "0.0.2-alpha.6", path = "../ecitygml-io" }
-ecitygml-transform = { version = "0.0.2-alpha.6", path = "../ecitygml-transform" }
+ecitygml-core = { version = "0.0.2-alpha.7", path = "../ecitygml-core" }
+ecitygml-io = { version = "0.0.2-alpha.7", path = "../ecitygml-io" }
+ecitygml-transform = { version = "0.0.2-alpha.7", path = "../ecitygml-transform" }
+
+[dev-dependencies]
+egml = { workspace = true }
+nalgebra = { workspace = true }
+rayon = { workspace = true }
+
+# Snippets: short programs giving a first impression of the library, next to the examples (examples/*.rs, found
+# automatically). Every binding in crates/ecitygml-ffi has the same snippets.
+[[example]]
+name = "compute_traffic_space_volume"
+path = "examples/snippets/compute_traffic_space_volume.rs"
+
+[[example]]
+name = "compute_wall_surface_area"
+path = "examples/snippets/compute_wall_surface_area.rs"
+
+[[example]]
+name = "compute_total_building_height"
+path = "examples/snippets/compute_total_building_height.rs"
+
+[[example]]
+name = "translate_to_local_coordinates"
+path = "examples/snippets/translate_to_local_coordinates.rs"

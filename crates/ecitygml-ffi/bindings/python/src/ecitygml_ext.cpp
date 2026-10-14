@@ -4,6 +4,8 @@
 // Forward declarations for binding add functions
 namespace ecitygml{
   
+void add_Scale3_binding(nb::module_);
+void add_Vector3_binding(nb::module_);
 void add_Bridge_binding(nb::module_);
 void add_BridgePart_binding(nb::module_);
 void add_BridgePartProperty_binding(nb::module_);
@@ -50,6 +52,9 @@ void add_RoofSurface_binding(nb::module_);
 void add_ElevationReferenceValue_binding(nb::module_);
 void add_WallSurface_binding(nb::module_);
 void add_WindowSurface_binding(nb::module_);
+void add_AbstractCityObjectKind_binding(nb::module_);
+void add_AbstractCityObjectProperty_binding(nb::module_);
+void add_AbstractCityObjectPropertyIterator_binding(nb::module_);
 void add_AbstractSpaceBoundaryKind_binding(nb::module_);
 void add_AbstractSpaceBoundaryProperty_binding(nb::module_);
 void add_AbstractSpaceBoundaryPropertyIterator_binding(nb::module_);
@@ -274,6 +279,8 @@ NB_MODULE(ecitygml, mod)
         .def("__str__", [](const std::monostate &)
              { return ""; });// Module declarations
     // Add bindings
+    add_Scale3_binding(mod);
+    add_Vector3_binding(mod);
     add_Bridge_binding(mod);
     add_BridgePart_binding(mod);
     add_BridgePartProperty_binding(mod);
@@ -320,6 +327,9 @@ NB_MODULE(ecitygml, mod)
     add_ElevationReferenceValue_binding(mod);
     add_WallSurface_binding(mod);
     add_WindowSurface_binding(mod);
+    add_AbstractCityObjectKind_binding(mod);
+    add_AbstractCityObjectProperty_binding(mod);
+    add_AbstractCityObjectPropertyIterator_binding(mod);
     add_AbstractSpaceBoundaryKind_binding(mod);
     add_AbstractSpaceBoundaryProperty_binding(mod);
     add_AbstractSpaceBoundaryPropertyIterator_binding(mod);

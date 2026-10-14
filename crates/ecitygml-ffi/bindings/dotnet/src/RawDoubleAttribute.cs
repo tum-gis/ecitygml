@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
-using Envis.Ecitygml;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml.Raw;
+namespace Ecitygml.Raw;
 
 [StructLayout(LayoutKind.Sequential)]
 internal partial struct DoubleAttribute

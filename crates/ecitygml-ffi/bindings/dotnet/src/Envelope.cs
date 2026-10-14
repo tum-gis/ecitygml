@@ -2,9 +2,9 @@
 
 using System;
 using System.Runtime.InteropServices;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml;
+namespace Ecitygml;
 
 #nullable enable
 
@@ -86,6 +86,23 @@ public partial class Envelope
             Raw.DirectPosition* result = Raw.Envelope.UpperCorner(AsFFI());
             GC.KeepAlive(this);
             return new DirectPosition(RustHandle<Raw.DirectPosition>.Borrowed(result, new object[] { this.DiplomatRetainDependency() }));
+        }
+    }
+
+    /// <returns>
+    /// A <c>DirectPosition</c> allocated on Rust side.
+    /// </returns>
+    public DirectPosition Center()
+    {
+        unsafe
+        {
+            if (_inner is null || _inner.IsNull)
+            {
+                throw new ObjectDisposedException("Envelope");
+            }
+            Raw.DirectPosition* result = Raw.Envelope.Center(AsFFI());
+            GC.KeepAlive(this);
+            return new DirectPosition(result);
         }
     }
 

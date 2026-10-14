@@ -2,6 +2,10 @@
 export { codepoint } from './diplomat-runtime';
 
 
+export { Scale3, Scale3_obj } from "./Scale3"
+
+export { Vector3, Vector3_obj } from "./Vector3"
+
 export { Bridge } from "./Bridge"
 
 export { BridgePart } from "./BridgePart"
@@ -93,6 +97,12 @@ export { ElevationReferenceValue } from "./ElevationReferenceValue"
 export { WallSurface } from "./WallSurface"
 
 export { WindowSurface } from "./WindowSurface"
+
+export { AbstractCityObjectKind } from "./AbstractCityObjectKind"
+
+export { AbstractCityObjectProperty } from "./AbstractCityObjectProperty"
+
+export { AbstractCityObjectPropertyIterator } from "./AbstractCityObjectPropertyIterator"
 
 export { AbstractSpaceBoundaryKind } from "./AbstractSpaceBoundaryKind"
 

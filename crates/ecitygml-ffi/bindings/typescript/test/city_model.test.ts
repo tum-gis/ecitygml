@@ -138,3 +138,21 @@ test('recompute_child_bounding_shapes', () => {
     cityModel.recomputeChildBoundingShapes();
     assert.ok(wallBounded());
 });
+
+test('apply_translation and apply_scale', () => {
+    const cityModel = read(FZK_LOD1);
+    const lowerCorner = () => {
+        const lower = cityModel.boundedBy()!.envelope()!.lowerCorner();
+        return [lower.x(), lower.y(), lower.z()];
+    };
+    const [x, y, z] = lowerCorner();
+    cityModel.applyTranslation({ x: -100.0, y: 200.0, z: 10.0 });
+    const moved = lowerCorner();
+    [x - 100.0, y + 200.0, z + 10.0].forEach((expected, axis) => assert.ok(Math.abs(moved[axis] - expected) < 1e-6));
+
+    cityModel.applyScale({ x: 2.0, y: 3.0, z: 0.5 });
+    const envelope = cityModel.boundedBy()!.envelope()!;
+    assert.ok(Math.abs(envelope.sizeX() - 24.0) < 1e-6);
+    assert.ok(Math.abs(envelope.sizeY() - 30.0) < 1e-6);
+    assert.ok(Math.abs(envelope.sizeZ() - 6.517669 / 2) < 1e-6);
+});

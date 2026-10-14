@@ -936,7 +936,7 @@
       </lod2Solid>
       <con:height>
         <con:Height>
-          <con:highReference>highestRoofEdge</con:highReference>
+          <con:highReference>topOfConstruction</con:highReference>
           <con:lowReference>lowestGroundPoint</con:lowReference>
           <con:status>measured</con:status>
           <con:value uom="urn:adv:uom:m">19.408</con:value>

@@ -41,12 +41,8 @@ fn main() -> Result<()> {
             commands::transform::run(
                 &input,
                 &output,
-                *tx,
-                *ty,
-                *tz,
-                *rx,
-                *ry,
-                *rz,
+                [*tx, *ty, *tz],
+                [*rx, *ry, *rz],
                 *formatting,
                 *indent_size,
             )?;

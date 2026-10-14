@@ -1,4 +1,4 @@
-namespace Envis.Ecitygml;
+namespace Ecitygml;
 
 public enum GeometryType : int
 {

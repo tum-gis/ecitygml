@@ -1,7 +1,7 @@
 using Xunit;
-using static Envis.Ecitygml.Tests.Helpers;
+using static Ecitygml.Tests.Helpers;
 
-namespace Envis.Ecitygml.Tests;
+namespace Ecitygml.Tests;
 
 public class BuildingTests
 {

@@ -1,5 +1,5 @@
 // Runs the scripts in examples/ and compares their output with the expected output shared by all
-// languages: for every `crates/ecitygml-ffi/tests/examples/expected/<example>/<fixture>.txt`, the example runs on
+// languages: for every `tests/expected/examples/<example>/<fixture>.txt`, the example runs on
 // `tests/fixtures/<fixture>.gml` and must print that text. Examples that write a file get a
 // temporary output path; if `expected/<example>/<fixture><extension>` exists, the file must match it.
 import assert from 'node:assert/strict';
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 
 const examples = fileURLToPath(new URL('../examples/', import.meta.url));
-const expected = fileURLToPath(new URL('../../../tests/examples/expected/', import.meta.url));
+const expected = fileURLToPath(new URL('../../../../../tests/expected/examples/', import.meta.url));
 const fixtures = fileURLToPath(new URL('../../../../../tests/fixtures/', import.meta.url));
 // Examples with an output file, and its extension.
 const outputExtensions: Record<string, string> = { '06_export_obj': '.obj', '07_convert': '.gml.gz' };

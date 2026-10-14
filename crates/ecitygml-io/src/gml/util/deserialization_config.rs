@@ -26,6 +26,7 @@ impl DeserializationConfig {
         self.initial_scan_depth
     }
 
+    #[expect(dead_code, reason = "not used yet")]
     pub fn set_initial_scan_depth(&mut self, initial_scan_depth: Option<usize>) {
         self.initial_scan_depth = initial_scan_depth;
     }
@@ -34,6 +35,7 @@ impl DeserializationConfig {
         self.feature_rescan_depth
     }
 
+    #[expect(dead_code, reason = "not used yet")]
     pub fn set_feature_rescan_depth(&mut self, feature_rescan_depth: Option<usize>) {
         self.feature_rescan_depth = feature_rescan_depth;
     }
@@ -42,6 +44,7 @@ impl DeserializationConfig {
         &self.gml_config
     }
 
+    #[expect(dead_code, reason = "not used yet")]
     pub fn set_gml_config(&mut self, gml_config: egml::io::util::DeserializationConfig) {
         self.gml_config = gml_config;
     }

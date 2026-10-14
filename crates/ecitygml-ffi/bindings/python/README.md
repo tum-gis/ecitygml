@@ -2,10 +2,10 @@
 
 Python bindings for ecitygml, generated with [Diplomat](https://github.com/rust-diplomat/diplomat)
 (nanobind backend) from the bridges in `crates/ecitygml-ffi`. `src/` is generated
-(`mise run generate-bindings`); `pyproject.toml`, `CMakeLists.txt`, `examples/` and `tests/` are
+(`mise run generate:bindings`); `pyproject.toml`, `CMakeLists.txt`, `examples/` and `tests/` are
 hand-written.
 
-Build and test with `mise run build-bindings-python` and `mise run test-bindings-python`.
+Build and test with `mise run build:bindings:python` and `mise run test:bindings:python`.
 
 ## Tests
 

@@ -22,10 +22,10 @@
 //           WindowSurface GML_356b85c1-25a0-49f9-b39e-013fbbafcce4
 //         ...
 
-using Envis.Ecitygml.Diplomat;
-using static Envis.Ecitygml.Examples.Common;
+using Ecitygml.Diplomat;
+using static Ecitygml.Examples.Common;
 
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 public static class BuildingReport
 {

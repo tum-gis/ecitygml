@@ -4,6 +4,7 @@ use crate::gml::util::{CombinedCityGmlElement, DeserializationConfig};
 use ecitygml_core::model::construction::AbstractFillingElement;
 use egml::io::util::XmlDocumentIndex;
 
+#[expect(dead_code, reason = "not used yet")]
 pub fn deserialize_abstract_filling_element(
     xml_document: &[u8],
     index: &XmlDocumentIndex<CombinedCityGmlElement>,

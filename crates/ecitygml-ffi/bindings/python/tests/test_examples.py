@@ -1,5 +1,5 @@
 """Runs the scripts in examples/ and compares their output with the expected output shared by all
-languages: for every `crates/ecitygml-ffi/tests/examples/expected/<example>/<fixture>.txt`, the example runs on
+languages: for every `tests/expected/examples/<example>/<fixture>.txt`, the example runs on
 `tests/fixtures/<fixture>.gml` and must print that text. Examples that write a file get a temporary
 output path; if `expected/<example>/<fixture><extension>` exists, the file must match it too."""
 
@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 EXAMPLES = Path(__file__).parents[1] / "examples"
-EXPECTED = Path(__file__).parents[3] / "tests" / "examples" / "expected"
+EXPECTED = Path(__file__).parents[5] / "tests" / "expected" / "examples"
 FIXTURES = Path(__file__).parents[5] / "tests" / "fixtures"
 # Examples with an output file, and its extension.
 OUTPUT_EXTENSIONS = {"06_export_obj": ".obj", "07_convert": ".gml.gz"}

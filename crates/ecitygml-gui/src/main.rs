@@ -1,6 +1,7 @@
 mod app;
 mod color;
 mod mesh;
+mod platform;
 mod scene;
 mod screenshot;
 mod ui;
@@ -11,21 +12,16 @@ use scene::Scene;
 use three_d::egui;
 use three_d::{
     Camera, Event, FrameOutput, GUI, InnerSpace, MouseButton, OrbitControl, PhysicalPoint,
-    Viewport, Window, WindowSettings, degrees, vec3,
+    Viewport, Window, degrees, vec3,
 };
 
 /// Number of idle frames before the selection overlay is rebuilt.
 const IDLE_FRAMES: u32 = 6;
 
 fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    platform::init_logging();
 
-    let window = Window::new(WindowSettings {
-        title: "ecitygml viewer".into(),
-        min_size: (900, 600),
-        initial_size: Some((1600, 900)),
-        ..Default::default()
-    })?;
+    let window = Window::new(platform::window_settings())?;
 
     let context = window.gl();
 
@@ -47,6 +43,9 @@ fn main() -> Result<()> {
     let mut idle_frames: u32 = IDLE_FRAMES;
 
     window.render_loop(move |mut frame_input| {
+        // Web: run the load started last frame (the desktop loads on a thread instead)
+        platform::run_deferred_tasks();
+
         // Poll background load
         if state.poll_load()
             && let Some(graphics) = state.graphics.clone()
@@ -80,7 +79,7 @@ fn main() -> Result<()> {
             select_all: None,
         };
         let mut toolbar_action = ui::toolbar::ToolbarAction {
-            open_file: None,
+            open_file: false,
             recenter: false,
             screenshot: false,
             toggle_sidebar: false,
@@ -188,8 +187,12 @@ fn main() -> Result<()> {
             }
         }
 
-        if let Some(path) = toolbar_action.open_file {
-            state.start_load(path);
+        if toolbar_action.open_file {
+            platform::request_open_file();
+        }
+
+        if let Some(file) = platform::take_opened_file() {
+            state.start_load(file);
             scene = None;
         }
 

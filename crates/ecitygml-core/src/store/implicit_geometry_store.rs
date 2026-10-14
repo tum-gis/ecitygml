@@ -7,7 +7,6 @@ use egml::model::base::{AsAbstractGml, HasAssociationAttributes, Id};
 use egml::model::common::ApplyTransform;
 use egml::model::geometry::{AbstractGeometryKind, DirectPosition, Envelope};
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
-use rayon::iter::IntoParallelRefMutIterator;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,6 +57,9 @@ pub struct ImplicitGeometryStore {
     placements: HashMap<(Id, LevelOfDetail), ImplicitGeometryPlacement>,
 }
 
+/// An occurrence of a prototype: the feature placing it, the LOD and the placement.
+type Placement<'a> = (&'a Id, LevelOfDetail, &'a ImplicitGeometryPlacement);
+
 impl ImplicitGeometryStore {
     pub fn new() -> Self {
         Self::default()
@@ -105,13 +107,8 @@ impl ImplicitGeometryStore {
     /// + LOD) — the grouping GPU instancing needs: one shared mesh, many placements.
     pub fn prototypes_with_placements(
         &self,
-    ) -> Vec<(
-        &Id,
-        &AbstractGeometryKind,
-        Vec<(&Id, LevelOfDetail, &ImplicitGeometryPlacement)>,
-    )> {
-        let mut by_prototype: HashMap<&Id, Vec<(&Id, LevelOfDetail, &ImplicitGeometryPlacement)>> =
-            HashMap::new();
+    ) -> Vec<(&Id, &AbstractGeometryKind, Vec<Placement<'_>>)> {
+        let mut by_prototype: HashMap<&Id, Vec<Placement<'_>>> = HashMap::new();
         for ((feature_id, lod), placement) in &self.placements {
             by_prototype
                 .entry(&placement.geometry_id)

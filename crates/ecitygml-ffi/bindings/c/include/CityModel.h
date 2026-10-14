@@ -8,11 +8,14 @@
 #include "diplomat_runtime.h"
 
 #include "AbstractCityObjectKindRefIterator.d.h"
+#include "AbstractCityObjectPropertyIterator.d.h"
 #include "AbstractFeatureKindRefIterator.d.h"
 #include "BoundingShape.d.h"
 #include "CodeIterator.d.h"
 #include "DateTime.d.h"
 #include "Id.d.h"
+#include "Scale3.d.h"
+#include "Vector3.d.h"
 
 #include "CityModel.d.h"
 
@@ -37,9 +40,15 @@ const DateTime* ecitygml_CityModel_valid_from(const CityModel* self);
 
 const DateTime* ecitygml_CityModel_valid_to(const CityModel* self);
 
+void ecitygml_CityModel_apply_translation(CityModel* self, Vector3 vector);
+
+void ecitygml_CityModel_apply_scale(CityModel* self, Scale3 scale);
+
 AbstractFeatureKindRefIterator* ecitygml_CityModel_iter_features(const CityModel* self);
 
 AbstractCityObjectKindRefIterator* ecitygml_CityModel_iter_city_objects(const CityModel* self);
+
+AbstractCityObjectPropertyIterator* ecitygml_CityModel_city_object_members(const CityModel* self);
 
 void ecitygml_CityModel_recompute_child_bounding_shapes(CityModel* self);
 

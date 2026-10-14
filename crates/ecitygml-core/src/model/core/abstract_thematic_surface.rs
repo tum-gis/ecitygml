@@ -288,6 +288,8 @@ impl ComputeEnvelope for AbstractThematicSurface {
 
 impl ApplyTransform for AbstractThematicSurface {
     fn apply_transform(&mut self, m: Transform3<f64>) {
+        self.abstract_space_boundary.apply_transform(m);
+
         if let Some(multi_curve) = self
             .abstract_thematic_surface_mut()
             .lod0_multi_curve
@@ -331,6 +333,8 @@ impl ApplyTransform for AbstractThematicSurface {
     }
 
     fn apply_isometry(&mut self, isometry: Isometry3<f64>) {
+        self.abstract_space_boundary.apply_isometry(isometry);
+
         if let Some(multi_curve) = self
             .abstract_thematic_surface_mut()
             .lod0_multi_curve
@@ -374,6 +378,8 @@ impl ApplyTransform for AbstractThematicSurface {
     }
 
     fn apply_translation(&mut self, vector: Vector3<f64>) {
+        self.abstract_space_boundary.apply_translation(vector);
+
         if let Some(multi_curve) = self
             .abstract_thematic_surface_mut()
             .lod0_multi_curve
@@ -417,6 +423,8 @@ impl ApplyTransform for AbstractThematicSurface {
     }
 
     fn apply_rotation(&mut self, rotation: Rotation3<f64>) {
+        self.abstract_space_boundary.apply_rotation(rotation);
+
         if let Some(multi_curve) = self
             .abstract_thematic_surface_mut()
             .lod0_multi_curve
@@ -460,6 +468,8 @@ impl ApplyTransform for AbstractThematicSurface {
     }
 
     fn apply_scale(&mut self, scale: Scale3<f64>) {
+        self.abstract_space_boundary.apply_scale(scale);
+
         if let Some(multi_curve) = self
             .abstract_thematic_surface_mut()
             .lod0_multi_curve

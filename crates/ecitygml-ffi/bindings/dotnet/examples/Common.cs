@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 /// <summary>Helpers shared by the examples.</summary>
 internal static class Common

@@ -20,6 +20,8 @@ const DirectPosition* ecitygml_Envelope_lower_corner(const Envelope* self);
 
 const DirectPosition* ecitygml_Envelope_upper_corner(const Envelope* self);
 
+DirectPosition* ecitygml_Envelope_center(const Envelope* self);
+
 double ecitygml_Envelope_size_x(const Envelope* self);
 
 double ecitygml_Envelope_size_y(const Envelope* self);

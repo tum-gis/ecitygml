@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Envis.Ecitygml.Diplomat;
+namespace Ecitygml.Diplomat;
 
 // Blittable one-byte stand-in for `bool`. .NET Framework P/Invoke can't return a
 // struct by value if any field is non-blittable, and `bool` is non-blittable, so

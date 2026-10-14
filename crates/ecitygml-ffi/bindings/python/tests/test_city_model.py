@@ -290,7 +290,7 @@ def test_building() -> None:
     assert building.date_of_demolition() is None
     heights = list(building.heights())
     assert len(heights) == 1
-    assert heights[0].high_reference().value() == "highestRoofEdge"
+    assert heights[0].high_reference().value() == "topOfConstruction"
     assert heights[0].status() == HeightStatusValue.Measured
     assert (heights[0].length().value(), heights[0].length().uom()) == (6.52, "m")
 

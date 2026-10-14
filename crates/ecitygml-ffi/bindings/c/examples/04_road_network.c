@@ -8,7 +8,7 @@
 // converted with `try_from`. Geometry calculations (`length_3d`, `area_3d`, `volume_3d`) can fail,
 // e.g. for degenerate geometry, and return a `..._result` struct.
 //
-// Built by bindings/c/CMakeLists.txt (`mise run build-bindings-c`), which also runs it as a test.
+// Built by bindings/c/CMakeLists.txt (`mise run build:bindings:c`), which also runs it as a test.
 //
 // Usage: 04_road_network path/to/model.gml
 //

@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using ObjCRuntime;
 #endif
 
-namespace Envis.Ecitygml.Diplomat;
+namespace Ecitygml.Diplomat;
 
 [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 internal delegate void WriteableFlush(IntPtr self);

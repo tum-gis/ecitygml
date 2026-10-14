@@ -21,9 +21,9 @@
 //
 //     Total volume of traffic spaces (LoD2): 1260.000 m^3
 
-using static Envis.Ecitygml.Examples.Common;
+using static Ecitygml.Examples.Common;
 
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 public static class RoadNetwork
 {

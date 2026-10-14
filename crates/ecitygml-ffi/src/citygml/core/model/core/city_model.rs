@@ -10,10 +10,12 @@
 #[diplomat::include("src/gml/core/model/feature/abstract_feature.rs")]
 #[diplomat::include("src/gml/core/model/base/abstract_gml.rs")]
 #[diplomat::include("src/gml/core/model/abstract_object.rs")]
+#[diplomat::include("src/gml/core/model/common/apply_transform.rs")]
 pub mod ffi {
+    use crate::citygml::core::model::core::abstract_city_object_property::ffi::AbstractCityObjectPropertyIterator;
     use crate::citygml::core::model::core::refs::abstract_city_object_kind_ref::ffi::AbstractCityObjectKindRefIterator;
 
-    /// A city model; mutable for `recompute_child_bounding_shapes`.
+    /// A city model; mutable for `recompute_child_bounding_shapes`, `apply_translation` and `apply_scale`.
     #[diplomat::opaque_mut]
     pub struct CityModel(pub(crate) ecitygml::model::core::CityModel);
 
@@ -23,6 +25,8 @@ pub mod ffi {
         impl_gml_abstract_feature_methods! {}
         impl_abstract_feature_methods! {}
         impl_abstract_feature_with_lifespan_methods! {}
+
+        impl_apply_transform_methods! {}
 
         /// Lazily iterates over all features at any depth (Rust: `IterFeatures::iter_features`).
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
@@ -41,6 +45,14 @@ pub mod ffi {
             Box::new(AbstractCityObjectKindRefIterator(Box::new(
                 self.0.iter_city_objects(),
             )))
+        }
+
+        /// The direct `cityObjectMember`s (Rust: `city_object_members`).
+        #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
+        pub fn city_object_members<'a>(&'a self) -> Box<AbstractCityObjectPropertyIterator<'a>> {
+            Box::new(AbstractCityObjectPropertyIterator(
+                self.0.city_object_members().iter(),
+            ))
         }
 
         /// Recomputes the bounding shape of every feature below the city model from its geometry.

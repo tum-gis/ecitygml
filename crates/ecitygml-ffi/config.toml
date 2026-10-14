@@ -6,14 +6,14 @@
 lib-name = "ecitygml"
 
 [kotlin]
-# Package: `<domain>.<lib-name>` = space.envis.ecitygml
+# Package: `<domain>.<lib-name>` = io.github.tum_gis.ecitygml
 lib-name = "ecitygml"
-domain = "space.envis"
+domain = "io.github.tum_gis"
 # The JVM loads libecitygml_ffi (JNA, `jna.library.path`).
 dylib-name = "ecitygml_ffi"
 
 [dotnet]
-# C#: namespace `Envis.Ecitygml` (Diplomat's .NET backend puts every type into one namespace).
-namespace = "Envis.Ecitygml"
+# C#: namespace `Ecitygml` (Diplomat's .NET backend puts every type into one namespace).
+namespace = "Ecitygml"
 # The native library loaded at runtime (libecitygml_ffi).
 dylib_name = "ecitygml_ffi"

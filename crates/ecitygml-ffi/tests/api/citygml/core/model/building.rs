@@ -36,7 +36,7 @@ fn own_and_inherited_getters() {
     let mut heights = building.heights();
     let height = heights.next().unwrap();
     assert!(heights.next().is_none());
-    assert_eq!(height.high_reference().value(), "highestRoofEdge");
+    assert_eq!(height.high_reference().value(), "topOfConstruction");
     assert_eq!(height.low_reference().value(), "lowestGroundPoint");
     assert_eq!(height.status(), HeightStatusValue::Measured);
     assert_eq!(height.length().value(), 6.52);

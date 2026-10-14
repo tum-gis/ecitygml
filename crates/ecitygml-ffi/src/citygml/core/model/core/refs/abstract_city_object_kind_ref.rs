@@ -16,6 +16,16 @@ pub mod ffi {
     );
 
     impl<'a> AbstractCityObjectKindRef<'a> {
+        /// A reference to a city object (Rust: `From<&AbstractCityObjectKind>`), to convert it with
+        /// `AbstractFeatureKindRef::from_city_object` and then e.g. `Building::try_from`.
+        pub fn from_city_object(
+            city_object: &'a crate::citygml::core::model::core::abstract_city_object_kind::ffi::AbstractCityObjectKind,
+        ) -> Box<AbstractCityObjectKindRef<'a>> {
+            Box::new(AbstractCityObjectKindRef(
+                ecitygml::model::core::refs::AbstractCityObjectKindRef::from(&city_object.0),
+            ))
+        }
+
         pub fn feature_type(&self) -> FeatureType {
             ecitygml::model::common::HasFeatureType::feature_type(&self.0).into()
         }

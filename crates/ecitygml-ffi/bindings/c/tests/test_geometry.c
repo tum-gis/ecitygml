@@ -5,6 +5,8 @@
 #include "BoundingShape.h"
 #include "DirectPosition.h"
 #include "Envelope.h"
+#include "Scale3.h"
+#include "Vector3.h"
 #include "ErrorKind.h"
 
 void setUp(void) {}
@@ -26,6 +28,25 @@ static void test_city_model_envelope(void) {
     ecitygml_CityModel_destroy(city_model);
 }
 
+static void test_apply_translation_and_scale(void) {
+    CityModel *city_model = read(FIXTURE("FZK-Haus-LoD1-KIT-IAI-KHH-B36-V1__v3.gml"));
+    const DirectPosition *lower = ecitygml_Envelope_lower_corner(ecitygml_BoundingShape_envelope(ecitygml_CityModel_bounded_by(city_model)));
+    double x = ecitygml_DirectPosition_x(lower), y = ecitygml_DirectPosition_y(lower), z = ecitygml_DirectPosition_z(lower);
+
+    ecitygml_CityModel_apply_translation(city_model, (Vector3){-100.0, 200.0, 10.0});
+    lower = ecitygml_Envelope_lower_corner(ecitygml_BoundingShape_envelope(ecitygml_CityModel_bounded_by(city_model)));
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, x - 100.0, ecitygml_DirectPosition_x(lower));
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, y + 200.0, ecitygml_DirectPosition_y(lower));
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, z + 10.0, ecitygml_DirectPosition_z(lower));
+
+    ecitygml_CityModel_apply_scale(city_model, (Scale3){2.0, 3.0, 0.5});
+    const Envelope *envelope = ecitygml_BoundingShape_envelope(ecitygml_CityModel_bounded_by(city_model));
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 24.0, ecitygml_Envelope_size_x(envelope));
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 30.0, ecitygml_Envelope_size_y(envelope));
+    TEST_ASSERT_DOUBLE_WITHIN(1e-6, 6.517669 / 2.0, ecitygml_Envelope_size_z(envelope));
+    ecitygml_CityModel_destroy(city_model);
+}
+
 static void test_direct_position_new(void) {
     ecitygml_DirectPosition_new_result position = ecitygml_DirectPosition_new(1.0, 2.0, 3.0);
     TEST_ASSERT_TRUE(position.is_ok);
@@ -42,6 +63,7 @@ static void test_direct_position_new(void) {
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_city_model_envelope);
+    RUN_TEST(test_apply_translation_and_scale);
     RUN_TEST(test_direct_position_new);
     return UNITY_END();
 }

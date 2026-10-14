@@ -6,6 +6,10 @@ use crate::model::core::{
     AbstractFeature, AbstractPointCloudKind, AsAbstractFeature, AsAbstractFeatureMut,
 };
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "boxing the large variants would change the public API; the size difference is platform-dependent, so `allow` instead of `expect`"
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AbstractFeatureKind {
     AbstractFeatureWithLifespanKind(AbstractFeatureWithLifespanKind),

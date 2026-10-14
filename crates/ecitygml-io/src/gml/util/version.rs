@@ -7,7 +7,7 @@ use std::fmt;
 /// The CityGML version of a document, as declared by its root element's namespace.
 ///
 /// Only [`CitygmlVersion::V3_0`] is supported for actual deserialization today — see
-/// [`detect_citygml_version`] for how this is determined.
+/// `detect_citygml_version` for how this is determined.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CitygmlVersion {
     V1_0,

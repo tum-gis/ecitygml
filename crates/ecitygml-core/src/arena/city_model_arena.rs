@@ -89,9 +89,6 @@ impl CityModelArena {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::building::AsAbstractBuilding;
-    use crate::model::construction::AsAbstractConstruction;
-    use crate::model::core::AsAbstractFeatureWithLifespan;
 
     #[test]
     fn test_arena_construction() {

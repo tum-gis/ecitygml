@@ -11,12 +11,8 @@ use tracing::{info, warn};
 pub fn run(
     input: impl AsRef<Path>,
     output: impl AsRef<Path>,
-    tx: f64,
-    ty: f64,
-    tz: f64,
-    rx_deg: f64,
-    ry_deg: f64,
-    rz_deg: f64,
+    [tx, ty, tz]: [f64; 3],
+    [rx_deg, ry_deg, rz_deg]: [f64; 3],
     formatting_arg: FormattingArg,
     indent_size: usize,
 ) -> Result<(), Error> {

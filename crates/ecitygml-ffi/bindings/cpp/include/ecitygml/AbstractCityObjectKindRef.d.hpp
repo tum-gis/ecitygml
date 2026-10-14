@@ -12,6 +12,10 @@
 #include "../diplomat_runtime.hpp"
 
 namespace ecitygml {
+namespace capi { struct AbstractCityObjectKind; }
+class AbstractCityObjectKind;
+namespace capi { struct AbstractCityObjectKindRef; }
+class AbstractCityObjectKindRef;
 class FeatureType;
 } // namespace ecitygml
 
@@ -31,6 +35,12 @@ namespace ecitygml {
  */
 class AbstractCityObjectKindRef {
 public:
+
+  /**
+   * A reference to a city object (Rust: `From<&AbstractCityObjectKind>`), to convert it with
+   * `AbstractFeatureKindRef::from_city_object` and then e.g. `Building::try_from`.
+   */
+  inline static std::unique_ptr<ecitygml::AbstractCityObjectKindRef> from_city_object(const ecitygml::AbstractCityObjectKind& city_object DIPLOMAT_LIFETIME_BOUND);
 
   inline ecitygml::FeatureType feature_type() const;
 

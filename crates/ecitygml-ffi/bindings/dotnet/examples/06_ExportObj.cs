@@ -12,9 +12,9 @@
 //     Wrote 48 vertices, 16 triangles, 7 groups
 
 using System.Globalization;
-using static Envis.Ecitygml.Examples.Common;
+using static Ecitygml.Examples.Common;
 
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 public static class ExportObj
 {

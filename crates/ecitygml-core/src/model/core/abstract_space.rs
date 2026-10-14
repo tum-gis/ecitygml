@@ -426,6 +426,8 @@ impl ComputeEnvelope for AbstractSpace {
 
 impl ApplyTransform for AbstractSpace {
     fn apply_transform(&mut self, m: Transform3<f64>) {
+        self.abstract_city_object.apply_transform(m);
+
         if let Some(solid) = self.lod1_solid.as_mut().and_then(|p| p.object_mut()) {
             solid.apply_transform(m);
         }
@@ -480,6 +482,8 @@ impl ApplyTransform for AbstractSpace {
     }
 
     fn apply_isometry(&mut self, isometry: Isometry3<f64>) {
+        self.abstract_city_object.apply_isometry(isometry);
+
         if let Some(solid) = self.lod1_solid.as_mut().and_then(|p| p.object_mut()) {
             solid.apply_isometry(isometry);
         }
@@ -534,6 +538,8 @@ impl ApplyTransform for AbstractSpace {
     }
 
     fn apply_translation(&mut self, vector: Vector3<f64>) {
+        self.abstract_city_object.apply_translation(vector);
+
         if let Some(solid) = self.lod1_solid.as_mut().and_then(|p| p.object_mut()) {
             solid.apply_translation(vector);
         }
@@ -588,6 +594,8 @@ impl ApplyTransform for AbstractSpace {
     }
 
     fn apply_rotation(&mut self, rotation: Rotation3<f64>) {
+        self.abstract_city_object.apply_rotation(rotation);
+
         if let Some(solid) = self.lod1_solid.as_mut().and_then(|p| p.object_mut()) {
             solid.apply_rotation(rotation);
         }
@@ -642,6 +650,8 @@ impl ApplyTransform for AbstractSpace {
     }
 
     fn apply_scale(&mut self, scale: Scale3<f64>) {
+        self.abstract_city_object.apply_scale(scale);
+
         if let Some(solid) = self.lod1_solid.as_mut().and_then(|p| p.object_mut()) {
             solid.apply_scale(scale);
         }

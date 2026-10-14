@@ -1,4 +1,4 @@
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 /// <summary>
 /// Runs an example by name: <c>dotnet run --project examples -- 01_read_city_model model.gml</c>. Each example is a

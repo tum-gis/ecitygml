@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
-using Envis.Ecitygml;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml.Raw;
+namespace Ecitygml.Raw;
 
 [StructLayout(LayoutKind.Sequential)]
 internal partial struct Envelope
@@ -14,6 +14,9 @@ internal partial struct Envelope
 
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_Envelope_upper_corner", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern DirectPosition* UpperCorner(Envelope* handle);
+
+    [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_Envelope_center", CallingConvention = CallingConvention.Cdecl)]
+    internal static unsafe extern DirectPosition* Center(Envelope* handle);
 
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_Envelope_size_x", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern double SizeX(Envelope* handle);

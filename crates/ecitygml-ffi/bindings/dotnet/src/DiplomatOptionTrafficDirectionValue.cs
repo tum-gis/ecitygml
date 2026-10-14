@@ -1,10 +1,10 @@
 using System;
 using System.Runtime.InteropServices;
 
-namespace Envis.Ecitygml.Raw;
+namespace Ecitygml.Raw;
 
-using Envis.Ecitygml;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml;
+using Ecitygml.Diplomat;
 
 [StructLayout(LayoutKind.Sequential)]
 internal partial struct DiplomatOptionTrafficDirectionValue

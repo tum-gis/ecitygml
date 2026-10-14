@@ -18,9 +18,9 @@
 //       LoD2 solid: 7 surfaces, 7 of them xlink:href references
 //         Volume: not computable (surface member references '#PolyID7350_878_759628_120742' via ...)
 
-using static Envis.Ecitygml.Examples.Common;
+using static Ecitygml.Examples.Common;
 
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 public static class MeasureGeometry
 {

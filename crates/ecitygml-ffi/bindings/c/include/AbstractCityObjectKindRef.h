@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include "diplomat_runtime.h"
 
+#include "AbstractCityObjectKind.d.h"
 #include "FeatureType.d.h"
 
 #include "AbstractCityObjectKindRef.d.h"
@@ -15,6 +16,8 @@
 
 
 
+
+AbstractCityObjectKindRef* ecitygml_AbstractCityObjectKindRef_from_city_object(const AbstractCityObjectKind* city_object);
 
 FeatureType ecitygml_AbstractCityObjectKindRef_feature_type(const AbstractCityObjectKindRef* self);
 

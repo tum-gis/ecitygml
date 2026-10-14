@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 
-namespace Envis.Ecitygml.Diplomat;
+namespace Ecitygml.Diplomat;
 
 #nullable enable
 

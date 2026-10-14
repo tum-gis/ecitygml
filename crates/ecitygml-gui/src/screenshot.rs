@@ -1,9 +1,11 @@
 use crate::app::ScreenshotStatus;
+use crate::platform;
 use crate::scene::Scene;
 use chrono::Local;
 use ecitygml_core::model::common::FeatureType;
-use image::RgbaImage;
+use image::{ImageFormat, RgbaImage};
 use std::collections::HashSet;
+use std::io::Cursor;
 use three_d::{
     Camera, ClearState, Context, DepthTexture2D, Interpolation, RenderTarget, Texture2D, Wrapping,
 };
@@ -63,13 +65,15 @@ fn save(pixels: Vec<[u8; 4]>, width: u32, height: u32) -> Option<ScreenshotStatu
         "citygml-screenshot-{}.png",
         Local::now().format("%Y-%m-%d_%H%M%S")
     );
-    let path = rfd::FileDialog::new()
-        .add_filter("PNG image", &["png"])
-        .set_file_name(&default_name)
-        .save_file()?;
+    let mut png = Vec::new();
+    if let Err(e) = image.write_to(&mut Cursor::new(&mut png), ImageFormat::Png) {
+        return Some(ScreenshotStatus::Error(e.to_string()));
+    }
 
-    Some(match image.save(&path) {
-        Ok(()) => ScreenshotStatus::Saved(path),
-        Err(e) => ScreenshotStatus::Error(e.to_string()),
-    })
+    Some(
+        match platform::save_file(&png, &default_name, ("PNG image", &["png"]))? {
+            Ok(location) => ScreenshotStatus::Saved(location),
+            Err(e) => ScreenshotStatus::Error(e),
+        },
+    )
 }

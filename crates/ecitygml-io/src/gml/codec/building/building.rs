@@ -221,7 +221,7 @@ mod tests {
       </genericAttribute>
       <con:height>
         <con:Height>
-          <con:highReference>highestRoofEdge</con:highReference>
+          <con:highReference>topOfConstruction</con:highReference>
           <con:lowReference>lowestGroundPoint</con:lowReference>
           <con:status>measured</con:status>
           <con:value uom=\"urn:adv:uom:m\">19.408</con:value>
@@ -271,9 +271,9 @@ mod tests {
                 char: b' ',
                 size: 2,
             });
-        let _gml = serialize_building(&building, &mut xml_fragment_writer).expect("should work");
+        serialize_building(&building, &mut xml_fragment_writer).expect("should work");
 
         // println!("{}", String::from_utf8_lossy(&gml));
-        println!("");
+        println!();
     }
 }

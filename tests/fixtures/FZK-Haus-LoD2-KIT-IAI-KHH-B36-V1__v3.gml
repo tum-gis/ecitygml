@@ -207,7 +207,7 @@
       <con:dateOfConstruction>2020-01-01</con:dateOfConstruction>
       <con:height>
         <con:Height>
-          <con:highReference>highestRoofEdge</con:highReference>
+          <con:highReference>topOfConstruction</con:highReference>
           <con:lowReference>lowestGroundPoint</con:lowReference>
           <con:status>measured</con:status>
           <con:value uom="m">6.52</con:value>

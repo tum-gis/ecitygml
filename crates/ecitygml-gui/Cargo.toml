@@ -5,15 +5,15 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Desktop GUI for viewing CityGML datasets."
+description = "Desktop and web GUI for viewing CityGML datasets."
 
 [[bin]]
 name = "ecitygml-gui"
 path = "src/main.rs"
 
 [dependencies]
-ecitygml = { version = "0.0.2-alpha.6", path = "../ecitygml" }
-ecitygml-core = { version = "0.0.2-alpha.6", path = "../ecitygml-core" }
+ecitygml = { version = "0.0.2-alpha.7", path = "../ecitygml" }
+ecitygml-core = { version = "0.0.2-alpha.7", path = "../ecitygml-core" }
 egml = { workspace = true }
 
 thiserror = { workspace = true }
@@ -26,3 +26,11 @@ tracing-subscriber = { workspace = true }
 nalgebra = { workspace = true }
 chrono = { workspace = true }
 image = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true, features = ["Blob", "Document", "HtmlAnchorElement", "Url", "Window"] }
+console_error_panic_hook = { workspace = true }
+tracing-web = { workspace = true }

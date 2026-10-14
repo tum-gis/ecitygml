@@ -23,6 +23,8 @@ namespace capi {
 
     const ecitygml::capi::DirectPosition* ecitygml_Envelope_upper_corner(const ecitygml::capi::Envelope* self);
 
+    ecitygml::capi::DirectPosition* ecitygml_Envelope_center(const ecitygml::capi::Envelope* self);
+
     double ecitygml_Envelope_size_x(const ecitygml::capi::Envelope* self);
 
     double ecitygml_Envelope_size_y(const ecitygml::capi::Envelope* self);
@@ -47,6 +49,11 @@ inline const ecitygml::DirectPosition& ecitygml::Envelope::lower_corner() const 
 inline const ecitygml::DirectPosition& ecitygml::Envelope::upper_corner() const DIPLOMAT_LIFETIME_BOUND {
     auto result = ecitygml::capi::ecitygml_Envelope_upper_corner(this->AsFFI());
     return *ecitygml::DirectPosition::FromFFI(result);
+}
+
+inline std::unique_ptr<ecitygml::DirectPosition> ecitygml::Envelope::center() const {
+    auto result = ecitygml::capi::ecitygml_Envelope_center(this->AsFFI());
+    return std::unique_ptr<ecitygml::DirectPosition>(ecitygml::DirectPosition::FromFFI(result));
 }
 
 inline double ecitygml::Envelope::size_x() const {

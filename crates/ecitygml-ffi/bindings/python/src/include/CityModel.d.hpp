@@ -13,6 +13,8 @@
 namespace ecitygml {
 namespace capi { struct AbstractCityObjectKindRefIterator; }
 class AbstractCityObjectKindRefIterator;
+namespace capi { struct AbstractCityObjectPropertyIterator; }
+class AbstractCityObjectPropertyIterator;
 namespace capi { struct AbstractFeatureKindRefIterator; }
 class AbstractFeatureKindRefIterator;
 namespace capi { struct BoundingShape; }
@@ -23,6 +25,8 @@ namespace capi { struct DateTime; }
 class DateTime;
 namespace capi { struct Id; }
 class Id;
+struct Scale3;
+struct Vector3;
 } // namespace ecitygml
 
 
@@ -35,7 +39,7 @@ namespace capi {
 
 namespace ecitygml {
 /**
- * A city model; mutable for `recompute_child_bounding_shapes`.
+ * A city model; mutable for `recompute_child_bounding_shapes`, `apply_translation` and `apply_scale`.
  */
 class CityModel {
 public:
@@ -69,6 +73,18 @@ public:
   inline const ecitygml::DateTime* valid_to() const DIPLOMAT_LIFETIME_BOUND;
 
   /**
+   * Translates the geometry and every stored envelope by `vector` (Rust:
+   * `ApplyTransform::apply_translation`).
+   */
+  inline void apply_translation(ecitygml::Vector3 vector);
+
+  /**
+   * Scales the geometry and every stored envelope by `scale`, per axis and about the origin (Rust:
+   * `ApplyTransform::apply_scale`).
+   */
+  inline void apply_scale(ecitygml::Scale3 scale);
+
+  /**
    * Lazily iterates over all features at any depth (Rust: `IterFeatures::iter_features`).
    */
   inline std::unique_ptr<ecitygml::AbstractFeatureKindRefIterator> iter_features() const DIPLOMAT_LIFETIME_BOUND;
@@ -78,6 +94,11 @@ public:
    * `iter_city_objects`).
    */
   inline std::unique_ptr<ecitygml::AbstractCityObjectKindRefIterator> iter_city_objects() const DIPLOMAT_LIFETIME_BOUND;
+
+  /**
+   * The direct `cityObjectMember`s (Rust: `city_object_members`).
+   */
+  inline std::unique_ptr<ecitygml::AbstractCityObjectPropertyIterator> city_object_members() const DIPLOMAT_LIFETIME_BOUND;
 
   /**
    * Recomputes the bounding shape of every feature below the city model from its geometry.

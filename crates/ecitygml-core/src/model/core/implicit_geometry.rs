@@ -121,6 +121,7 @@ impl ImplicitGeometry {
         &self.appearances
     }
 
+    #[expect(dead_code, reason = "not used yet")]
     fn appearances_mut(&mut self) -> &mut Vec<AbstractAppearanceProperty> {
         &mut self.appearances
     }
@@ -129,10 +130,12 @@ impl ImplicitGeometry {
         self.appearances = appearances;
     }
 
+    #[expect(dead_code, reason = "not used yet")]
     fn push_appearance(&mut self, appearance: AbstractAppearanceProperty) {
         self.appearances.push(appearance);
     }
 
+    #[expect(dead_code, reason = "not used yet")]
     fn extend_appearances(
         &mut self,
         appearances: impl IntoIterator<Item = AbstractAppearanceProperty>,

@@ -2,9 +2,9 @@
 
 using System;
 using System.Runtime.InteropServices;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml;
+namespace Ecitygml;
 
 #nullable enable
 

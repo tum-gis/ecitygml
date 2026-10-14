@@ -1,8 +1,8 @@
 using System.Reflection;
 using System.Text;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml.Tests;
+namespace Ecitygml.Tests;
 
 /// <summary>Conveniences shared by the tests.</summary>
 internal static class Helpers

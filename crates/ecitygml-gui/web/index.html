@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Page of the web build, bundled by Trunk (`mise run build:gui-web`, `mise run serve:gui-web`). -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ecitygml viewer</title>
+    <link data-trunk rel="rust" href="../Cargo.toml" data-bin="ecitygml-gui">
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<!-- The viewer renders into the page's first canvas and resizes it to the browser window. -->
+<canvas></canvas>
+</body>
+</html>

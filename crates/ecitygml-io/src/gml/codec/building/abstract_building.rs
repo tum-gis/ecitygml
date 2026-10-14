@@ -21,7 +21,6 @@ use crate::gml::codec::core::{deserialize_address_property, serialize_address_pr
 use crate::gml::util::{
     CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
 };
-use ecitygml_core::model::bridge::AsAbstractBridge;
 use ecitygml_core::model::building::{AbstractBuilding, AsAbstractBuilding, AsAbstractBuildingMut};
 use ecitygml_core::model::construction::AsAbstractConstruction;
 use egml::io::codec::basic::{deserialize_code, serialize_code};
@@ -320,7 +319,7 @@ mod tests {
                 .value(),
             "31001_3020"
         );
-        assert_eq!(abstract_building.usages().is_empty(), true);
+        assert!(abstract_building.usages().is_empty());
         assert_eq!(
             abstract_building
                 .roof_type()

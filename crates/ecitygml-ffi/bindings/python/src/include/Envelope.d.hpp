@@ -35,6 +35,11 @@ public:
   inline const ecitygml::DirectPosition& upper_corner() const DIPLOMAT_LIFETIME_BOUND;
 
   /**
+   * The center of the envelope (Rust: `Envelope::center`).
+   */
+  inline std::unique_ptr<ecitygml::DirectPosition> center() const;
+
+  /**
    * Extent along the x axis.
    */
   inline double size_x() const;

@@ -5,7 +5,7 @@
 // spaces; `ecitygml_Formatting_compact` writes no line breaks at all), and `finish` writes the city
 // model. Reading the written file back verifies the result.
 //
-// Built by bindings/c/CMakeLists.txt (`mise run build-bindings-c`), which also runs it as a test.
+// Built by bindings/c/CMakeLists.txt (`mise run build:bindings:c`), which also runs it as a test.
 //
 // Usage: 07_convert input.gml output.gml.gz
 //

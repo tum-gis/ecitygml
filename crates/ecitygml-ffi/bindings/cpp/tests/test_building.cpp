@@ -76,7 +76,7 @@ TEST_CASE("Building own and inherited getters", "[building]") {
     const auto* height = heights->next();
     REQUIRE(height != nullptr);
     REQUIRE(heights->next() == nullptr);
-    REQUIRE(height->high_reference().value() == "highestRoofEdge");
+    REQUIRE(height->high_reference().value() == "topOfConstruction");
     REQUIRE(height->status() == ecitygml::HeightStatusValue::Measured);
     REQUIRE(height->length().value() == 6.52);
     REQUIRE(height->length().uom() == "m");

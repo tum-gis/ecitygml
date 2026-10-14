@@ -5,6 +5,7 @@ use crate::arena::convert::core::abstract_point_cloud_kind::flatten_abstract_poi
 use crate::model::common::arena::InternalKey;
 use crate::model::core::AbstractFeatureKind;
 
+#[expect(dead_code, reason = "not used yet")]
 pub fn flatten_abstract_feature_kind(
     abstract_feature_kind: AbstractFeatureKind,
     city_model_arena: &mut CityModelArena,

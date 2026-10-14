@@ -1,6 +1,6 @@
 using System;
 
-namespace Envis.Ecitygml.Diplomat;
+namespace Ecitygml.Diplomat;
 
 #nullable enable
 

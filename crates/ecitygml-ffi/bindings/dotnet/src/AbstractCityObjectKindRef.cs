@@ -2,9 +2,9 @@
 
 using System;
 using System.Runtime.InteropServices;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml;
+namespace Ecitygml;
 
 #nullable enable
 
@@ -45,6 +45,26 @@ public partial class AbstractCityObjectKindRef
     internal unsafe AbstractCityObjectKindRef(RustHandle<Raw.AbstractCityObjectKindRef> inner)
     {
         _inner = inner;
+    }
+
+    /// <returns>
+    /// A <c>AbstractCityObjectKindRef</c> allocated on Rust side.
+    /// </returns>
+    /// <remarks>
+    /// Lifetime: the returned native-backed value may borrow from the receiver or one or more inputs.
+    /// The caller is responsible for keeping any borrowed backing storage alive and undisposed while the returned value is in use.
+    /// </remarks>
+    public static AbstractCityObjectKindRef FromCityObject(AbstractCityObjectKind cityObject)
+    {
+        unsafe
+        {
+            if (cityObject == null) throw new ArgumentNullException(nameof(cityObject));
+            Raw.AbstractCityObjectKind* cityObjectRaw = cityObject.AsFFI();
+            if (cityObjectRaw == null) throw new ObjectDisposedException(nameof(AbstractCityObjectKind));
+            Raw.AbstractCityObjectKindRef* result = Raw.AbstractCityObjectKindRef.FromCityObject(cityObjectRaw);
+            GC.KeepAlive(cityObject);
+            return new AbstractCityObjectKindRef(result, new object[] { cityObject.DiplomatRetainDependency() });
+        }
     }
 
     public FeatureType FeatureType()

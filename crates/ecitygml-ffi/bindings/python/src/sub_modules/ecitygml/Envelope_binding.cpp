@@ -13,6 +13,7 @@ void add_Envelope_binding(nb::module_ mod) {
     
     nb::class_<ecitygml::Envelope> opaque(mod, "Envelope", nb::type_slots(ecitygml_Envelope_slots), "An axis-aligned bounding box, borrowed from a city model.");
     opaque
+        .def("center", std::move(maybe_op_unwrap(&ecitygml::Envelope::center)), "The center of the envelope (Rust: `Envelope::center`).")
         .def("contains", &ecitygml::Envelope::contains, "point"_a, "Whether `point` lies inside or on the boundary of the box.")
         .def("lower_corner", &ecitygml::Envelope::lower_corner, nb::rv_policy::reference_internal)
         .def("size_x", &ecitygml::Envelope::size_x, "Extent along the x axis.")

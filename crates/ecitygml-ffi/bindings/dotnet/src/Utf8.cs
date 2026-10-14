@@ -1,4 +1,4 @@
-namespace Envis.Ecitygml.Diplomat;
+namespace Ecitygml.Diplomat;
 
 /// <summary>
 /// Explicit conversions between a C# <c>string</c> (always UTF-16 internally)

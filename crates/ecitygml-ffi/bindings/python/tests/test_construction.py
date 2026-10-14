@@ -66,7 +66,7 @@ class TestHeights:
         assert len(heights) == 1
         height = heights[0]
         assert isinstance(height, Height)
-        assert height.high_reference().value() == "highestRoofEdge"
+        assert height.high_reference().value() == "topOfConstruction"
         assert height.low_reference().value() == "lowestGroundPoint"
         assert height.status() == HeightStatusValue.Measured
         assert height.length().value() == pytest.approx(6.52)

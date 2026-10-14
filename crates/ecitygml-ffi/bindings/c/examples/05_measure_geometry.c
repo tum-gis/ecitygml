@@ -7,7 +7,7 @@
 // case: a solid whose surfaces only reference the boundary polygons by `xlink:href` (the reader
 // doesn't resolve such references, as in Rust), shown here as "not computable" with the error message.
 //
-// Built by bindings/c/CMakeLists.txt (`mise run build-bindings-c`), which also runs it as a test.
+// Built by bindings/c/CMakeLists.txt (`mise run build:bindings:c`), which also runs it as a test.
 //
 // Usage: 05_measure_geometry path/to/model.gml
 //

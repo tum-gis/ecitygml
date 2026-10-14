@@ -20,6 +20,8 @@ mod abstract_thematic_surface;
 #[macro_use]
 mod abstract_unoccupied_space;
 
+pub mod abstract_city_object_kind;
+pub mod abstract_city_object_property;
 pub mod abstract_space_boundary_kind;
 pub mod abstract_space_boundary_property;
 pub mod city_model;

@@ -10,6 +10,9 @@ fn bounded_by() {
     assert_eq!(envelope.size_x(), 12.0);
     assert_eq!(envelope.size_y(), 10.0);
     assert!((envelope.size_z() - 6.517669).abs() < 1e-9);
+    let center = envelope.center();
+    assert_eq!((center.x(), center.y()), (457848.0, 5439088.0));
+    assert!((center.z() - (envelope.lower_corner().z() + 6.517669 / 2.0)).abs() < 1e-9);
 }
 
 /// FZK LoD1 with lifespan dates on the city model itself (the fixtures only have them on buildings).
@@ -83,6 +86,9 @@ mod city_objects {
     use ecitygml_ffi::citygml::core::model::construction::wall_surface::WallSurface;
     use ecitygml_ffi::citygml::core::model::core::refs::abstract_feature_kind_ref::AbstractFeatureKindRef;
     use ecitygml_ffi::citygml::core::model::transportation::road::Road;
+    use ecitygml_ffi::gml::core::model::common::scale3::Scale3;
+    use ecitygml_ffi::gml::core::model::common::vector3::Vector3;
+    use ecitygml_ffi::gml::core::model::geometry::envelope::Envelope;
 
     #[test]
     fn iter_city_objects_at_all_depths() {
@@ -145,5 +151,64 @@ mod city_objects {
         assert_eq!(walls_bounded(&city_model), [false; 4]);
         city_model.recompute_child_bounding_shapes();
         assert_eq!(walls_bounded(&city_model), [true; 4]);
+    }
+
+    /// The lower corner of the city model's envelope and of the first wall surface's.
+    fn lower_corners(city_model: &CityModel) -> [[f64; 3]; 2] {
+        let corner = |envelope: &Envelope| {
+            let lower = envelope.lower_corner();
+            [lower.x(), lower.y(), lower.z()]
+        };
+        let mut features = city_model.iter_features();
+        let wall = std::iter::from_fn(|| features.next())
+            .find_map(|f| {
+                WallSurface::try_from(&f)
+                    .and_then(|w| w.bounded_by()?.envelope())
+                    .map(corner)
+            })
+            .unwrap();
+        [
+            corner(city_model.bounded_by().unwrap().envelope().unwrap()),
+            wall,
+        ]
+    }
+
+    #[test]
+    fn apply_translation() {
+        // The reader derives the wall surfaces' envelopes, so the translation has to move them too.
+        let path = format!("{FIXTURES}FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3.gml");
+        let mut city_model = read(path.as_bytes()).unwrap();
+        let before = lower_corners(&city_model);
+        city_model.apply_translation(Vector3 {
+            x: -100.0,
+            y: 200.0,
+            z: 10.0,
+        });
+        let after = lower_corners(&city_model);
+        for (before, after) in before.iter().zip(&after) {
+            assert_eq!(
+                [
+                    after[0] - before[0],
+                    after[1] - before[1],
+                    after[2] - before[2]
+                ],
+                [-100.0, 200.0, 10.0]
+            );
+        }
+    }
+
+    #[test]
+    fn apply_scale() {
+        let path = format!("{FIXTURES}FZK-Haus-LoD1-KIT-IAI-KHH-B36-V1__v3.gml");
+        let mut city_model = read(path.as_bytes()).unwrap();
+        city_model.apply_scale(Scale3 {
+            x: 2.0,
+            y: 3.0,
+            z: 0.5,
+        });
+        let envelope = city_model.bounded_by().unwrap().envelope().unwrap();
+        assert!((envelope.size_x() - 24.0).abs() < 1e-6);
+        assert!((envelope.size_y() - 30.0).abs() < 1e-6);
+        assert!((envelope.size_z() - 6.517669 / 2.0).abs() < 1e-6);
     }
 }

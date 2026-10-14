@@ -1,10 +1,9 @@
 #![allow(deprecated)]
 use crate::app::AppState;
-use std::path::PathBuf;
 use three_d::egui::{self, Context};
 
 pub struct ToolbarAction {
-    pub open_file: Option<PathBuf>,
+    pub open_file: bool,
     pub recenter: bool,
     pub screenshot: bool,
     pub toggle_sidebar: bool,
@@ -13,7 +12,7 @@ pub struct ToolbarAction {
 
 pub fn show(ctx: &Context, state: &AppState) -> ToolbarAction {
     let mut action = ToolbarAction {
-        open_file: None,
+        open_file: false,
         recenter: false,
         screenshot: false,
         toggle_sidebar: false,
@@ -22,12 +21,8 @@ pub fn show(ctx: &Context, state: &AppState) -> ToolbarAction {
 
     egui::Panel::top("toolbar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            if ui.button("Open File…").clicked()
-                && let Some(path) = rfd::FileDialog::new()
-                    .add_filter("CityGML", &["gml", "xml", "zst", "gz"])
-                    .pick_file()
-            {
-                action.open_file = Some(path);
+            if ui.button("Open File…").clicked() {
+                action.open_file = true;
             }
 
             ui.menu_button("View", |ui| {
@@ -59,10 +54,10 @@ pub fn show(ctx: &Context, state: &AppState) -> ToolbarAction {
             }
 
             match &state.screenshot_status {
-                Some(crate::app::ScreenshotStatus::Saved(path)) => {
+                Some(crate::app::ScreenshotStatus::Saved(location)) => {
                     ui.colored_label(
                         egui::Color32::DARK_GREEN,
-                        format!("Saved screenshot to {}", path.display()),
+                        format!("Saved screenshot to {location}"),
                     );
                 }
                 Some(crate::app::ScreenshotStatus::Error(msg)) => {

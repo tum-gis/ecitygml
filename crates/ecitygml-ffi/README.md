@@ -14,24 +14,26 @@ Each `ffi` module in `src/` is a Diplomat bridge. `diplomat-tool` (same version 
 [`config.toml`](config.toml):
 
 ```sh
-mise run generate-bindings    # all languages (c, cpp, nanobind, kotlin, js, dotnet)
-mise run check-bindings       # fails if the committed bindings are out of date (for CI)
-mise run build-bindings-c     # builds the library and bindings/c (CMake: Unity unit tests with ASan/UBSan, examples)
-mise run test-bindings-c      # CTest: unit tests and examples (total traffic-space volume: 1260 m^3)
-mise run build-bindings-cpp   # builds the library and bindings/cpp (CMake: Catch2 unit tests, examples)
-mise run test-bindings-cpp    # CTest: unit tests and examples
-mise run build-bindings-python   # release static library + nanobind extension into bindings/python/.venv (CMake, uv)
-mise run test-bindings-python    # pytest
-mise run build-bindings-kotlin   # Gradle (JDK 21 and Gradle 9.8 installed by mise)
-mise run test-bindings-kotlin    # JUnit, loads target/debug/libecitygml_ffi via JNA
-mise run build-bindings-typescript   # WebAssembly module (release, wasm32-unknown-unknown)
-mise run test-bindings-typescript    # node --test (Node >= 22.18 runs the .ts tests directly)
-mise run build-bindings-dotnet   # C# library, examples and xUnit tests (.NET 10 SDK installed by mise)
-mise run test-bindings-dotnet    # dotnet test (also runs the examples), loads target/debug/libecitygml_ffi
+mise run generate:bindings    # all languages (c, cpp, nanobind, kotlin, js, dotnet)
+mise run check:bindings       # fails if the committed bindings are out of date (for CI)
+mise run build:bindings:c     # builds the library and bindings/c (CMake: Unity unit tests with ASan/UBSan, examples)
+mise run test:bindings:c      # CTest: unit tests and examples (total traffic-space volume: 1260 m^3)
+mise run build:bindings:cpp   # builds the library and bindings/cpp (CMake: Catch2 unit tests, examples)
+mise run test:bindings:cpp    # CTest: unit tests and examples
+mise run build:bindings:python   # release static library + nanobind extension into bindings/python/.venv (CMake, uv)
+mise run test:bindings:python    # pytest
+mise run build:bindings:kotlin   # Gradle (JDK 21 and Gradle 9.8 installed by mise)
+mise run test:bindings:kotlin    # JUnit, loads target/debug/libecitygml_ffi via JNA
+mise run build:bindings:typescript   # WebAssembly module (release, wasm32-unknown-unknown)
+mise run test:bindings:typescript    # node --test (Node >= 22.18 runs the .ts tests directly)
+mise run build:bindings:dotnet   # C# library, examples and xUnit tests (.NET 10 SDK installed by mise)
+mise run test:bindings:dotnet    # dotnet test (also runs the examples), loads target/debug/libecitygml_ffi
 ```
 
-The generated bindings are committed and the build tasks use them as they are: run `generate-bindings` whenever a
-bridge in `src/` changes. CI fails via `check-bindings` if they are out of date. Only `generate-bindings` needs
+Each `test:bindings:<language>` builds its bindings first; `mise run 'test:bindings:*'` builds and tests all of them.
+
+The generated bindings are committed and the build tasks use them as they are: run `generate:bindings` whenever a
+bridge in `src/` changes. CI fails via `check:bindings` if they are out of date. Only `generate:bindings` needs
 `diplomat-tool`, which mise installs (task `tools`).
 
 ## Usage
@@ -76,7 +78,7 @@ stable ABI (CPython ≥ 3.12), needs a C++20 compiler and ships a type stub (`ec
 because the generated code uses nanobind internals. The venv uses a uv-managed Python (`--managed-python`), which ships the headers
 nanobind needs; scikit-build-core fetches CMake and Ninja from PyPI if they are missing.
 
-### Kotlin (`bindings/kotlin`, package `space.envis.ecitygml`)
+### Kotlin (`bindings/kotlin`, package `io.github.tum_gis.ecitygml`)
 
 ```kotlin
 val cityModel = GmlReader.fromPath("model.gml").getOrThrow().finish().getOrThrow()   // exceptions are `Error`s
@@ -141,11 +143,11 @@ C conventions:
 - Strings are passed as `DiplomatStringView` (pointer + length, UTF-8) and returned through a `DiplomatWrite`
   (e.g. `diplomat_buffer_write_create`).
 
-### C# / .NET (`bindings/dotnet`, namespace `Envis.Ecitygml`, .NET 10)
+### C# / .NET (`bindings/dotnet`, namespace `Ecitygml`, .NET 10)
 
 ```csharp
 using System.Text;
-using Envis.Ecitygml;
+using Ecitygml;
 
 var cityModel = GmlReader.FromPath(Encoding.UTF8.GetBytes("model.gml")).Finish();   // throws ErrorException
 Console.WriteLine(cityModel.CityObjectsLen());
@@ -189,8 +191,8 @@ exit with 0, 1 on errors (message on standard error) and 2 on wrong arguments. T
 
 | Language | Source | Run |
 |---|---|---|
-| C | `bindings/c/examples/<example>.c`, e.g. `01_read_city_model.c` | built by `mise run build-bindings-c`: `target/bindings-c/<example> model.gml` |
-| C++ | `bindings/cpp/examples/<example>.cpp` | built by `mise run build-bindings-cpp`: `target/bindings-cpp/<example> model.gml` |
+| C | `bindings/c/examples/<example>.c`, e.g. `01_read_city_model.c` | built by `mise run build:bindings:c`: `target/bindings-c/<example> model.gml` |
+| C++ | `bindings/cpp/examples/<example>.cpp` | built by `mise run build:bindings:cpp`: `target/bindings-cpp/<example> model.gml` |
 | Python | `bindings/python/examples/<example>.py` | `python examples/<example>.py model.gml` |
 | Kotlin | `bindings/kotlin/src/examples/…/<NN>_<Example>.kt`, e.g. `01_ReadCityModel.kt` | `gradle run<NN><Example> --args="model.gml"`, e.g. `run01ReadCityModel` |
 | TypeScript | `bindings/typescript/examples/<example>.ts` | `node examples/<example>.ts model.gml` (Node ≥ 22.18) |
@@ -203,16 +205,53 @@ byte slices without NumPy, so it writes with `GmlWriter.from_path` like C, C++, 
 
 ### Expected output
 
-`tests/examples/expected/<example>/<fixture>.txt` is what the example prints for `tests/fixtures/<fixture>.gml`;
-`tests/examples/expected/06_export_obj/<fixture>.obj` is the file it writes. Every language's tests discover these
-files and compare (C and C++ under CTest, via `tests/examples/examples.cmake` and `compare_output.cmake`), so the
-languages can't drift apart, and a new test case is just a new file. When changing an example,
-change it in every language and update its expected output.
+[`tests/expected/examples/<example>/<fixture>.txt`](../../tests/expected/examples) at the repository root is what the
+example prints for `tests/fixtures/<fixture>.gml`; `tests/expected/examples/06_export_obj/<fixture>.obj` is the file it
+writes. Every language's tests discover these files and compare (C and C++ under CTest, via
+`bindings/{c,cpp}/examples/CMakeLists.txt` and `cmake/compare_output.cmake`), so the languages can't drift apart, and
+a new test case is just a new file. The Rust examples in [`crates/ecitygml/examples`](../ecitygml/examples) are the
+reference and are checked against the same files. When changing an example, change it in every language and update
+its expected output.
+
+### Snippets
+
+Snippets are short programs that give a first impression of each language, e.g. for a README: not examples to
+learn from, so they have no comments. Every language has the same snippets as Rust
+([`crates/ecitygml/examples/snippets`](../ecitygml/examples/snippets)), which run like the examples, against
+`tests/expected/snippets/<snippet>/<fixture>.txt` at the repository root:
+
+| Snippet | Computes | Fixture |
+|---|---|---|
+| `compute_wall_surface_area` | The total LoD2 area of all wall surfaces | `FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3` |
+| `compute_traffic_space_volume` | The total LoD2 solid volume of all traffic spaces (collects them first, as in Rust) | `ASAM-UC_RoadShape` |
+| `compute_total_building_height` | The sum of the building heights from `lowestGroundPoint` to `topOfConstruction` that are measured and in `urn:adv:uom:m` | `TUM-Main-Entrance` |
+| `translate_to_local_coordinates` | Translates the city model so that the center of its envelope is the origin, and writes it (second argument) | `FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3` |
+
+| Language | Snippet files | Run by |
+|---|---|---|
+| C, C++ | `bindings/{c,cpp}/examples/snippets/<snippet>.{c,cpp}` | CTest, via `bindings/{c,cpp}/examples/snippets/CMakeLists.txt` |
+| Python | `bindings/python/examples/snippets/<snippet>.py` | `tests/test_snippets.py` |
+| Kotlin | `bindings/kotlin/src/examples/…/snippets/ComputeWallSurfaceArea.kt` etc. (`gradle runComputeWallSurfaceArea --args="model.gml"`) | `SnippetsTest.kt` |
+| TypeScript | `bindings/typescript/examples/snippets/<snippet>.ts` (imports the package as `ecitygml`) | `test/snippets.test.ts` |
+| C# | `bindings/dotnet/examples/snippets/ComputeWallSurfaceArea.cs` etc., file-based apps (`dotnet run --file …`) | `tests/SnippetsTests.cs` |
+
+Each reads `model.gml`, or the file given as its first argument. A snippet that writes a file takes its path as the
+second argument; the tests compare the written file byte for byte with `<fixture><extension>` next to the expected
+output. They run every snippet in a process of its own (Kotlin: a JVM of its own), because the ids the reader
+generates for features without `gml:id` are numbered per process. A new snippet needs an entry in `SnippetsTest.kt`
+and `SnippetsTests.cs` (their file names are PascalCase); the other languages find it by its file name.
 
 ## What is bound
 
 - Reading: `GmlReader` (`from_path`, `with_rebuild_object_bounds`, `finish`).
-- `CityModel`: `city_objects_len`, `iter_features` (yields `AbstractFeatureKindRef`, with `feature_type()`).
+- `CityModel`: `city_objects_len`, `iter_features` (yields `AbstractFeatureKindRef`, with `feature_type()`),
+  `city_object_members` (yields `AbstractCityObjectProperty`; its `object()` is an `AbstractCityObjectKind`, converted
+  with `AbstractCityObjectKindRef::from_city_object` and `AbstractFeatureKindRef::from_city_object`).
+- Transformations (egml `ApplyTransform`, macro `impl_apply_transform_methods!`): `CityModel::apply_translation`
+  (`Vector3`) and `apply_scale` (`Scale3`; the center of a model comes from `Envelope::center`), which move the geometry and every stored envelope. `Vector3` and
+  `Scale3` are structs, passed by value (C: `(Vector3){x, y, z}`, TypeScript: `{ x, y, z }`). Only on `CityModel`:
+  everything below it is reached through read-only references. Rotations, isometries and general transforms are
+  not bound yet.
 - `TrafficSpace`: reached with `TrafficSpace::try_from(&feature)` (Rust: `<&TrafficSpace>::try_from`); own getters
   `class`, `functions`, `usages`, `granularity`, `traffic_direction`, `occupancies`.
 - Abstract types, generated into every type that derives from them (one macro per abstract type; each type invokes

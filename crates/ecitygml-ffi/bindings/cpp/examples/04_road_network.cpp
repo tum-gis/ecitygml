@@ -8,7 +8,7 @@
 // with `try_from`. Geometry calculations (`length_3d`, `area_3d`, `volume_3d`) can fail, e.g. for
 // degenerate geometry, and return a `diplomat::result`.
 //
-// Built by bindings/cpp/CMakeLists.txt (`mise run build-bindings-cpp`), which also runs it as a test.
+// Built by bindings/cpp/CMakeLists.txt (`mise run build:bindings:cpp`), which also runs it as a test.
 //
 // Usage: 04_road_network path/to/model.gml
 //

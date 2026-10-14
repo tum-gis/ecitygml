@@ -1,8 +1,8 @@
 using System.Reflection;
-using Envis.Ecitygml.Examples;
+using Ecitygml.Examples;
 using Xunit;
 
-namespace Envis.Ecitygml.Tests;
+namespace Ecitygml.Tests;
 
 /// <summary>The examples redirect the console, which is global: their tests must not run in parallel with others.</summary>
 [CollectionDefinition(nameof(ConsoleCollection), DisableParallelization = true)]
@@ -10,7 +10,7 @@ public class ConsoleCollection;
 
 /// <summary>
 /// Runs the examples and compares their output with the expected output shared by all languages: for every
-/// `crates/ecitygml-ffi/tests/examples/expected/&lt;example&gt;/&lt;fixture&gt;.txt`, the example runs on
+/// `tests/expected/examples/&lt;example&gt;/&lt;fixture&gt;.txt`, the example runs on
 /// `tests/fixtures/&lt;fixture&gt;.gml` and must print that text. Examples that write a file get a temporary output
 /// path; if `&lt;fixture&gt;&lt;extension&gt;` exists next to the expected text, the file must match it.
 /// </summary>

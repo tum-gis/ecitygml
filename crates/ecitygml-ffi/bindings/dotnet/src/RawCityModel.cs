@@ -1,9 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
-using Envis.Ecitygml;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml.Raw;
+namespace Ecitygml.Raw;
 
 [StructLayout(LayoutKind.Sequential)]
 internal partial struct CityModel
@@ -33,11 +33,20 @@ internal partial struct CityModel
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_CityModel_valid_to", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern DateTime* ValidTo(CityModel* handle);
 
+    [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_CityModel_apply_translation", CallingConvention = CallingConvention.Cdecl)]
+    internal static unsafe extern void ApplyTranslation(CityModel* handle, Vector3 vector);
+
+    [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_CityModel_apply_scale", CallingConvention = CallingConvention.Cdecl)]
+    internal static unsafe extern void ApplyScale(CityModel* handle, Scale3 scale);
+
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_CityModel_iter_features", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern AbstractFeatureKindRefIterator* IterFeatures(CityModel* handle);
 
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_CityModel_iter_city_objects", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern AbstractCityObjectKindRefIterator* IterCityObjects(CityModel* handle);
+
+    [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_CityModel_city_object_members", CallingConvention = CallingConvention.Cdecl)]
+    internal static unsafe extern AbstractCityObjectPropertyIterator* CityObjectMembers(CityModel* handle);
 
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_CityModel_recompute_child_bounding_shapes", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern void RecomputeChildBoundingShapes(CityModel* handle);

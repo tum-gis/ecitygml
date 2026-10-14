@@ -1,0 +1,12 @@
+# Trunk configuration of the web build (`mise run build:gui-web`, `mise run serve:gui-web`).
+
+[build]
+# The page and other web-only files live in web/.
+target = "web/index.html"
+dist = "../../target/gui-web"
+# Relative asset paths, so the build also works when hosted under a subpath.
+public_url = "./"
+
+[serve]
+# Open the viewer in the browser once the first build is done.
+open = true

@@ -1,57 +1,66 @@
 min_version = "2026.9.0"
 
-[tasks.default]
-run = ['mise run lint', 'mise run build', 'mise run test', 'mise run doc']
+[tools]
+rust = { version = "stable", profile = "minimal", components = "rustfmt,clippy", targets = "wasm32-unknown-unknown" }
 
+# --- Entry points ---
+
+[tasks.default]
+description = "Check, build, test and document the Rust workspace"
+run = [
+	{ task = "check" },
+	{ task = "build" },
+	{ task = "test" },
+	{ task = "doc" },
+]
 
 [tasks.full]
-description = "Build and test everything: the Rust workspace, then generate, build and test all bindings"
+description = "Check, build and test everything: the Rust workspace and the web viewer, then generate, build and test all bindings"
 run = '''
+mise run check
 mise run build
 mise run test
-mise run generate-bindings
-mise run build-bindings-c
-mise run test-bindings-c
-mise run build-bindings-cpp
-mise run test-bindings-cpp
-mise run build-bindings-python
-mise run test-bindings-python
-mise run build-bindings-kotlin
-mise run test-bindings-kotlin
-mise run build-bindings-typescript
-mise run test-bindings-typescript
-mise run build-bindings-dotnet
-mise run test-bindings-dotnet
+mise run build:gui-web
+mise run generate:bindings
+mise run --jobs 1 'test:bindings:*'
 '''
 
+# --- Code quality ---
 
-[tasks.init-build-environment]
-description = "Set up the build environment"
-run = '''
-rustup component add rustfmt clippy
-'''
+[tasks.check]
+description = "Run all read-only checks (formatting, clippy for native and WebAssembly, documentation)"
+depends = ["check:fmt", "check:clippy", "check:wasm", "check:doc"]
 
-[tasks.init-build-bindings-python-environment]
-description = "Set up the environment for building the Python bindings (venv with pytest)"
-depends = "init-build-environment"
-tools = { uv = "latest" }
-dir = "crates/ecitygml-ffi/bindings/python"
-run = '''
-# uv-managed Python: ships the headers nanobind needs (Debian's system Python doesn't)
-uv venv --clear --managed-python --python 3.13 .venv
-uv pip install --python .venv pytest
-'''
+[tasks."check:fmt"]
+description = "Check the formatting"
+run = "cargo fmt --all -- --check"
 
-[tasks.lint]
-description = "Format and lint the project"
+[tasks."check:clippy"]
+description = "Lint the workspace with clippy"
+run = "cargo clippy --workspace --all-targets --all-features -- -D warnings"
+
+[tasks."check:wasm"]
+description = "Lint the workspace with clippy for WebAssembly (covers the cfg(target_arch = \"wasm32\") code)"
+run = "cargo clippy --workspace --all-targets --target wasm32-unknown-unknown -- -D warnings"
+
+[tasks."check:doc"]
+description = "Check the documentation (broken intra-doc links, invalid HTML)"
+env = { RUSTDOCFLAGS = "-D warnings" }
+run = "cargo doc --no-deps --all-features"
+
+[tasks.fix]
+description = "Apply compiler and clippy fixes and format the code (rewrites files; see check for the read-only variant)"
+alias = "lint"
 run = '''
-cargo fix --allow-dirty
-cargo clippy --fix --allow-dirty --allow-staged
+cargo fix --workspace --all-targets --all-features --allow-dirty
+cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
 cargo fmt --all
 '''
 
+# --- Build, test and documentation ---
+
 [tasks.build]
-description = "Compile the project"
+description = "Build the project"
 usage = '''
 flag "-r --release" help="Build artifacts in release mode, with optimizations"
 '''
@@ -64,7 +73,63 @@ else
 fi
 '''
 
-[tasks.generate-bindings]
+[tasks."build:gui-web"]
+description = "Build the web version of the viewer (static files in target/gui-web, e.g. for hosting)"
+tools = { "github:trunk-rs/trunk" = "0.21.14" }
+dir = "crates/ecitygml-gui"
+# The 32 MiB stack is set in .cargo/config.toml.
+run = '''
+trunk build --release
+'''
+
+[tasks.test]
+description = "Run the unit and integration tests"
+run = "cargo test --workspace --all-features"
+
+[tasks.doc]
+description = "Build the documentation"
+run = '''
+cargo doc --no-deps --all-features
+echo '<meta http-equiv="refresh" content="0; url=ecitygml/index.html">' > target/doc/index.html
+'''
+
+# --- Run and serve ---
+
+[tasks."run:cli"]
+description = "Run the CLI (arguments are passed through, e.g. mise run run:cli -- --help)"
+run = "cargo run -p ecitygml-cli --"
+
+[tasks."run:gui"]
+description = "Run the native viewer"
+run = "cargo run -p ecitygml-gui"
+
+[tasks."serve:doc"]
+description = "Serve the documentation on a local web server"
+depends = ["doc"]
+tools = { "cargo:miniserve" = "0" }
+run = '''
+miniserve ./target/doc --index index.html
+'''
+
+[tasks."serve:gui-web"]
+description = "Serve the web version of the viewer on http://127.0.0.1:8080 and open it, rebuilding on changes"
+usage = '''
+flag "-r --release" help="Build in release mode, with optimizations (slower rebuilds, faster viewer)"
+'''
+tools = { "github:trunk-rs/trunk" = "0.21.14" }
+dir = "crates/ecitygml-gui"
+# Own dist directory: target/gui-web stays the release build of build:gui-web.
+run = '''
+if [ "${usage_release}" = 'true' ]; then
+    trunk serve --release --dist ../../target/gui-web-serve;
+else
+    trunk serve --dist ../../target/gui-web-serve;
+fi
+'''
+
+# --- Bindings ---
+
+[tasks."generate:bindings"]
 description = "Generate the bindings of all languages from the Diplomat bridges in ecitygml-ffi"
 tools = { "cargo:diplomat-tool" = "0.16.1" }
 dir = "crates/ecitygml-ffi"
@@ -78,21 +143,21 @@ diplomat-tool --silent js bindings/typescript/lib
 diplomat-tool --silent dotnet bindings/dotnet/src
 '''
 
-[tasks.check-bindings]
+[tasks."check:bindings"]
 description = "Fail if the committed bindings are out of date with the Diplomat bridges"
-depends = "generate-bindings"
+depends = "generate:bindings"
 run = '''
 # Changed and new (untracked) files, without touching the Git index.
 changes="$(git status --porcelain -- crates/ecitygml-ffi/bindings)"
 if [ -n "$changes" ]; then
     echo "$changes"
-    echo "Bindings are out of date: run 'mise run generate-bindings' and commit the result."
+    echo "Bindings are out of date: run 'mise run generate:bindings' and commit the result."
     exit 1
 fi
 '''
 
-[tasks.build-bindings-c]
-description = "Compile the C examples against the C bindings (committed headers, see check-bindings)"
+[tasks."build:bindings:c"]
+description = "Build the C unit tests and examples against the C bindings (committed headers, see check:bindings)"
 # mise installs CMake on demand (e.g. in CI)
 tools = { cmake = "4" }
 run = '''
@@ -101,8 +166,16 @@ cmake -S crates/ecitygml-ffi/bindings/c -B target/bindings-c -DCMAKE_BUILD_TYPE=
 cmake --build target/bindings-c
 '''
 
-[tasks.build-bindings-cpp]
-description = "Compile the C++ unit tests and examples against the C++ bindings (committed headers, see check-bindings)"
+[tasks."test:bindings:c"]
+description = "Test the C bindings: unit tests and examples on fixtures (CTest)"
+depends = "build:bindings:c"
+tools = { cmake = "4" }
+run = '''
+ctest --test-dir target/bindings-c --output-on-failure
+'''
+
+[tasks."build:bindings:cpp"]
+description = "Build the C++ unit tests and examples against the C++ bindings (committed headers, see check:bindings)"
 # mise installs CMake on demand (e.g. in CI); the unit tests fetch Catch2 when configuring
 tools = { cmake = "4" }
 run = '''
@@ -111,8 +184,42 @@ cmake -S crates/ecitygml-ffi/bindings/cpp -B target/bindings-cpp -DCMAKE_BUILD_T
 cmake --build target/bindings-cpp
 '''
 
-[tasks.build-bindings-kotlin]
-description = "Compile the Kotlin bindings (committed sources, see check-bindings)"
+[tasks."test:bindings:cpp"]
+description = "Test the C++ bindings: unit tests (Catch2) and examples on fixtures (CTest)"
+depends = "build:bindings:cpp"
+tools = { cmake = "4" }
+run = '''
+ctest --test-dir target/bindings-cpp --output-on-failure
+'''
+
+[tasks."setup:bindings:python"]
+description = "Set up the environment for building the Python bindings (venv with pytest)"
+tools = { uv = "latest" }
+dir = "crates/ecitygml-ffi/bindings/python"
+run = '''
+# uv-managed Python: ships the headers nanobind needs (Debian's system Python doesn't)
+uv venv --clear --managed-python --python 3.13 .venv
+uv pip install --python .venv pytest
+'''
+
+[tasks."build:bindings:python"]
+description = "Build the Python bindings (nanobind, statically linked) into the venv (see setup:bindings:python)"
+tools = { uv = "latest" }
+run = '''
+cargo build -p ecitygml-ffi --release
+uv pip install --python crates/ecitygml-ffi/bindings/python/.venv --reinstall ./crates/ecitygml-ffi/bindings/python
+'''
+
+[tasks."test:bindings:python"]
+description = "Test the Python bindings (pytest)"
+depends = "build:bindings:python"
+dir = "crates/ecitygml-ffi/bindings/python"
+run = '''
+.venv/bin/python -m pytest tests
+'''
+
+[tasks."build:bindings:kotlin"]
+description = "Build the Kotlin bindings (committed sources, see check:bindings)"
 # mise installs these on demand (e.g. in CI)
 tools = { java = "openjdk-21", gradle = "9.8.0" }
 run = '''
@@ -120,106 +227,53 @@ cargo build -p ecitygml-ffi
 gradle --project-dir crates/ecitygml-ffi/bindings/kotlin build -x test
 '''
 
-[tasks.build-bindings-typescript]
-description = "Compile the WebAssembly module for the TypeScript bindings (committed sources, see check-bindings)"
-tools = { node = "22" }
-run = '''
-rustup target add wasm32-unknown-unknown
-# Pure Rust: the FFI crate builds without the `zstd` feature (C code) for WebAssembly.
-# 32 MiB stack: the deserializer runs on the main thread in WebAssembly (as big as the native workers' stacks)
-RUSTFLAGS="-C link-arg=-zstack-size=33554432" cargo build -p ecitygml-ffi --release --target wasm32-unknown-unknown
-'''
-
-[tasks.build-bindings-python]
-description = "Compile the Python bindings (nanobind, statically linked) into the venv"
-tools = { uv = "latest" }
-run = '''
-cargo build -p ecitygml-ffi --release
-uv pip install --python crates/ecitygml-ffi/bindings/python/.venv --reinstall ./crates/ecitygml-ffi/bindings/python
-'''
-
-[tasks.test]
-description = "Execute unit and integration tests"
-run = '''
-cargo fmt --all -- --check
-cargo clippy
-cargo test --verbose --all-features
-'''
-
-[tasks.test-bindings-c]
-description = "Run the C examples on fixtures (CTest)"
-tools = { cmake = "4" }
-run = '''
-ctest --test-dir target/bindings-c --output-on-failure
-'''
-
-[tasks.test-bindings-cpp]
-description = "Run the C++ unit tests (Catch2) and examples on fixtures (CTest)"
-tools = { cmake = "4" }
-run = '''
-ctest --test-dir target/bindings-cpp --output-on-failure
-'''
-
-[tasks.test-bindings-kotlin]
-description = "Execute the tests of the Kotlin bindings (loads target/debug/libecitygml_ffi via JNA)"
+[tasks."test:bindings:kotlin"]
+description = "Test the Kotlin bindings (JUnit; loads target/debug/libecitygml_ffi via JNA)"
+depends = "build:bindings:kotlin"
 tools = { java = "openjdk-21", gradle = "9.8.0" }
 run = '''
 gradle --project-dir crates/ecitygml-ffi/bindings/kotlin test
 '''
 
-[tasks.test-bindings-typescript]
-description = "Execute the tests of the TypeScript bindings (Node >= 22.18 runs the .ts tests directly)"
+[tasks."build:bindings:typescript"]
+description = "Build the WebAssembly module for the TypeScript bindings (committed sources, see check:bindings)"
+tools = { node = "22" }
+run = '''
+# Pure Rust: the FFI crate builds without the `zstd` feature (C code) for WebAssembly.
+# The 32 MiB stack is set in .cargo/config.toml.
+cargo build -p ecitygml-ffi --release --target wasm32-unknown-unknown
+'''
+
+[tasks."test:bindings:typescript"]
+description = "Test the TypeScript bindings (Node >= 22.18 runs the .ts tests directly)"
+depends = "build:bindings:typescript"
 tools = { node = "22" }
 dir = "crates/ecitygml-ffi/bindings/typescript"
 run = '''
 node --test
 '''
 
-[tasks.build-bindings-dotnet]
-description = "Compile the C# (.NET) bindings and their tests (committed sources, see check-bindings)"
+[tasks."build:bindings:dotnet"]
+description = "Build the C# (.NET) bindings and their tests (committed sources, see check:bindings)"
 tools = { dotnet = "10" }
 run = '''
 cargo build -p ecitygml-ffi
 dotnet build crates/ecitygml-ffi/bindings/dotnet/tests/Ecitygml.Tests.csproj -nologo
 '''
 
-[tasks.test-bindings-dotnet]
-description = "Execute the tests of the C# (.NET) bindings (xUnit; loads target/debug/libecitygml_ffi)"
+[tasks."test:bindings:dotnet"]
+description = "Test the C# (.NET) bindings (xUnit; loads target/debug/libecitygml_ffi)"
+depends = "build:bindings:dotnet"
 tools = { dotnet = "10" }
 run = '''
 dotnet test crates/ecitygml-ffi/bindings/dotnet/tests/Ecitygml.Tests.csproj -nologo
 '''
 
-
-[tasks.test-bindings-python]
-description = "Execute the tests of the Python bindings"
-dir = "crates/ecitygml-ffi/bindings/python"
-run = '''
-.venv/bin/python -m pytest tests
-'''
-
-[tasks.run]
-description = "Run the project"
-run = "cargo run"
+# --- Maintenance ---
 
 [tasks.clean]
 description = "Remove generated artifacts"
 run = "cargo clean"
-
-[tasks.doc]
-description = "Build the documentation"
-run = '''
-cargo doc --no-deps --all-features
-echo '<meta http-equiv="refresh" content="0; url=ecitygml/index.html">' > target/doc/index.html
-'''
-
-[tasks.serve-doc]
-description = "Start a local webserver with the documentation"
-depends = ["doc"]
-tools = { "cargo:miniserve" = "0" }
-run = '''
-miniserve ./target/doc --index index.html
-'''
 
 [tasks.release]
 description = "Create a new software release and publish it"

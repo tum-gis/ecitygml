@@ -3,10 +3,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
-    EcitygmlError(#[from] ecitygml::Error),
+    Ecitygml(#[from] ecitygml::Error),
     #[error(transparent)]
-    EcitygmlIoError(#[from] ecitygml::io::Error),
+    EcitygmlIo(#[from] ecitygml::io::Error),
 
     #[error(transparent)]
-    StdIoError(#[from] std::io::Error),
+    StdIo(#[from] std::io::Error),
 }

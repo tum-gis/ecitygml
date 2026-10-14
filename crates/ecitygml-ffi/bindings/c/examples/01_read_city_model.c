@@ -8,7 +8,7 @@
 // - Strings are `DiplomatStringView`s (pointer and length, not null-terminated); text computed on
 //   demand (e.g. error messages) is written into a `DiplomatWrite` buffer.
 //
-// Built by bindings/c/CMakeLists.txt (`mise run build-bindings-c`), which also runs it as a test.
+// Built by bindings/c/CMakeLists.txt (`mise run build:bindings:c`), which also runs it as a test.
 //
 // Usage: 01_read_city_model path/to/model.gml
 //

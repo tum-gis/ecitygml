@@ -45,16 +45,19 @@ impl From<XalElement> for CombinedCityGmlElement {
     }
 }
 
+/// An egml deserializer for one element of the index `E`.
+type Deserializer<E, T> = fn(
+    &[u8],
+    &XmlDocumentIndex<E>,
+    &egml::io::util::DeserializationConfig,
+) -> Result<T, egml::io::Error>;
+
 pub fn collect_gml_child<T>(
     xml_document: &[u8],
     index: &XmlDocumentIndex<CombinedCityGmlElement>,
     element: CombinedCityGmlElement,
     config: &egml::io::util::DeserializationConfig,
-    deserializer: fn(
-        &[u8],
-        &XmlDocumentIndex<GmlElement>,
-        &egml::io::util::DeserializationConfig,
-    ) -> Result<T, egml::io::Error>,
+    deserializer: Deserializer<GmlElement, T>,
 ) -> Result<Option<T>, Error> {
     let all_matches = index.get(element);
     match all_matches.first() {
@@ -77,11 +80,7 @@ pub fn collect_xal_child<T>(
     index: &XmlDocumentIndex<CombinedCityGmlElement>,
     element: CombinedCityGmlElement,
     config: &egml::io::util::DeserializationConfig,
-    deserializer: fn(
-        &[u8],
-        &XmlDocumentIndex<XalElement>,
-        &egml::io::util::DeserializationConfig,
-    ) -> Result<T, egml::io::Error>,
+    deserializer: Deserializer<XalElement, T>,
 ) -> Result<Option<T>, Error> {
     let all_matches = index.get(element);
     match all_matches.first() {
@@ -110,11 +109,7 @@ pub fn collect_gml_child_lenient<T>(
     index: &XmlDocumentIndex<CombinedCityGmlElement>,
     element: CombinedCityGmlElement,
     config: &egml::io::util::DeserializationConfig,
-    deserializer: fn(
-        &[u8],
-        &XmlDocumentIndex<GmlElement>,
-        &egml::io::util::DeserializationConfig,
-    ) -> Result<T, egml::io::Error>,
+    deserializer: Deserializer<GmlElement, T>,
 ) -> Option<T> {
     match collect_gml_child(xml_document, index, element, config, deserializer) {
         Ok(value) => value,

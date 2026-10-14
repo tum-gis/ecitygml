@@ -1,7 +1,6 @@
 use crate::impl_abstract_relief_component_mut_traits;
 use crate::impl_abstract_relief_component_traits;
 use crate::model::common::{FeatureType, ForEachFeatureMut, HasFeatureType, IterFeatures};
-use crate::model::core::AsAbstractFeature;
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
 use crate::model::relief::{

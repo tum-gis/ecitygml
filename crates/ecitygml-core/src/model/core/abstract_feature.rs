@@ -1,8 +1,6 @@
 use egml::model::base::{AsAbstractGml, AsAbstractGmlMut, Id};
 use egml::model::common::ApplyTransform;
-use egml::model::feature::{
-    AsAbstractFeature as GmlAsAbstractFeature, AsAbstractFeatureMut as GmlAsAbstractFeatureMut,
-};
+use egml::model::feature::AsAbstractFeatureMut as GmlAsAbstractFeatureMut;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 
 #[derive(Debug, Clone, PartialEq)]

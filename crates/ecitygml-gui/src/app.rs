@@ -1,14 +1,15 @@
+use crate::platform::{self, OpenedFile};
 use ecitygml_core::model::common::{FeatureType, HasFeatureType};
 use ecitygml_core::store::CityModelGraphicsStore;
 use egml::model::base::Id;
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 
 /// Outcome of the most recent screenshot save attempt, shown in the toolbar.
 pub enum ScreenshotStatus {
-    Saved(PathBuf),
+    /// Where the screenshot was saved (desktop) or the downloaded file's name (web).
+    Saved(String),
     Error(String),
 }
 
@@ -79,10 +80,10 @@ impl AppState {
         }
     }
 
-    pub fn start_load(&mut self, path: PathBuf) {
+    pub fn start_load(&mut self, file: OpenedFile) {
         let (tx, rx): (Sender<LoadResult>, Receiver<LoadResult>) = mpsc::channel();
-        std::thread::spawn(move || {
-            let result = load_store(path);
+        platform::spawn(move || {
+            let result = load_store(file);
             let _ = tx.send(result);
         });
         self.load_state = LoadState::Loading(rx);
@@ -117,11 +118,8 @@ impl AppState {
     }
 }
 
-fn load_store(path: PathBuf) -> LoadResult {
-    use ecitygml::io::GmlReader;
-
-    let result = GmlReader::from_path(&path).and_then(|r| r.finish());
-    match result {
+fn load_store(file: OpenedFile) -> LoadResult {
+    match file.read_city_model() {
         Ok(model) => match CityModelGraphicsStore::from_city_model(model) {
             Ok(graphics) => LoadResult::Ok(graphics),
             Err(e) => LoadResult::Err(e.to_string()),

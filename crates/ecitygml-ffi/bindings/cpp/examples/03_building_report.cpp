@@ -10,7 +10,7 @@
 // - Abstract types are converted with `try_from`, e.g. a generic attribute to a `MeasureAttribute`,
 //   or a boundary (via `AbstractFeatureKindRef::from_space_boundary`) to a `WallSurface`.
 //
-// Built by bindings/cpp/CMakeLists.txt (`mise run build-bindings-cpp`), which also runs it as a test.
+// Built by bindings/cpp/CMakeLists.txt (`mise run build:bindings:cpp`), which also runs it as a test.
 //
 // Usage: 03_building_report path/to/model.gml
 //

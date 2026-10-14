@@ -31,6 +31,10 @@ pub enum Commands {
         input: PathBuf,
 
         /// Output file (defaults to <input_stem>_transformed.<ext>)
+        #[allow(
+            rustdoc::invalid_html_tags,
+            reason = "clap help text, shown verbatim in --help"
+        )]
         #[clap(short, long, value_hint = ValueHint::FilePath)]
         output: Option<PathBuf>,
 

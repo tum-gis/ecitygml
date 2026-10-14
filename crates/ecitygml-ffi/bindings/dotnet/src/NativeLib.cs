@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Envis.Ecitygml.Diplomat;
+namespace Ecitygml.Diplomat;
 
 // Shared native-library name for every `[DllImport]` in the raw layer.
 // Emitted once per generation run so the iOS framework-bundle path and the

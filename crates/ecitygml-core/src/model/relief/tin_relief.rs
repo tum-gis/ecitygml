@@ -86,30 +86,40 @@ impl ComputeEnvelope for TinRelief {
 
 impl ApplyTransform for TinRelief {
     fn apply_transform(&mut self, m: Transform3<f64>) {
+        self.abstract_relief_component.apply_transform(m);
+
         if let Some(triangulated_surface) = self.tin.as_mut().and_then(|p| p.object_mut()) {
             triangulated_surface.apply_transform(m);
         }
     }
 
     fn apply_isometry(&mut self, isometry: Isometry3<f64>) {
+        self.abstract_relief_component.apply_isometry(isometry);
+
         if let Some(triangulated_surface) = self.tin.as_mut().and_then(|p| p.object_mut()) {
             triangulated_surface.apply_isometry(isometry);
         }
     }
 
     fn apply_translation(&mut self, vector: Vector3<f64>) {
+        self.abstract_relief_component.apply_translation(vector);
+
         if let Some(triangulated_surface) = self.tin.as_mut().and_then(|p| p.object_mut()) {
             triangulated_surface.apply_translation(vector);
         }
     }
 
     fn apply_rotation(&mut self, rotation: Rotation3<f64>) {
+        self.abstract_relief_component.apply_rotation(rotation);
+
         if let Some(triangulated_surface) = self.tin.as_mut().and_then(|p| p.object_mut()) {
             triangulated_surface.apply_rotation(rotation);
         }
     }
 
     fn apply_scale(&mut self, scale: Scale3<f64>) {
+        self.abstract_relief_component.apply_scale(scale);
+
         if let Some(triangulated_surface) = self.tin.as_mut().and_then(|p| p.object_mut()) {
             triangulated_surface.apply_scale(scale);
         }

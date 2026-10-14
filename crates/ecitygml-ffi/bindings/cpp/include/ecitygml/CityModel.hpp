@@ -13,11 +13,14 @@
 #include <cstdlib>
 #include "../diplomat_runtime.hpp"
 #include "AbstractCityObjectKindRefIterator.hpp"
+#include "AbstractCityObjectPropertyIterator.hpp"
 #include "AbstractFeatureKindRefIterator.hpp"
 #include "BoundingShape.hpp"
 #include "CodeIterator.hpp"
 #include "DateTime.hpp"
 #include "Id.hpp"
+#include "Scale3.hpp"
+#include "Vector3.hpp"
 
 
 namespace ecitygml {
@@ -40,9 +43,15 @@ namespace capi {
 
     const ecitygml::capi::DateTime* ecitygml_CityModel_valid_to(const ecitygml::capi::CityModel* self);
 
+    void ecitygml_CityModel_apply_translation(ecitygml::capi::CityModel* self, ecitygml::capi::Vector3 vector);
+
+    void ecitygml_CityModel_apply_scale(ecitygml::capi::CityModel* self, ecitygml::capi::Scale3 scale);
+
     ecitygml::capi::AbstractFeatureKindRefIterator* ecitygml_CityModel_iter_features(const ecitygml::capi::CityModel* self);
 
     ecitygml::capi::AbstractCityObjectKindRefIterator* ecitygml_CityModel_iter_city_objects(const ecitygml::capi::CityModel* self);
+
+    ecitygml::capi::AbstractCityObjectPropertyIterator* ecitygml_CityModel_city_object_members(const ecitygml::capi::CityModel* self);
 
     void ecitygml_CityModel_recompute_child_bounding_shapes(ecitygml::capi::CityModel* self);
 
@@ -94,6 +103,16 @@ inline const ecitygml::DateTime* ecitygml::CityModel::valid_to() const DIPLOMAT_
     return ecitygml::DateTime::FromFFI(result);
 }
 
+inline void ecitygml::CityModel::apply_translation(ecitygml::Vector3 vector) {
+    ecitygml::capi::ecitygml_CityModel_apply_translation(this->AsFFI(),
+        vector.AsFFI());
+}
+
+inline void ecitygml::CityModel::apply_scale(ecitygml::Scale3 scale) {
+    ecitygml::capi::ecitygml_CityModel_apply_scale(this->AsFFI(),
+        scale.AsFFI());
+}
+
 inline std::unique_ptr<ecitygml::AbstractFeatureKindRefIterator> ecitygml::CityModel::iter_features() const DIPLOMAT_LIFETIME_BOUND {
     auto result = ecitygml::capi::ecitygml_CityModel_iter_features(this->AsFFI());
     return std::unique_ptr<ecitygml::AbstractFeatureKindRefIterator>(ecitygml::AbstractFeatureKindRefIterator::FromFFI(result));
@@ -102,6 +121,11 @@ inline std::unique_ptr<ecitygml::AbstractFeatureKindRefIterator> ecitygml::CityM
 inline std::unique_ptr<ecitygml::AbstractCityObjectKindRefIterator> ecitygml::CityModel::iter_city_objects() const DIPLOMAT_LIFETIME_BOUND {
     auto result = ecitygml::capi::ecitygml_CityModel_iter_city_objects(this->AsFFI());
     return std::unique_ptr<ecitygml::AbstractCityObjectKindRefIterator>(ecitygml::AbstractCityObjectKindRefIterator::FromFFI(result));
+}
+
+inline std::unique_ptr<ecitygml::AbstractCityObjectPropertyIterator> ecitygml::CityModel::city_object_members() const DIPLOMAT_LIFETIME_BOUND {
+    auto result = ecitygml::capi::ecitygml_CityModel_city_object_members(this->AsFFI());
+    return std::unique_ptr<ecitygml::AbstractCityObjectPropertyIterator>(ecitygml::AbstractCityObjectPropertyIterator::FromFFI(result));
 }
 
 inline void ecitygml::CityModel::recompute_child_bounding_shapes() {

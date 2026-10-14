@@ -2,9 +2,9 @@
 
 using System;
 using System.Runtime.InteropServices;
-using Envis.Ecitygml.Diplomat;
+using Ecitygml.Diplomat;
 
-namespace Envis.Ecitygml;
+namespace Ecitygml;
 
 #nullable enable
 
@@ -215,6 +215,32 @@ public partial class CityModel
         }
     }
 
+    public void ApplyTranslation(Vector3 vector)
+    {
+        unsafe
+        {
+            if (_inner is null || _inner.IsNull)
+            {
+                throw new ObjectDisposedException("CityModel");
+            }
+            Raw.CityModel.ApplyTranslation(AsFFI(), vector.AsFFI());
+            GC.KeepAlive(this);
+        }
+    }
+
+    public void ApplyScale(Scale3 scale)
+    {
+        unsafe
+        {
+            if (_inner is null || _inner.IsNull)
+            {
+                throw new ObjectDisposedException("CityModel");
+            }
+            Raw.CityModel.ApplyScale(AsFFI(), scale.AsFFI());
+            GC.KeepAlive(this);
+        }
+    }
+
     /// <returns>
     /// A <c>AbstractFeatureKindRefIterator</c> allocated on Rust side.
     /// </returns>
@@ -254,6 +280,27 @@ public partial class CityModel
             Raw.AbstractCityObjectKindRefIterator* result = Raw.CityModel.IterCityObjects(AsFFI());
             GC.KeepAlive(this);
             return new AbstractCityObjectKindRefIterator(result, new object[] { this.DiplomatRetainDependency() });
+        }
+    }
+
+    /// <returns>
+    /// A <c>AbstractCityObjectPropertyIterator</c> allocated on Rust side.
+    /// </returns>
+    /// <remarks>
+    /// Lifetime: the returned native-backed value may borrow from the receiver or one or more inputs.
+    /// The caller is responsible for keeping any borrowed backing storage alive and undisposed while the returned value is in use.
+    /// </remarks>
+    public AbstractCityObjectPropertyIterator CityObjectMembers()
+    {
+        unsafe
+        {
+            if (_inner is null || _inner.IsNull)
+            {
+                throw new ObjectDisposedException("CityModel");
+            }
+            Raw.AbstractCityObjectPropertyIterator* result = Raw.CityModel.CityObjectMembers(AsFFI());
+            GC.KeepAlive(this);
+            return new AbstractCityObjectPropertyIterator(result, new object[] { this.DiplomatRetainDependency() });
         }
     }
 

@@ -4,10 +4,14 @@ use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::core::abstract_city_object_kind::AbstractCityObjectKind;
 use crate::model::core::{
-    AbstractAppearanceKind, AbstractFeatureWithLifespan, AsAbstractFeature,
-    AsAbstractFeatureWithLifespan, AsAbstractFeatureWithLifespanMut, CityModel,
+    AbstractAppearanceKind, AbstractFeatureWithLifespan, AsAbstractFeatureWithLifespan,
+    AsAbstractFeatureWithLifespanMut, CityModel,
 };
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "boxing the large variants would change the public API; the size difference is platform-dependent, so `allow` instead of `expect`"
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AbstractFeatureWithLifespanKind {
     AbstractAppearanceKind(AbstractAppearanceKind),

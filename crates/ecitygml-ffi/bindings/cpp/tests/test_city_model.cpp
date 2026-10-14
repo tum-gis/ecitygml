@@ -13,6 +13,8 @@
 #include <ecitygml/FeatureType.hpp>
 #include <ecitygml/Id.hpp>
 #include <ecitygml/Road.hpp>
+#include <ecitygml/Scale3.hpp>
+#include <ecitygml/Vector3.hpp>
 #include <ecitygml/WallSurface.hpp>
 
 #include <algorithm>
@@ -146,4 +148,24 @@ TEST_CASE("CityModel recompute_child_bounding_shapes", "[city_model]") {
     REQUIRE(!wall_bounded());
     city_model->recompute_child_bounding_shapes();
     REQUIRE(wall_bounded());
+}
+
+TEST_CASE("CityModel apply_translation and apply_scale", "[city_model]") {
+    auto city_model = read(fixture("FZK-Haus-LoD1-KIT-IAI-KHH-B36-V1__v3.gml"));
+    const auto* envelope = city_model->bounded_by()->envelope();
+    const double x = envelope->lower_corner().x();
+    const double y = envelope->lower_corner().y();
+    const double z = envelope->lower_corner().z();
+
+    city_model->apply_translation(ecitygml::Vector3{-100.0, 200.0, 10.0});
+    envelope = city_model->bounded_by()->envelope();
+    REQUIRE_THAT(envelope->lower_corner().x(), Catch::Matchers::WithinAbs(x - 100.0, 1e-6));
+    REQUIRE_THAT(envelope->lower_corner().y(), Catch::Matchers::WithinAbs(y + 200.0, 1e-6));
+    REQUIRE_THAT(envelope->lower_corner().z(), Catch::Matchers::WithinAbs(z + 10.0, 1e-6));
+
+    city_model->apply_scale(ecitygml::Scale3{2.0, 3.0, 0.5});
+    envelope = city_model->bounded_by()->envelope();
+    REQUIRE_THAT(envelope->size_x(), Catch::Matchers::WithinAbs(24.0, 1e-6));
+    REQUIRE_THAT(envelope->size_y(), Catch::Matchers::WithinAbs(30.0, 1e-6));
+    REQUIRE_THAT(envelope->size_z(), Catch::Matchers::WithinAbs(6.517669 / 2.0, 1e-6));
 }

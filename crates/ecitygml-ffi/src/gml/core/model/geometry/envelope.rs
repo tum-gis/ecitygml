@@ -24,6 +24,11 @@ pub mod ffi {
             DirectPosition::transparent_convert(self.0.upper_corner())
         }
 
+        /// The center of the envelope (Rust: `Envelope::center`).
+        pub fn center(&self) -> Box<DirectPosition> {
+            Box::new(DirectPosition(self.0.center()))
+        }
+
         /// Extent along the x axis.
         pub fn size_x(&self) -> f64 {
             self.0.size_x()

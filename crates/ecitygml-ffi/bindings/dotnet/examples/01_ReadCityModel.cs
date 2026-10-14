@@ -17,9 +17,9 @@
 //       upper corner: 457854.000, 5439093.000, 118.318
 //       size: 12.000 x 10.000 x 6.518
 
-using static Envis.Ecitygml.Examples.Common;
+using static Ecitygml.Examples.Common;
 
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 public static class ReadCityModel
 {

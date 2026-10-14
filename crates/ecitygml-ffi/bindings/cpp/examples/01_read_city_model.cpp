@@ -5,7 +5,7 @@
 // `diplomat::result` holding either the value or an `ecitygml::Error`; owned objects come as
 // `std::unique_ptr`, borrowed ones as references or pointers (null when absent).
 //
-// Built by bindings/cpp/CMakeLists.txt (`mise run build-bindings-cpp`), which also runs it as a test.
+// Built by bindings/cpp/CMakeLists.txt (`mise run build:bindings:cpp`), which also runs it as a test.
 //
 // Usage: 01_read_city_model path/to/model.gml
 //

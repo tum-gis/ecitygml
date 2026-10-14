@@ -6,7 +6,10 @@ mod abstract_building_subdivision;
 
 pub mod abstract_building_subdivision_kind;
 pub mod abstract_building_subdivision_property;
-#[allow(clippy::module_inception)] // mirrors ecitygml-core: `model::building::building`
+#[expect(
+    clippy::module_inception,
+    reason = "mirrors ecitygml-core: `model::building::building`"
+)]
 pub mod building;
 pub mod building_part;
 pub mod building_part_property;

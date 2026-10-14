@@ -65,7 +65,6 @@ mod tests {
     use egml::io::util::{Formatting, XmlFragmentWriter};
     use egml::model::base::{AsAbstractGml, Id};
     use egml::model::basic_types::Code;
-    use itertools::Itertools;
 
     #[test]
     fn test_serialize_round_trip() {

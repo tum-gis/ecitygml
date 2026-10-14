@@ -6,7 +6,7 @@
 // ground surface, door and window becomes a named OBJ group, using its highest level of detail;
 // buildings without such surfaces fall back to their highest LoD solid.
 //
-// Built by bindings/cpp/CMakeLists.txt (`mise run build-bindings-cpp`), which also runs it as a test.
+// Built by bindings/cpp/CMakeLists.txt (`mise run build:bindings:cpp`), which also runs it as a test.
 //
 // Usage: 06_export_obj input.gml output.obj
 //

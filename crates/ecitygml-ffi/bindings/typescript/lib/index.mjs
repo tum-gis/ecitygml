@@ -1,5 +1,9 @@
 
 
+export { Scale3 } from "./Scale3.mjs"
+
+export { Vector3 } from "./Vector3.mjs"
+
 export { Bridge } from "./Bridge.mjs"
 
 export { BridgePart } from "./BridgePart.mjs"
@@ -91,6 +95,12 @@ export { ElevationReferenceValue } from "./ElevationReferenceValue.mjs"
 export { WallSurface } from "./WallSurface.mjs"
 
 export { WindowSurface } from "./WindowSurface.mjs"
+
+export { AbstractCityObjectKind } from "./AbstractCityObjectKind.mjs"
+
+export { AbstractCityObjectProperty } from "./AbstractCityObjectProperty.mjs"
+
+export { AbstractCityObjectPropertyIterator } from "./AbstractCityObjectPropertyIterator.mjs"
 
 export { AbstractSpaceBoundaryKind } from "./AbstractSpaceBoundaryKind.mjs"
 

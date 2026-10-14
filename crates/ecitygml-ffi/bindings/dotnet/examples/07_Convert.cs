@@ -14,9 +14,9 @@
 //     Read back: 1 city object members, 8 city objects
 
 using System.Text;
-using static Envis.Ecitygml.Examples.Common;
+using static Ecitygml.Examples.Common;
 
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 public static class Convert
 {

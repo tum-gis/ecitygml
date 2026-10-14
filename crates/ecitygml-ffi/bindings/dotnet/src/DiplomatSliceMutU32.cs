@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Envis.Ecitygml.Diplomat;
+namespace Ecitygml.Diplomat;
 
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct DiplomatSliceMutU32

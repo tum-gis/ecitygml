@@ -1,6 +1,6 @@
 using System;
 
-namespace Envis.Ecitygml;
+namespace Ecitygml;
 
 /// <summary>
 /// If <c>Error</c> is an opaque error that borrows from an opaque

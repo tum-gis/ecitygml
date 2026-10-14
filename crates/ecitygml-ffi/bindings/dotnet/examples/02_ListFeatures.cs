@@ -19,9 +19,9 @@
 //     Buildings:
 //       UUID_d281adfc-4901-0f52-540b-4cc1a9325f82
 
-using static Envis.Ecitygml.Examples.Common;
+using static Ecitygml.Examples.Common;
 
-namespace Envis.Ecitygml.Examples;
+namespace Ecitygml.Examples;
 
 public static class ListFeatures
 {

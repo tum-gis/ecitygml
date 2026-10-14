@@ -5,6 +5,7 @@ use crate::arena::convert::core::flatten_city_model;
 use crate::model::common::arena::InternalKey;
 use crate::model::core::AbstractFeatureWithLifespanKind;
 
+#[expect(dead_code, reason = "not used yet")]
 pub fn flatten_abstract_feature_with_lifespan_kind(
     abstract_feature_with_lifespan_kind: AbstractFeatureWithLifespanKind,
     city_model_arena: &mut CityModelArena,

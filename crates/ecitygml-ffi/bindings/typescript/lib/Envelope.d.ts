@@ -19,6 +19,11 @@ export class Envelope {
     upperCorner(): DirectPosition;
 
     /**
+     * The center of the envelope (Rust: `Envelope::center`).
+     */
+    center(): DirectPosition;
+
+    /**
      * Extent along the x axis.
      */
     sizeX(): number;

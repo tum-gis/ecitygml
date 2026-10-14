@@ -5,7 +5,7 @@
 // `AbstractFeatureKindRef`s. Each tells its `feature_type()`; to use the getters of its concrete
 // type, convert it with that type's `try_from`, which returns null for other types.
 //
-// Built by bindings/cpp/CMakeLists.txt (`mise run build-bindings-cpp`), which also runs it as a test.
+// Built by bindings/cpp/CMakeLists.txt (`mise run build:bindings:cpp`), which also runs it as a test.
 //
 // Usage: 02_list_features path/to/model.gml
 //

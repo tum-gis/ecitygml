@@ -143,7 +143,7 @@ mod tests {
       </genericAttribute>
       <con:height>
         <con:Height>
-          <con:highReference>highestRoofEdge</con:highReference>
+          <con:highReference>topOfConstruction</con:highReference>
           <con:lowReference>lowestGroundPoint</con:lowReference>
           <con:status>measured</con:status>
           <con:value uom=\"urn:adv:uom:m\">19.408</con:value>
@@ -170,7 +170,7 @@ mod tests {
 
         assert_eq!(abstract_construction.heights().len(), 1);
         let height = &abstract_construction.heights()[0];
-        assert_eq!(height.high_reference().value(), "highestRoofEdge");
+        assert_eq!(height.high_reference().value(), "topOfConstruction");
         assert_eq!(height.low_reference().value(), "lowestGroundPoint");
         assert_eq!(height.status(), HeightStatusValue::Measured);
         assert_eq!(height.length().uom(), "urn:adv:uom:m");

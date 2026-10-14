@@ -1,8 +1,8 @@
 using System.Text;
 using Xunit;
-using static Envis.Ecitygml.Tests.Helpers;
+using static Ecitygml.Tests.Helpers;
 
-namespace Envis.Ecitygml.Tests;
+namespace Ecitygml.Tests;
 
 public class CityModelTests
 {
@@ -50,6 +50,26 @@ public class CityModelTests
         Assert.Equal(6.517669, envelope.SizeZ(), 1e-9);
         Assert.Equal(457842.0, envelope.LowerCorner().X());
         Assert.True(envelope.Contains(envelope.UpperCorner()));
+    }
+
+    [Fact]
+    public void ApplyTranslationAndScale()
+    {
+        var cityModel = Read(FzkLod1);
+        Envelope Envelope() => cityModel.BoundedBy()!.Envelope()!;
+        var lower = Envelope().LowerCorner();
+        var (x, y, z) = (lower.X(), lower.Y(), lower.Z());
+
+        cityModel.ApplyTranslation(new Vector3 { X = -100.0, Y = 200.0, Z = 10.0 });
+        var moved = Envelope().LowerCorner();
+        Assert.Equal(x - 100.0, moved.X(), 1e-6);
+        Assert.Equal(y + 200.0, moved.Y(), 1e-6);
+        Assert.Equal(z + 10.0, moved.Z(), 1e-6);
+
+        cityModel.ApplyScale(new Scale3 { X = 2.0, Y = 3.0, Z = 0.5 });
+        Assert.Equal(24.0, Envelope().SizeX(), 1e-6);
+        Assert.Equal(30.0, Envelope().SizeY(), 1e-6);
+        Assert.Equal(6.517669 / 2, Envelope().SizeZ(), 1e-6);
     }
 
     [Fact]

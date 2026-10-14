@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <cstdlib>
+#include "AbstractCityObjectKind.hpp"
 #include "FeatureType.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -19,6 +20,8 @@ namespace ecitygml {
 namespace capi {
     extern "C" {
 
+    ecitygml::capi::AbstractCityObjectKindRef* ecitygml_AbstractCityObjectKindRef_from_city_object(const ecitygml::capi::AbstractCityObjectKind* city_object);
+
     ecitygml::capi::FeatureType ecitygml_AbstractCityObjectKindRef_feature_type(const ecitygml::capi::AbstractCityObjectKindRef* self);
 
     void ecitygml_AbstractCityObjectKindRef_destroy(AbstractCityObjectKindRef* self);
@@ -26,6 +29,11 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::unique_ptr<ecitygml::AbstractCityObjectKindRef> ecitygml::AbstractCityObjectKindRef::from_city_object(const ecitygml::AbstractCityObjectKind& city_object DIPLOMAT_LIFETIME_BOUND) {
+    auto result = ecitygml::capi::ecitygml_AbstractCityObjectKindRef_from_city_object(city_object.AsFFI());
+    return std::unique_ptr<ecitygml::AbstractCityObjectKindRef>(ecitygml::AbstractCityObjectKindRef::FromFFI(result));
+}
 
 inline ecitygml::FeatureType ecitygml::AbstractCityObjectKindRef::feature_type() const {
     auto result = ecitygml::capi::ecitygml_AbstractCityObjectKindRef_feature_type(this->AsFFI());

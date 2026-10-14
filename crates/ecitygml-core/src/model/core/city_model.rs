@@ -241,6 +241,8 @@ impl ForEachFeatureMut for CityModel {
 
 impl ApplyTransform for CityModel {
     fn apply_transform(&mut self, m: Transform3<f64>) {
+        self.abstract_feature_with_lifespan.apply_transform(m);
+
         self.city_object_members
             .par_iter_mut()
             .filter_map(|x| x.object_mut())
@@ -248,6 +250,8 @@ impl ApplyTransform for CityModel {
     }
 
     fn apply_isometry(&mut self, isometry: Isometry3<f64>) {
+        self.abstract_feature_with_lifespan.apply_isometry(isometry);
+
         self.city_object_members
             .par_iter_mut()
             .filter_map(|x| x.object_mut())
@@ -255,6 +259,9 @@ impl ApplyTransform for CityModel {
     }
 
     fn apply_translation(&mut self, vector: Vector3<f64>) {
+        self.abstract_feature_with_lifespan
+            .apply_translation(vector);
+
         self.city_object_members
             .par_iter_mut()
             .filter_map(|x| x.object_mut())
@@ -262,6 +269,8 @@ impl ApplyTransform for CityModel {
     }
 
     fn apply_rotation(&mut self, rotation: Rotation3<f64>) {
+        self.abstract_feature_with_lifespan.apply_rotation(rotation);
+
         self.city_object_members
             .par_iter_mut()
             .filter_map(|x| x.object_mut())
@@ -269,9 +278,87 @@ impl ApplyTransform for CityModel {
     }
 
     fn apply_scale(&mut self, scale: Scale3<f64>) {
+        self.abstract_feature_with_lifespan.apply_scale(scale);
+
         self.city_object_members
             .par_iter_mut()
             .filter_map(|x| x.object_mut())
             .for_each(|x| x.apply_scale(scale));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::building::Building;
+    use crate::model::common::LevelOfDetail;
+    use crate::model::construction::WallSurface;
+    use crate::model::core::{AbstractSpaceBoundaryProperty, AsAbstractSpaceMut};
+    use crate::model::relief::{AbstractReliefComponentProperty, ReliefFeature, TinRelief};
+    use egml::model::feature::{AsAbstractFeature, AsAbstractFeatureMut, BoundingShape};
+    use egml::model::geometry::DirectPosition;
+
+    fn envelope(offset: f64) -> Option<BoundingShape> {
+        let corner = |value: f64| DirectPosition::new(value, value, value).expect("finite");
+        let envelope = Envelope::new(corner(offset), corner(offset + 1.0)).expect("valid envelope");
+        Some(BoundingShape::new(envelope))
+    }
+
+    fn id(value: &str) -> Id {
+        Id::try_from(value).expect("valid id")
+    }
+
+    /// A city model with a building (a space) with a wall surface (a thematic surface) and a relief feature
+    /// with a TIN relief, each with its own envelope.
+    fn city_model_with_envelopes() -> CityModel {
+        let mut wall = WallSurface::new(id("wall"));
+        wall.set_bounded_by(envelope(2.0));
+        let mut building = Building::new(id("building"));
+        building.set_bounded_by(envelope(1.0));
+        building.push_boundary(AbstractSpaceBoundaryProperty::from_object(wall.into()));
+
+        let mut tin = TinRelief::new(id("tin"), LevelOfDetail::Two);
+        tin.set_bounded_by(envelope(4.0));
+        let mut relief = ReliefFeature::new(id("relief"), LevelOfDetail::Two);
+        relief.set_bounded_by(envelope(3.0));
+        relief
+            .relief_components_mut()
+            .push(AbstractReliefComponentProperty::from_object(tin.into()));
+
+        let mut city_model = CityModel::new(id("city_model"));
+        city_model.set_bounded_by(envelope(0.0));
+        city_model
+            .push_city_object_member(AbstractCityObjectProperty::from_object(building.into()));
+        city_model.push_city_object_member(AbstractCityObjectProperty::from_object(relief.into()));
+        city_model
+    }
+
+    /// The feature types and lower corners of all stored envelopes, in document order.
+    fn lower_corners(city_model: &CityModel) -> Vec<(FeatureType, [f64; 3])> {
+        city_model
+            .iter_features()
+            .filter_map(|feature| {
+                let lower = *feature.bounded_by()?.envelope()?.lower_corner();
+                Some((feature.feature_type(), [lower.x(), lower.y(), lower.z()]))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_apply_translation_moves_every_envelope_once() {
+        let mut city_model = city_model_with_envelopes();
+        city_model.apply_translation(Vector3::new(10.0, 20.0, 30.0));
+
+        let moved = |offset: f64| [offset + 10.0, offset + 20.0, offset + 30.0];
+        assert_eq!(
+            lower_corners(&city_model),
+            vec![
+                (FeatureType::CityModel, moved(0.0)),
+                (FeatureType::Building, moved(1.0)),
+                (FeatureType::WallSurface, moved(2.0)),
+                (FeatureType::ReliefFeature, moved(3.0)),
+                (FeatureType::TinRelief, moved(4.0)),
+            ]
+        );
     }
 }

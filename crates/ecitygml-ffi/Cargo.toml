@@ -15,8 +15,9 @@ include = ["/src/**", "/Cargo.toml", "/config.toml", "/README.md"]
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
+ecitygml = { version = "0.0.2-alpha.7", path = "../ecitygml" }
 egml = { workspace = true }
-ecitygml = { version = "0.0.2-alpha.6", path = "../ecitygml" }
 
-diplomat = "0.16.1"
-diplomat-runtime = "0.16.0"
+nalgebra = { workspace = true }
+diplomat = { workspace = true }
+diplomat-runtime = { workspace = true }

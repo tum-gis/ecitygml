@@ -72,6 +72,22 @@ export class Envelope {
     }
 
     /**
+     * The center of the envelope (Rust: `Envelope::center`).
+     */
+    center() {
+
+        const result = wasm.ecitygml_Envelope_center(this.ffiValue);
+
+        try {
+            return new DirectPosition(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    /**
      * Extent along the x axis.
      */
     sizeX() {

@@ -1,0 +1,71 @@
+package io.github.tum_gis.ecitygml;
+import com.sun.jna.Callback
+import com.sun.jna.Library
+import com.sun.jna.Native
+import com.sun.jna.Pointer
+import com.sun.jna.Structure
+
+internal interface PlantCoverUsageValueIteratorLib: Library {
+    fun ecitygml_PlantCoverUsageValueIterator_destroy(handle: Pointer)
+    fun ecitygml_PlantCoverUsageValueIterator_next(handle: Pointer): Pointer?
+}
+typealias PlantCoverUsageValueIteratorIteratorItem = PlantCoverUsageValue?
+/** Iterates over a list of code-list values, borrowed from a city model.
+*/
+class PlantCoverUsageValueIterator internal constructor (
+    internal val handle: Pointer,
+    // These ensure that anything that is borrowed is kept alive and not cleaned
+    // up by the garbage collector.
+    internal val selfEdges: List<Any>,
+    internal val aEdges: List<Any?>,
+    internal var owned: Boolean,
+): Iterator<PlantCoverUsageValue?> {
+
+    init {
+        if (this.owned) {
+            this.registerCleaner()
+        }
+    }
+
+    private class PlantCoverUsageValueIteratorCleaner(val handle: Pointer, val lib: PlantCoverUsageValueIteratorLib) : Runnable {
+        override fun run() {
+            lib.ecitygml_PlantCoverUsageValueIterator_destroy(handle)
+        }
+    }
+    private fun registerCleaner() {
+        CLEANER.register(this, PlantCoverUsageValueIterator.PlantCoverUsageValueIteratorCleaner(handle, PlantCoverUsageValueIterator.lib));
+    }
+
+    companion object {
+        internal val libClass: Class<PlantCoverUsageValueIteratorLib> = PlantCoverUsageValueIteratorLib::class.java
+        internal val lib: PlantCoverUsageValueIteratorLib = Native.load("ecitygml_ffi", libClass)
+    }
+    
+    internal fun nextInternal(): PlantCoverUsageValue? {
+        // This lifetime edge depends on lifetimes: 'a
+        val aEdges: MutableList<Any> = mutableListOf(this);
+        
+        val returnVal = lib.ecitygml_PlantCoverUsageValueIterator_next(handle);
+        val selfEdges: List<Any> = listOf(this)
+        val handle = returnVal ?: return null
+        val returnOpaque = PlantCoverUsageValue(handle, selfEdges, false)
+        return returnOpaque
+    }
+
+    var iterVal = nextInternal()
+
+    override fun hasNext(): Boolean {
+       return iterVal != null
+    }
+
+    override fun next(): PlantCoverUsageValue?{
+        val returnVal = iterVal
+        if (returnVal == null) {
+            throw NoSuchElementException()
+        } else {
+            iterVal = nextInternal()
+            return returnVal
+        }
+    }
+
+}

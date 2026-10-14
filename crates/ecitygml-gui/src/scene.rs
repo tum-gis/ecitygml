@@ -23,6 +23,9 @@ use three_d::{
     Positions, RenderStates, Srgba, Vec3, WriteMask,
 };
 
+/// Positions, normals and indices of the meshes merged into one batch.
+type MeshBuffers = (Vec<Vec3>, Vec<Vec3>, Vec<u32>);
+
 /// Clear color used for the interactive viewport. Screenshot export uses its own
 /// (white) background instead — see `screenshot::BACKGROUND` — so the two are
 /// deliberately kept independent rather than sharing one constant.
@@ -86,8 +89,7 @@ impl Scene {
 
         let center = compute_center(&city_objects);
 
-        let mut cpu_buckets: HashMap<FeatureType, (Vec<Vec3>, Vec<Vec3>, Vec<u32>)> =
-            HashMap::new();
+        let mut cpu_buckets: HashMap<FeatureType, MeshBuffers> = HashMap::new();
         let mut entries: Vec<SceneEntry> = Vec::new();
 
         for city_object in &city_objects {
@@ -421,7 +423,7 @@ fn instanced_gm(
     (feature_type, gm)
 }
 
-fn merge_into(bucket: &mut (Vec<Vec3>, Vec<Vec3>, Vec<u32>), src: &CpuMesh) {
+fn merge_into(bucket: &mut MeshBuffers, src: &CpuMesh) {
     let (positions, normals, indices) = bucket;
     let base = positions.len() as u32;
 
@@ -503,6 +505,7 @@ fn compute_center(city_objects: &[AbstractCityObjectKindRef<'_>]) -> Point3<f64>
     Point3::new(sum[0] / n, sum[1] / n, sum[2] / n)
 }
 
+#[expect(dead_code, reason = "not used yet")]
 fn brighten(c: Srgba) -> Srgba {
     Srgba::new(
         (c.r as u16 + 80).min(255) as u8,

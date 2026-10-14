@@ -2,7 +2,7 @@ use crate::model::common::{ForEachFeatureMut, IterFeatures, LevelOfDetail};
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
 use crate::model::core::{
-    AbstractPhysicalSpace, AsAbstractPhysicalSpace, AsAbstractPhysicalSpaceMut, AsAbstractSpace,
+    AbstractPhysicalSpace, AsAbstractPhysicalSpace, AsAbstractPhysicalSpaceMut,
     ImplicitGeometryProperty,
 };
 use egml::model::base::Id;

@@ -8,7 +8,7 @@
 // (the reader doesn't resolve such references, as in Rust), shown here as "not computable" with the
 // error message.
 //
-// Built by bindings/cpp/CMakeLists.txt (`mise run build-bindings-cpp`), which also runs it as a test.
+// Built by bindings/cpp/CMakeLists.txt (`mise run build:bindings:cpp`), which also runs it as a test.
 //
 // Usage: 05_measure_geometry path/to/model.gml
 //

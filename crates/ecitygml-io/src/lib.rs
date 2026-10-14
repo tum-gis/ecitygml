@@ -1,3 +1,8 @@
+#![expect(
+    clippy::module_inception,
+    reason = "the modules mirror the CityGML packages and types, e.g. `model::building::building`"
+)]
+
 mod error;
 mod format;
 pub mod gml;

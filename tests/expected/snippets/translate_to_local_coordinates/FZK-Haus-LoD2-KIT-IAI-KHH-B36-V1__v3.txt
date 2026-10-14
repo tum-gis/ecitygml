@@ -1,0 +1,1 @@
+Translated the city model by (-457848.000, -5439088.000, -115.059) to local coordinates
