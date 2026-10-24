@@ -8,6 +8,8 @@ use crate::model::core::{
 };
 use crate::model::relief::refs::AbstractReliefComponentKindRef;
 use crate::model::relief::{AbstractReliefComponentKind, ReliefFeature};
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractSpaceBoundaryKindRef<'a> {
@@ -122,3 +124,13 @@ impl_try_from_city_object_kind_ref_for_enum!(
     AbstractSpaceBoundaryKind,
     AbstractSpaceBoundaryKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractSpaceBoundaryKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractSpaceBoundaryKindRef::AbstractThematicSurfaceKind(x) => x.compute_envelope(),
+            AbstractSpaceBoundaryKindRef::ReliefFeature(_) => None,
+            AbstractSpaceBoundaryKindRef::AbstractReliefComponentKind(x) => x.compute_envelope(),
+        }
+    }
+}

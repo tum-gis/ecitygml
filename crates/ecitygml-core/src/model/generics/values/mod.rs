@@ -1,13 +1,25 @@
+mod generic_logical_space_class_value;
+mod generic_logical_space_function_value;
+mod generic_logical_space_usage_value;
 mod generic_occupied_space_class_value;
 mod generic_occupied_space_function_value;
 mod generic_occupied_space_usage_value;
 mod generic_thematic_surface_class_value;
 mod generic_thematic_surface_function_value;
 mod generic_thematic_surface_usage_value;
+mod generic_unoccupied_space_class_value;
+mod generic_unoccupied_space_function_value;
+mod generic_unoccupied_space_usage_value;
 
+pub use generic_logical_space_class_value::*;
+pub use generic_logical_space_function_value::*;
+pub use generic_logical_space_usage_value::*;
 pub use generic_occupied_space_class_value::*;
 pub use generic_occupied_space_function_value::*;
 pub use generic_occupied_space_usage_value::*;
 pub use generic_thematic_surface_class_value::*;
 pub use generic_thematic_surface_function_value::*;
 pub use generic_thematic_surface_usage_value::*;
+pub use generic_unoccupied_space_class_value::*;
+pub use generic_unoccupied_space_function_value::*;
+pub use generic_unoccupied_space_usage_value::*;

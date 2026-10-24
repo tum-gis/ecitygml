@@ -27,6 +27,6 @@ export function* features(iterator: AbstractFeatureKindRefIterator) {
 
 /** A model with the FZK LoD2 header and `member` as its only city object (no fixture has one). */
 export function readMember(member: string): CityModel {
-    const text = new TextDecoder().decode(fixtureBytes('FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3.gml'));
+    const text = new TextDecoder().decode(fixtureBytes('fzk-haus/FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3.gml'));
     return readBytes(new TextEncoder().encode(text.slice(0, text.indexOf('<cityObjectMember>')) + member));
 }

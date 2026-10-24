@@ -28,6 +28,12 @@ pub use abstract_filling_surface_kind_ref::*;
 mod abstract_filling_surface_kind_ref_mut;
 pub use abstract_filling_surface_kind_ref_mut::*;
 
+mod abstract_furniture_kind_ref;
+pub use abstract_furniture_kind_ref::*;
+
+mod abstract_furniture_kind_ref_mut;
+pub use abstract_furniture_kind_ref_mut::*;
+
 mod abstract_installation_kind_ref;
 pub use abstract_installation_kind_ref::*;
 

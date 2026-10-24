@@ -5,6 +5,8 @@ use crate::model::appearance::{
 };
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractTextureKindRef<'a> {
@@ -76,6 +78,7 @@ macro_rules! impl_try_from_for_texture_kind_ref {
                 }
             }
         }
+        $crate::impl_try_from_for_surface_data_kind_ref!(AbstractTextureKind, $type);
     };
     ($variant:ident) => {
         $crate::impl_try_from_for_texture_kind_ref!($variant, $variant);
@@ -84,3 +87,12 @@ macro_rules! impl_try_from_for_texture_kind_ref {
 impl_try_from_for_texture_kind_ref!(GeoreferencedTexture);
 impl_try_from_for_texture_kind_ref!(ParameterizedTexture);
 impl_try_from_surface_data_kind_ref_for_enum!(AbstractTextureKind, AbstractTextureKindRef);
+
+impl<'a> ComputeEnvelope for AbstractTextureKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractTextureKindRef::GeoreferencedTexture(x) => x.compute_envelope(),
+            AbstractTextureKindRef::ParameterizedTexture(x) => x.compute_envelope(),
+        }
+    }
+}

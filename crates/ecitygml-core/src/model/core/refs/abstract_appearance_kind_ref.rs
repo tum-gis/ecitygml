@@ -3,6 +3,8 @@ use crate::model::appearance::Appearance;
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::core::{AbstractAppearance, AbstractAppearanceKind, AsAbstractAppearance};
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractAppearanceKindRef<'a> {
@@ -78,3 +80,11 @@ impl_try_from_feature_with_lifespan_kind_ref_for_enum!(
     AbstractAppearanceKind,
     AbstractAppearanceKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractAppearanceKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractAppearanceKindRef::Appearance(x) => x.compute_envelope(),
+        }
+    }
+}

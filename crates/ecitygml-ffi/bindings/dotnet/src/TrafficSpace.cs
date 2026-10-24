@@ -746,6 +746,48 @@ public partial class TrafficSpace
         }
     }
 
+    /// <returns>
+    /// A <c>TrafficSpaceReferenceIterator</c> allocated on Rust side.
+    /// </returns>
+    /// <remarks>
+    /// Lifetime: the returned native-backed value may borrow from the receiver or one or more inputs.
+    /// The caller is responsible for keeping any borrowed backing storage alive and undisposed while the returned value is in use.
+    /// </remarks>
+    public TrafficSpaceReferenceIterator Predecessors()
+    {
+        unsafe
+        {
+            if (_inner is null || _inner.IsNull)
+            {
+                throw new ObjectDisposedException("TrafficSpace");
+            }
+            Raw.TrafficSpaceReferenceIterator* result = Raw.TrafficSpace.Predecessors(AsFFI());
+            GC.KeepAlive(this);
+            return new TrafficSpaceReferenceIterator(result, new object[] { this.DiplomatRetainDependency() });
+        }
+    }
+
+    /// <returns>
+    /// A <c>TrafficSpaceReferenceIterator</c> allocated on Rust side.
+    /// </returns>
+    /// <remarks>
+    /// Lifetime: the returned native-backed value may borrow from the receiver or one or more inputs.
+    /// The caller is responsible for keeping any borrowed backing storage alive and undisposed while the returned value is in use.
+    /// </remarks>
+    public TrafficSpaceReferenceIterator Successors()
+    {
+        unsafe
+        {
+            if (_inner is null || _inner.IsNull)
+            {
+                throw new ObjectDisposedException("TrafficSpace");
+            }
+            Raw.TrafficSpaceReferenceIterator* result = Raw.TrafficSpace.Successors(AsFFI());
+            GC.KeepAlive(this);
+            return new TrafficSpaceReferenceIterator(result, new object[] { this.DiplomatRetainDependency() });
+        }
+    }
+
     /// <summary>
     /// Returns the underlying raw handle.
     /// </summary>

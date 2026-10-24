@@ -1,7 +1,7 @@
 use crate::Error;
 use crate::gml::codec::generics::generic_attribute_set::read_nested_element_index;
 use crate::gml::codec::generics::{deserialize_generic_attribute, serialize_generic_attribute};
-use crate::gml::util::{CityGmlElement, CityGmlNamespace};
+use crate::gml::util::{CityGmlElement, CityGmlNamespace, DeserializationConfig};
 use ecitygml_core::model::core::CityObjectRelation;
 use ecitygml_core::model::core::values::RelationTypeValue;
 use ecitygml_core::model::generics::GenericAttributeKind;
@@ -11,8 +11,12 @@ use egml::io::util::{ChunkedSink, XmlFragmentWriter};
 use egml::model::base::Reference;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use tracing::warn;
 
-pub fn deserialize_city_object_relation(xml_document: &[u8]) -> Result<CityObjectRelation, Error> {
+pub fn deserialize_city_object_relation(
+    xml_document: &[u8],
+    config: &DeserializationConfig,
+) -> Result<CityObjectRelation, Error> {
     let mut reader = Reader::from_reader(xml_document);
     reader.config_mut().trim_text(true);
 
@@ -50,9 +54,11 @@ pub fn deserialize_city_object_relation(xml_document: &[u8]) -> Result<CityObjec
                 }
                 "genericAttribute" => {
                     let (pos_start, pos_end) = read_nested_element_index(&mut reader)?;
-                    generic_attributes.push(deserialize_generic_attribute(
-                        &xml_document[pos_start..pos_end],
-                    )?);
+                    // An invalid attribute is dropped and logged instead of failing the relation.
+                    match deserialize_generic_attribute(&xml_document[pos_start..pos_end], config) {
+                        Ok(attribute) => generic_attributes.push(attribute),
+                        Err(error) => warn!(?error, "dropping invalid generic attribute"),
+                    }
                     reader.read_to_end(start.name())?;
                 }
                 _ => {
@@ -125,6 +131,33 @@ mod tests {
     use egml::model::base::HasAssociationAttributes;
     use egml::model::xlink::HRef;
 
+    #[test]
+    fn test_deserialize_city_object_relation_drops_invalid_generic_attribute() {
+        let xml_document = b"<CityObjectRelation>\
+          <genericAttribute>\
+            <IntAttribute>\
+              <name>tip_prem_name</name>\
+              <value></value>\
+            </IntAttribute>\
+          </genericAttribute>\
+          <genericAttribute>\
+            <StringAttribute>\
+              <name>identifier_roadId</name>\
+              <value>1970000</value>\
+            </StringAttribute>\
+          </genericAttribute>\
+          <relationType>relatedVegetation</relationType>\
+          <relatedTo href=\"#UUID_e8b543d5-43f3-3b07-94ee-c8e76419b29f\"/>\
+        </CityObjectRelation>";
+
+        let relation =
+            deserialize_city_object_relation(xml_document, &DeserializationConfig::default())
+                .expect("should convert");
+
+        assert_eq!(relation.generic_attributes().len(), 1);
+        assert_eq!(relation.generic_attributes()[0].name(), "identifier_roadId");
+    }
+
     fn full_xml() -> &'static str {
         "<CityObjectRelation>\
           <genericAttribute>\
@@ -152,8 +185,11 @@ mod tests {
 
     #[test]
     fn test_convert_to_city_object_relation() {
-        let relation =
-            deserialize_city_object_relation(full_xml().as_bytes()).expect("should convert");
+        let relation = deserialize_city_object_relation(
+            full_xml().as_bytes(),
+            &DeserializationConfig::default(),
+        )
+        .expect("should convert");
 
         assert_eq!(relation.relation_type().value(), "relatedVegetation");
         assert_eq!(
@@ -165,8 +201,11 @@ mod tests {
 
     #[test]
     fn test_generic_attribute_names() {
-        let relation =
-            deserialize_city_object_relation(full_xml().as_bytes()).expect("should convert");
+        let relation = deserialize_city_object_relation(
+            full_xml().as_bytes(),
+            &DeserializationConfig::default(),
+        )
+        .expect("should convert");
 
         let names: Vec<&str> = relation
             .generic_attributes()
@@ -186,7 +225,9 @@ mod tests {
           <relatedTo href=\"#UUID_abc123\"/>\
         </CityObjectRelation>";
 
-        let relation = deserialize_city_object_relation(xml.as_bytes()).expect("should convert");
+        let relation =
+            deserialize_city_object_relation(xml.as_bytes(), &DeserializationConfig::default())
+                .expect("should convert");
 
         assert_eq!(relation.relation_type().value(), "adjecent");
         assert_eq!(
@@ -202,7 +243,8 @@ mod tests {
           <relatedTo href=\"#UUID_abc123\"/>\
         </CityObjectRelation>";
 
-        let result = deserialize_city_object_relation(xml.as_bytes());
+        let result =
+            deserialize_city_object_relation(xml.as_bytes(), &DeserializationConfig::default());
         assert!(result.is_err());
     }
 
@@ -212,14 +254,18 @@ mod tests {
           <relationType>adjecent</relationType>\
         </CityObjectRelation>";
 
-        let result = deserialize_city_object_relation(xml.as_bytes());
+        let result =
+            deserialize_city_object_relation(xml.as_bytes(), &DeserializationConfig::default());
         assert!(result.is_err());
     }
 
     #[test]
     fn test_round_trip() {
-        let relation =
-            deserialize_city_object_relation(full_xml().as_bytes()).expect("should convert");
+        let relation = deserialize_city_object_relation(
+            full_xml().as_bytes(),
+            &DeserializationConfig::default(),
+        )
+        .expect("should convert");
 
         let mut xml_fragment_writer =
             XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
@@ -235,7 +281,8 @@ mod tests {
         .expect("should convert to string");
 
         let round_tripped =
-            deserialize_city_object_relation(xml.as_bytes()).expect("should round trip");
+            deserialize_city_object_relation(xml.as_bytes(), &DeserializationConfig::default())
+                .expect("should round trip");
 
         assert_eq!(relation.relation_type(), round_tripped.relation_type());
         assert_eq!(relation.relation_to(), round_tripped.relation_to());

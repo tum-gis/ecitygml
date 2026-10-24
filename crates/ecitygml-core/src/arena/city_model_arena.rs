@@ -3,9 +3,7 @@ use crate::arena::convert::core::{flatten_city_model, unflatten_city_model_arena
 use crate::model::core::refs::{
     AbstractCityObjectKindRef, AbstractFeatureKindRef, AbstractFeatureKindRefMut,
 };
-use crate::model::core::{
-    AbstractFeatureKind, AbstractFeatureWithLifespanKind, AsAbstractFeature, CityModel,
-};
+use crate::model::core::{AbstractFeatureKind, AsAbstractFeature, CityModel};
 use egml::model::base::Id;
 use egml::model::common::RecomputeBoundingShape;
 use rayon::prelude::*;
@@ -56,22 +54,33 @@ impl CityModelArena {
     }
 
     pub fn iter_city_objects(&self) -> impl Iterator<Item = AbstractCityObjectKindRef<'_>> {
-        self.features.values().filter_map(|feature| match feature {
-            AbstractFeatureKind::AbstractFeatureWithLifespanKind(
-                AbstractFeatureWithLifespanKind::AbstractCityObjectKind(x),
-            ) => Some(x.into()),
-            _ => None,
+        self.features
+            .values()
+            .filter_map(|feature| AbstractFeatureKindRef::from(feature).try_into().ok())
+    }
+
+    /// Iterates over all city objects together with their arena key.
+    ///
+    /// The key is a stable handle that can be resolved with [`Self::get_city_object`].
+    pub fn iter_city_objects_with_keys(
+        &self,
+    ) -> impl Iterator<Item = (DefaultKey, AbstractCityObjectKindRef<'_>)> {
+        self.features.iter().filter_map(|(key, feature)| {
+            Some((key, AbstractFeatureKindRef::from(feature).try_into().ok()?))
         })
+    }
+
+    /// Returns the city object stored under `key`, or `None` if the key is unknown or the feature
+    /// is not a city object.
+    pub fn get_city_object(&self, key: DefaultKey) -> Option<AbstractCityObjectKindRef<'_>> {
+        AbstractFeatureKindRef::from(self.features.get(key)?)
+            .try_into()
+            .ok()
     }
 
     pub fn get_city_object_by_id(&self, id: &Id) -> Option<AbstractCityObjectKindRef<'_>> {
         let key = *self.by_id.get(id)?;
-        match self.features.get(key)? {
-            AbstractFeatureKind::AbstractFeatureWithLifespanKind(
-                AbstractFeatureWithLifespanKind::AbstractCityObjectKind(x),
-            ) => Some(x.into()),
-            _ => None,
-        }
+        self.get_city_object(key)
     }
 
     pub fn recompute_bounding_shapes(&mut self) {

@@ -13,11 +13,14 @@
 #include <cstdlib>
 #include "../diplomat_runtime.hpp"
 #include "HRef.hpp"
+#include "TrafficSpaceReference.hpp"
 
 
 namespace ecitygml {
 namespace capi {
     extern "C" {
+
+    ecitygml::capi::Reference* ecitygml_Reference_from_traffic_space_reference(const ecitygml::capi::TrafficSpaceReference* reference);
 
     const ecitygml::capi::HRef* ecitygml_Reference_href(const ecitygml::capi::Reference* self);
 
@@ -26,6 +29,11 @@ namespace capi {
     } // extern "C"
 } // namespace capi
 } // namespace
+
+inline std::unique_ptr<ecitygml::Reference> ecitygml::Reference::from_traffic_space_reference(const ecitygml::TrafficSpaceReference& reference) {
+    auto result = ecitygml::capi::ecitygml_Reference_from_traffic_space_reference(reference.AsFFI());
+    return std::unique_ptr<ecitygml::Reference>(ecitygml::Reference::FromFFI(result));
+}
 
 inline const ecitygml::HRef* ecitygml::Reference::href() const DIPLOMAT_LIFETIME_BOUND {
     auto result = ecitygml::capi::ecitygml_Reference_href(this->AsFFI());

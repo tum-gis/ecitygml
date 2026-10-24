@@ -156,7 +156,10 @@ impl ApplyTransform for Tunnel {
 mod tests {
     use super::*;
     use crate::model::common::{FeatureType, ForEachFeatureMut, HasFeatureType, IterFeatures};
-    use crate::model::tunnel::{TunnelPart, TunnelPartProperty};
+    use crate::model::tunnel::{
+        AsAbstractTunnelMut, HollowSpace, HollowSpaceProperty, TunnelFurniture,
+        TunnelFurnitureProperty, TunnelPart, TunnelPartProperty,
+    };
 
     fn tunnel_with_part() -> Tunnel {
         let mut tunnel = Tunnel::new(Id::try_from("tunnel").expect("valid id"));
@@ -185,6 +188,84 @@ mod tests {
         assert_eq!(
             feature_types,
             vec![FeatureType::Tunnel, FeatureType::TunnelPart]
+        );
+    }
+
+    fn tunnel_with_hollow_space() -> Tunnel {
+        let mut tunnel = Tunnel::new(Id::try_from("tunnel").expect("valid id"));
+        tunnel.push_hollow_space(HollowSpaceProperty::from_object(HollowSpace::new(
+            Id::try_from("hollow_space").expect("valid id"),
+        )));
+        tunnel
+    }
+
+    #[test]
+    fn test_iter_features_yields_tunnel_and_its_hollow_spaces() {
+        let feature_types: Vec<FeatureType> = tunnel_with_hollow_space()
+            .iter_features()
+            .map(|f| f.feature_type())
+            .collect();
+        assert_eq!(
+            feature_types,
+            vec![FeatureType::Tunnel, FeatureType::HollowSpace]
+        );
+    }
+
+    #[test]
+    fn test_for_each_feature_mut_visits_tunnel_and_its_hollow_spaces() {
+        let mut feature_types = Vec::new();
+        tunnel_with_hollow_space()
+            .for_each_feature_mut(&mut |f| feature_types.push(f.feature_type()));
+        assert_eq!(
+            feature_types,
+            vec![FeatureType::Tunnel, FeatureType::HollowSpace]
+        );
+    }
+
+    fn tunnel_with_furniture_on_tunnel_and_in_hollow_space() -> Tunnel {
+        let mut hollow_space = HollowSpace::new(Id::try_from("hollow_space").expect("valid id"));
+        hollow_space.push_tunnel_furniture(TunnelFurnitureProperty::from_object(
+            TunnelFurniture::new(Id::try_from("hollow_space_furniture").expect("valid id")),
+        ));
+
+        let mut tunnel = Tunnel::new(Id::try_from("tunnel").expect("valid id"));
+        tunnel.push_hollow_space(HollowSpaceProperty::from_object(hollow_space));
+        tunnel.push_tunnel_furniture(TunnelFurnitureProperty::from_object(TunnelFurniture::new(
+            Id::try_from("tunnel_furniture").expect("valid id"),
+        )));
+        tunnel
+    }
+
+    #[test]
+    fn test_iter_features_yields_furniture_on_tunnel_and_in_hollow_spaces() {
+        let feature_types: Vec<FeatureType> = tunnel_with_furniture_on_tunnel_and_in_hollow_space()
+            .iter_features()
+            .map(|f| f.feature_type())
+            .collect();
+        assert_eq!(
+            feature_types,
+            vec![
+                FeatureType::Tunnel,
+                FeatureType::HollowSpace,
+                FeatureType::TunnelFurniture,
+                FeatureType::TunnelFurniture
+            ]
+        );
+    }
+
+    #[test]
+    fn test_for_each_feature_mut_visits_furniture_on_tunnel_and_in_hollow_spaces() {
+        let mut feature_types = Vec::new();
+        tunnel_with_furniture_on_tunnel_and_in_hollow_space()
+            .for_each_feature_mut(&mut |f| feature_types.push(f.feature_type()));
+        assert_eq!(
+            feature_types,
+            vec![
+                FeatureType::Tunnel,
+                FeatureType::HollowSpace,
+                FeatureType::TunnelFurniture,
+                FeatureType::TunnelFurniture
+            ]
         );
     }
 }

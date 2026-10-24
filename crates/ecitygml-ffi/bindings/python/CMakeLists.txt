@@ -6,12 +6,14 @@ project(ecitygml_python LANGUAGES CXX)
 find_package(Python 3.12 REQUIRED COMPONENTS Interpreter Development.Module OPTIONAL_COMPONENTS Development.SABIModule)
 find_package(nanobind CONFIG REQUIRED)
 
-# Static Rust library (`cargo build -p ecitygml-ffi --release`).
+# Static Rust library: the debug build (`cargo build -p ecitygml-ffi`), unless overridden with
+# -DECITYGML_FFI_LIBRARY_DIR=... (`mise run build:bindings:python --release` passes target/release).
+set(ECITYGML_FFI_LIBRARY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../target/debug"
+    CACHE PATH "Directory with the static library built from crates/ecitygml-ffi")
 set(ECITYGML_FFI_LIBRARY
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../../../target/release/${CMAKE_STATIC_LIBRARY_PREFIX}ecitygml_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}"
-    CACHE FILEPATH "Static library built from crates/ecitygml-ffi")
+    "${ECITYGML_FFI_LIBRARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}ecitygml_ffi${CMAKE_STATIC_LIBRARY_SUFFIX}")
 if(NOT EXISTS "${ECITYGML_FFI_LIBRARY}")
-    message(FATAL_ERROR "${ECITYGML_FFI_LIBRARY} not found; run `cargo build -p ecitygml-ffi --release` first")
+    message(FATAL_ERROR "${ECITYGML_FFI_LIBRARY} not found; run `cargo build -p ecitygml-ffi` (or with --release) first")
 endif()
 
 file(GLOB_RECURSE BINDING_SOURCES CONFIGURE_DEPENDS src/sub_modules/*.cpp)

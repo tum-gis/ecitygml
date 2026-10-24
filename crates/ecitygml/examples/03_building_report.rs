@@ -47,12 +47,19 @@ fn optional(value: Option<i64>) -> String {
     value.map_or("-".to_string(), |value| value.to_string())
 }
 
-/// The value of a generic attribute: string, integer, double or measure (value and unit).
+/// The value of a generic attribute: string, integer, double, date, code (value and code space), URI or measure
+/// (value and unit).
 fn generic_attribute_value(attribute: &GenericAttributeKind) -> String {
     match attribute {
         GenericAttributeKind::StringAttribute(x) => x.value.clone(),
         GenericAttributeKind::IntAttribute(x) => x.value.to_string(),
         GenericAttributeKind::DoubleAttribute(x) => format!("{:.3}", x.value),
+        GenericAttributeKind::DateAttribute(x) => x.value.date().to_string(),
+        GenericAttributeKind::CodeAttribute(x) => match x.value.code_space() {
+            Some(code_space) => format!("{} ({code_space})", x.value.value()),
+            None => x.value.value().to_string(),
+        },
+        GenericAttributeKind::UriAttribute(x) => x.value.to_string(),
         GenericAttributeKind::MeasureAttribute(x) => {
             format!("{:.3} {}", x.value.value, x.value.uom)
         }

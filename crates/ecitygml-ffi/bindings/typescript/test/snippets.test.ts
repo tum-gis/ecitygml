@@ -1,6 +1,6 @@
 // Runs the scripts in examples/snippets/ (short programs giving a first impression of the bindings) and compares their output with the
-// expected output shared by all languages: for every `tests/expected/snippets/<snippet>/<fixture>.txt`,
-// the snippet runs on `tests/fixtures/<fixture>.gml` and must print that text.
+// expected output shared by all languages: for every `tests/expected/snippets/<snippet>/<dataset>/<fixture>.txt`,
+// the snippet runs on `tests/fixtures/<dataset>/<fixture>.gml` and must print that text.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
@@ -16,7 +16,7 @@ const fixtures = fileURLToPath(new URL('../../../../../tests/fixtures/', import.
 const outputExtensions: Record<string, string> = { translate_to_local_coordinates: '.gml' };
 
 for (const snippet of readdirSync(expected).sort()) {
-    for (const file of readdirSync(join(expected, snippet)).filter((name) => name.endsWith('.txt')).sort()) {
+    for (const file of readdirSync(join(expected, snippet), { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.txt')).sort()) {
         const fixture = file.slice(0, -'.txt'.length);
         test(`${snippet} ${fixture}`, () => {
             const extension = outputExtensions[snippet];

@@ -3,12 +3,13 @@
 //! Like all abstract-type macros (see `src/gml/core/model/feature/abstract_feature.rs`): each type invokes the
 //! macro of every abstract supertype itself and includes this file with `#[diplomat::include(...)]`.
 //! Not bound yet: building_constructive_elements, building_installations, building_rooms,
-//! addresses.
+//! building_furniture, addresses.
 
 #[diplomat::macro_rules]
 macro_rules! impl_abstract_building_methods {
     () => {
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
+        #[diplomat::attr(dart, rename = "classifier")] // `class` is reserved in Dart, which has no escaping
         pub fn class<'a>(
             &'a self,
         ) -> Option<&'a crate::citygml::core::model::building::values::building_class_value::ffi::BuildingClassValue> {

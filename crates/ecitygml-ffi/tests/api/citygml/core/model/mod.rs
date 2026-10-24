@@ -1,9 +1,0 @@
-mod bridge;
-mod building;
-mod city_furniture;
-mod common;
-mod construction;
-mod core;
-mod relief;
-mod transportation;
-mod vegetation;

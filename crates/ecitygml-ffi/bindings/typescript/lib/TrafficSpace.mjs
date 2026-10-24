@@ -20,6 +20,7 @@ import { SpaceType } from "./SpaceType.mjs"
 import { TrafficDirectionValue } from "./TrafficDirectionValue.mjs"
 import { TrafficSpaceClassValue } from "./TrafficSpaceClassValue.mjs"
 import { TrafficSpaceFunctionValueIterator } from "./TrafficSpaceFunctionValueIterator.mjs"
+import { TrafficSpaceReferenceIterator } from "./TrafficSpaceReferenceIterator.mjs"
 import { TrafficSpaceUsageValueIterator } from "./TrafficSpaceUsageValueIterator.mjs"
 import wasm from "./diplomat-wasm.mjs";
 import * as diplomatRuntime from "./diplomat-runtime.mjs";
@@ -646,6 +647,38 @@ export class TrafficSpace {
 
         try {
             return new OccupancyIterator(diplomatRuntime.internalConstructor, result, [], aEdges);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    predecessors() {
+        // This lifetime edge depends on lifetimes 'a
+        let aEdges = [this];
+
+
+        const result = wasm.ecitygml_TrafficSpace_predecessors(this.ffiValue);
+
+        try {
+            return new TrafficSpaceReferenceIterator(diplomatRuntime.internalConstructor, result, [], aEdges);
+        }
+
+        finally {
+            diplomatRuntime.FUNCTION_PARAM_ALLOC.clean();
+        }
+    }
+
+    successors() {
+        // This lifetime edge depends on lifetimes 'a
+        let aEdges = [this];
+
+
+        const result = wasm.ecitygml_TrafficSpace_successors(this.ffiValue);
+
+        try {
+            return new TrafficSpaceReferenceIterator(diplomatRuntime.internalConstructor, result, [], aEdges);
         }
 
         finally {

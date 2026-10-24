@@ -1,15 +1,22 @@
 mod abstract_generic_attribute;
+mod code_attribute;
+mod date_attribute;
 mod double_attribute;
 mod generic_attribute_property;
 pub(crate) mod generic_attribute_set;
+mod generic_logical_space;
 mod generic_occupied_space;
 mod generic_thematic_surface;
+mod generic_unoccupied_space;
 mod int_attribute;
 mod measure_attribute;
 mod string_attribute;
+mod uri_attribute;
 
 pub use abstract_generic_attribute::*;
 pub use generic_attribute_property::*;
+pub use generic_logical_space::*;
 pub use generic_occupied_space::*;
 pub use generic_thematic_surface::*;
+pub use generic_unoccupied_space::*;
 pub use string_attribute::*;

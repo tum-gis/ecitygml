@@ -6,3 +6,7 @@ crates/ecitygml-ffi/bindings/python/src/**        linguist-generated
 crates/ecitygml-ffi/bindings/kotlin/src/main/**   linguist-generated
 crates/ecitygml-ffi/bindings/typescript/lib/**    linguist-generated
 crates/ecitygml-ffi/bindings/dotnet/src/**        linguist-generated
+crates/ecitygml-ffi/bindings/dart/lib/src/**      linguist-generated
+
+# Test fixtures are kept byte-identical to their sources (tests/fixtures/README.md): no line-ending conversion.
+tests/fixtures/**/*.gml -text

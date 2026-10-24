@@ -5,6 +5,8 @@ use crate::model::vegetation::{
     AbstractVegetationObject, AbstractVegetationObjectKind, AsAbstractVegetationObject, PlantCover,
     SolitaryVegetationObject,
 };
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractVegetationObjectKindRef<'a> {
@@ -86,3 +88,12 @@ impl_try_from_occupied_space_kind_ref_for_enum!(
     AbstractVegetationObjectKind,
     AbstractVegetationObjectKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractVegetationObjectKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractVegetationObjectKindRef::PlantCover(x) => x.compute_envelope(),
+            AbstractVegetationObjectKindRef::SolitaryVegetationObject(x) => x.compute_envelope(),
+        }
+    }
+}

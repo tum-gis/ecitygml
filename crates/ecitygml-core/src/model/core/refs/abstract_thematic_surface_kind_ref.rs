@@ -14,6 +14,8 @@ use crate::model::transportation::{AuxiliaryTrafficArea, HoleSurface, Marking, T
 use crate::model::water_body::{
     AbstractWaterBoundarySurfaceKind, AbstractWaterBoundarySurfaceKindRef,
 };
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractThematicSurfaceKindRef<'a> {
@@ -176,3 +178,24 @@ impl_try_from_space_boundary_kind_ref_for_enum!(
     AbstractThematicSurfaceKind,
     AbstractThematicSurfaceKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractThematicSurfaceKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractThematicSurfaceKindRef::AuxiliaryTrafficArea(x) => x.compute_envelope(),
+            AbstractThematicSurfaceKindRef::ClosureSurface(x) => x.compute_envelope(),
+            AbstractThematicSurfaceKindRef::AbstractConstructionSurfaceKind(x) => {
+                x.compute_envelope()
+            }
+            AbstractThematicSurfaceKindRef::AbstractFillingSurfaceKind(x) => x.compute_envelope(),
+            AbstractThematicSurfaceKindRef::GenericThematicSurface(x) => x.compute_envelope(),
+            AbstractThematicSurfaceKindRef::HoleSurface(x) => x.compute_envelope(),
+            AbstractThematicSurfaceKindRef::LandUse(x) => x.compute_envelope(),
+            AbstractThematicSurfaceKindRef::Marking(x) => x.compute_envelope(),
+            AbstractThematicSurfaceKindRef::TrafficArea(x) => x.compute_envelope(),
+            AbstractThematicSurfaceKindRef::AbstractWaterBoundarySurfaceKind(x) => {
+                x.compute_envelope()
+            }
+        }
+    }
+}

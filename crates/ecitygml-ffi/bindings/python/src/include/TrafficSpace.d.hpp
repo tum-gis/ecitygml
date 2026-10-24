@@ -45,6 +45,8 @@ namespace capi { struct TrafficSpaceClassValue; }
 class TrafficSpaceClassValue;
 namespace capi { struct TrafficSpaceFunctionValueIterator; }
 class TrafficSpaceFunctionValueIterator;
+namespace capi { struct TrafficSpaceReferenceIterator; }
+class TrafficSpaceReferenceIterator;
 namespace capi { struct TrafficSpaceUsageValueIterator; }
 class TrafficSpaceUsageValueIterator;
 class GranularityValue;
@@ -162,6 +164,10 @@ public:
   inline std::optional<ecitygml::TrafficDirectionValue> traffic_direction() const;
 
   inline std::unique_ptr<ecitygml::OccupancyIterator> occupancies() const DIPLOMAT_LIFETIME_BOUND;
+
+  inline std::unique_ptr<ecitygml::TrafficSpaceReferenceIterator> predecessors() const DIPLOMAT_LIFETIME_BOUND;
+
+  inline std::unique_ptr<ecitygml::TrafficSpaceReferenceIterator> successors() const DIPLOMAT_LIFETIME_BOUND;
 
     inline const ecitygml::capi::TrafficSpace* AsFFI() const;
     inline ecitygml::capi::TrafficSpace* AsFFI();

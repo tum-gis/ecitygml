@@ -148,11 +148,14 @@ macro_rules! impl_try_from_for_thematic_surface_kind {
 }
 impl_try_from_for_thematic_surface_kind!(AuxiliaryTrafficArea);
 impl_try_from_for_thematic_surface_kind!(ClosureSurface);
+impl_try_from_for_thematic_surface_kind!(AbstractConstructionSurfaceKind);
+impl_try_from_for_thematic_surface_kind!(AbstractFillingSurfaceKind);
 impl_try_from_for_thematic_surface_kind!(GenericThematicSurface);
 impl_try_from_for_thematic_surface_kind!(HoleSurface);
 impl_try_from_for_thematic_surface_kind!(LandUse);
 impl_try_from_for_thematic_surface_kind!(Marking);
 impl_try_from_for_thematic_surface_kind!(TrafficArea);
+impl_try_from_for_thematic_surface_kind!(AbstractWaterBoundarySurfaceKind);
 
 impl IterFeatures for AbstractThematicSurfaceKind {
     fn iter_features(&self) -> Box<dyn Iterator<Item = AbstractFeatureKindRef<'_>> + '_> {

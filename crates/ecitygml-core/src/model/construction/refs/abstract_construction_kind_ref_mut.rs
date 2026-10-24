@@ -7,7 +7,7 @@ use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::construction::{
     AbstractConstruction, AbstractConstructionKind, AsAbstractConstruction,
-    AsAbstractConstructionMut,
+    AsAbstractConstructionMut, OtherConstruction,
 };
 use crate::model::tunnel::AbstractTunnelKind;
 use crate::model::tunnel::refs::AbstractTunnelKindRefMut;
@@ -18,6 +18,7 @@ pub enum AbstractConstructionKindRefMut<'a> {
     AbstractBuildingKind(AbstractBuildingKindRefMut<'a>),
     AbstractBridgeKind(AbstractBridgeKindRefMut<'a>),
     AbstractTunnelKind(AbstractTunnelKindRefMut<'a>),
+    OtherConstruction(&'a mut OtherConstruction),
 }
 
 impl<'a> From<&'a mut AbstractConstructionKind> for AbstractConstructionKindRefMut<'a> {
@@ -28,6 +29,7 @@ impl<'a> From<&'a mut AbstractConstructionKind> for AbstractConstructionKindRefM
             }
             AbstractConstructionKind::AbstractBridgeKind(x) => Self::AbstractBridgeKind(x.into()),
             AbstractConstructionKind::AbstractTunnelKind(x) => Self::AbstractTunnelKind(x.into()),
+            AbstractConstructionKind::OtherConstruction(x) => Self::OtherConstruction(x),
         }
     }
 }
@@ -38,6 +40,7 @@ impl<'a> AsAbstractConstruction for AbstractConstructionKindRefMut<'a> {
             Self::AbstractBuildingKind(x) => x.abstract_construction(),
             Self::AbstractBridgeKind(x) => x.abstract_construction(),
             Self::AbstractTunnelKind(x) => x.abstract_construction(),
+            Self::OtherConstruction(x) => x.abstract_construction(),
         }
     }
 }
@@ -48,6 +51,7 @@ impl<'a> AsAbstractConstructionMut for AbstractConstructionKindRefMut<'a> {
             Self::AbstractBuildingKind(x) => x.abstract_construction_mut(),
             Self::AbstractBridgeKind(x) => x.abstract_construction_mut(),
             Self::AbstractTunnelKind(x) => x.abstract_construction_mut(),
+            Self::OtherConstruction(x) => x.abstract_construction_mut(),
         }
     }
 }
@@ -60,6 +64,7 @@ impl<'a> HasFeatureType for AbstractConstructionKindRefMut<'a> {
             Self::AbstractBuildingKind(x) => x.feature_type(),
             Self::AbstractBridgeKind(x) => x.feature_type(),
             Self::AbstractTunnelKind(x) => x.feature_type(),
+            Self::OtherConstruction(x) => x.feature_type(),
         }
     }
 }
@@ -85,6 +90,7 @@ macro_rules! impl_from_for_construction_kind_ref_mut {
 impl_from_for_construction_kind_ref_mut!(AbstractBuildingKind);
 impl_from_for_construction_kind_ref_mut!(AbstractBridgeKind);
 impl_from_for_construction_kind_ref_mut!(AbstractTunnelKind);
+impl_from_for_construction_kind_ref_mut!(OtherConstruction);
 
 #[macro_export]
 macro_rules! impl_try_from_for_construction_kind_ref_mut {
@@ -108,6 +114,8 @@ macro_rules! impl_try_from_for_construction_kind_ref_mut {
         $crate::impl_try_from_for_occupied_space_kind_ref_mut!(AbstractConstructionKind, $type);
     };
 }
+
+impl_try_from_for_construction_kind_ref_mut!(OtherConstruction, OtherConstruction);
 
 #[macro_export]
 macro_rules! impl_try_from_construction_kind_ref_mut_for_enum {
@@ -145,6 +153,7 @@ impl<'a> RecomputeBoundingShape for AbstractConstructionKindRefMut<'a> {
             Self::AbstractBuildingKind(x) => x.recompute_bounding_shape(),
             Self::AbstractBridgeKind(x) => x.recompute_bounding_shape(),
             Self::AbstractTunnelKind(x) => x.recompute_bounding_shape(),
+            Self::OtherConstruction(x) => x.recompute_bounding_shape(),
         }
     }
 }

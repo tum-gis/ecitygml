@@ -4,6 +4,7 @@ use crate::model::water_body::{
     AbstractWaterBoundarySurface, AbstractWaterBoundarySurfaceKind, AsAbstractWaterBoundarySurface,
     WaterGroundSurface, WaterSurface,
 };
+use egml::model::common::ComputeEnvelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractWaterBoundarySurfaceKindRef<'a> {
@@ -86,3 +87,12 @@ impl_try_from_thematic_surface_kind_ref_for_enum!(
     AbstractWaterBoundarySurfaceKind,
     AbstractWaterBoundarySurfaceKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractWaterBoundarySurfaceKindRef<'a> {
+    fn compute_envelope(&self) -> Option<egml::model::geometry::Envelope> {
+        match self {
+            AbstractWaterBoundarySurfaceKindRef::WaterGroundSurface(x) => x.compute_envelope(),
+            AbstractWaterBoundarySurfaceKindRef::WaterSurface(x) => x.compute_envelope(),
+        }
+    }
+}

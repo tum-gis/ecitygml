@@ -28,6 +28,7 @@
 #include "TrafficDirectionValue.d.h"
 #include "TrafficSpaceClassValue.d.h"
 #include "TrafficSpaceFunctionValueIterator.d.h"
+#include "TrafficSpaceReferenceIterator.d.h"
 #include "TrafficSpaceUsageValueIterator.d.h"
 
 #include "TrafficSpace.d.h"
@@ -110,6 +111,10 @@ typedef struct ecitygml_TrafficSpace_traffic_direction_result {union {TrafficDir
 ecitygml_TrafficSpace_traffic_direction_result ecitygml_TrafficSpace_traffic_direction(const TrafficSpace* self);
 
 OccupancyIterator* ecitygml_TrafficSpace_occupancies(const TrafficSpace* self);
+
+TrafficSpaceReferenceIterator* ecitygml_TrafficSpace_predecessors(const TrafficSpace* self);
+
+TrafficSpaceReferenceIterator* ecitygml_TrafficSpace_successors(const TrafficSpace* self);
 
 void ecitygml_TrafficSpace_destroy(TrafficSpace* self);
 

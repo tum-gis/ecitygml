@@ -4,11 +4,11 @@ use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::construction::refs::{
     AbstractConstructionKindRef, AbstractConstructiveElementKindRef, AbstractFillingElementKindRef,
-    AbstractInstallationKindRef,
+    AbstractFurnitureKindRef, AbstractInstallationKindRef,
 };
 use crate::model::construction::{
     AbstractConstructionKind, AbstractConstructiveElementKind, AbstractFillingElementKind,
-    AbstractInstallationKind,
+    AbstractFurnitureKind, AbstractInstallationKind,
 };
 use crate::model::core::{
     AbstractOccupiedSpace, AbstractOccupiedSpaceKind, AsAbstractOccupiedSpace,
@@ -17,6 +17,8 @@ use crate::model::generics::GenericOccupiedSpace;
 use crate::model::vegetation::AbstractVegetationObjectKind;
 use crate::model::vegetation::refs::AbstractVegetationObjectKindRef;
 use crate::model::water_body::WaterBody;
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractOccupiedSpaceKindRef<'a> {
@@ -25,6 +27,7 @@ pub enum AbstractOccupiedSpaceKindRef<'a> {
     AbstractConstructiveElementKind(AbstractConstructiveElementKindRef<'a>),
     AbstractFillingElementKind(AbstractFillingElementKindRef<'a>),
     GenericOccupiedSpace(&'a GenericOccupiedSpace),
+    AbstractFurnitureKind(AbstractFurnitureKindRef<'a>),
     AbstractInstallationKind(AbstractInstallationKindRef<'a>),
     AbstractVegetationObjectKind(AbstractVegetationObjectKindRef<'a>),
     WaterBody(&'a WaterBody),
@@ -44,6 +47,9 @@ impl<'a> From<&'a AbstractOccupiedSpaceKind> for AbstractOccupiedSpaceKindRef<'a
                 Self::AbstractFillingElementKind(x.into())
             }
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => Self::GenericOccupiedSpace(x),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => {
+                Self::AbstractFurnitureKind(x.into())
+            }
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => {
                 Self::AbstractInstallationKind(x.into())
             }
@@ -63,6 +69,7 @@ impl<'a> AsAbstractOccupiedSpace for AbstractOccupiedSpaceKindRef<'a> {
             Self::AbstractConstructiveElementKind(x) => x.abstract_occupied_space(),
             Self::AbstractFillingElementKind(x) => x.abstract_occupied_space(),
             Self::GenericOccupiedSpace(x) => x.abstract_occupied_space(),
+            Self::AbstractFurnitureKind(x) => x.abstract_occupied_space(),
             Self::AbstractInstallationKind(x) => x.abstract_occupied_space(),
             Self::AbstractVegetationObjectKind(x) => x.abstract_occupied_space(),
             Self::WaterBody(x) => x.abstract_occupied_space(),
@@ -79,6 +86,7 @@ impl<'a> HasFeatureType for AbstractOccupiedSpaceKindRef<'a> {
             Self::AbstractConstructiveElementKind(x) => x.feature_type(),
             Self::AbstractFillingElementKind(x) => x.feature_type(),
             Self::GenericOccupiedSpace(_) => FeatureType::GenericOccupiedSpace,
+            Self::AbstractFurnitureKind(x) => x.feature_type(),
             Self::AbstractInstallationKind(x) => x.feature_type(),
             Self::AbstractVegetationObjectKind(x) => x.feature_type(),
             Self::WaterBody(x) => x.feature_type(),
@@ -105,6 +113,7 @@ impl_from_for_occupied_space_kind_ref!(AbstractConstructionKind);
 impl_from_for_occupied_space_kind_ref!(AbstractConstructiveElementKind);
 impl_from_for_occupied_space_kind_ref!(AbstractFillingElementKind);
 impl_from_for_occupied_space_kind_ref!(GenericOccupiedSpace);
+impl_from_for_occupied_space_kind_ref!(AbstractFurnitureKind);
 impl_from_for_occupied_space_kind_ref!(AbstractInstallationKind);
 impl_from_for_occupied_space_kind_ref!(AbstractVegetationObjectKind);
 impl_from_for_occupied_space_kind_ref!(WaterBody);
@@ -167,3 +176,21 @@ impl_try_from_physical_space_kind_ref_for_enum!(
     AbstractOccupiedSpaceKind,
     AbstractOccupiedSpaceKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractOccupiedSpaceKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractOccupiedSpaceKindRef::CityFurniture(x) => x.compute_envelope(),
+            AbstractOccupiedSpaceKindRef::AbstractConstructionKind(x) => x.compute_envelope(),
+            AbstractOccupiedSpaceKindRef::AbstractConstructiveElementKind(x) => {
+                x.compute_envelope()
+            }
+            AbstractOccupiedSpaceKindRef::AbstractFillingElementKind(x) => x.compute_envelope(),
+            AbstractOccupiedSpaceKindRef::GenericOccupiedSpace(x) => x.compute_envelope(),
+            AbstractOccupiedSpaceKindRef::AbstractFurnitureKind(x) => x.compute_envelope(),
+            AbstractOccupiedSpaceKindRef::AbstractInstallationKind(x) => x.compute_envelope(),
+            AbstractOccupiedSpaceKindRef::AbstractVegetationObjectKind(x) => x.compute_envelope(),
+            AbstractOccupiedSpaceKindRef::WaterBody(x) => x.compute_envelope(),
+        }
+    }
+}

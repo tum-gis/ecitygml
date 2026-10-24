@@ -151,3 +151,60 @@ impl ApplyTransform for Building {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::building::{
+        AsAbstractBuildingMut, BuildingFurniture, BuildingFurnitureProperty, BuildingRoom,
+        BuildingRoomProperty,
+    };
+    use crate::model::common::{FeatureType, ForEachFeatureMut, HasFeatureType, IterFeatures};
+
+    fn building_with_furniture_on_building_and_in_room() -> Building {
+        let mut room = BuildingRoom::new(Id::try_from("building_room").expect("valid id"));
+        room.push_building_furniture(BuildingFurnitureProperty::from_object(
+            BuildingFurniture::new(Id::try_from("room_furniture").expect("valid id")),
+        ));
+
+        let mut building = Building::new(Id::try_from("building").expect("valid id"));
+        building.push_building_room(BuildingRoomProperty::from_object(room));
+        building.push_building_furniture(BuildingFurnitureProperty::from_object(
+            BuildingFurniture::new(Id::try_from("building_furniture").expect("valid id")),
+        ));
+        building
+    }
+
+    #[test]
+    fn test_iter_features_yields_furniture_on_building_and_in_rooms() {
+        let feature_types: Vec<FeatureType> = building_with_furniture_on_building_and_in_room()
+            .iter_features()
+            .map(|f| f.feature_type())
+            .collect();
+        assert_eq!(
+            feature_types,
+            vec![
+                FeatureType::Building,
+                FeatureType::BuildingRoom,
+                FeatureType::BuildingFurniture,
+                FeatureType::BuildingFurniture
+            ]
+        );
+    }
+
+    #[test]
+    fn test_for_each_feature_mut_visits_furniture_on_building_and_in_rooms() {
+        let mut feature_types = Vec::new();
+        building_with_furniture_on_building_and_in_room()
+            .for_each_feature_mut(&mut |f| feature_types.push(f.feature_type()));
+        assert_eq!(
+            feature_types,
+            vec![
+                FeatureType::Building,
+                FeatureType::BuildingRoom,
+                FeatureType::BuildingFurniture,
+                FeatureType::BuildingFurniture
+            ]
+        );
+    }
+}

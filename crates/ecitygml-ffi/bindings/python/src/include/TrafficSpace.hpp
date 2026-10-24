@@ -32,6 +32,7 @@
 #include "TrafficDirectionValue.hpp"
 #include "TrafficSpaceClassValue.hpp"
 #include "TrafficSpaceFunctionValueIterator.hpp"
+#include "TrafficSpaceReferenceIterator.hpp"
 #include "TrafficSpaceUsageValueIterator.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -113,6 +114,10 @@ namespace capi {
     ecitygml_TrafficSpace_traffic_direction_result ecitygml_TrafficSpace_traffic_direction(const ecitygml::capi::TrafficSpace* self);
 
     ecitygml::capi::OccupancyIterator* ecitygml_TrafficSpace_occupancies(const ecitygml::capi::TrafficSpace* self);
+
+    ecitygml::capi::TrafficSpaceReferenceIterator* ecitygml_TrafficSpace_predecessors(const ecitygml::capi::TrafficSpace* self);
+
+    ecitygml::capi::TrafficSpaceReferenceIterator* ecitygml_TrafficSpace_successors(const ecitygml::capi::TrafficSpace* self);
 
     void ecitygml_TrafficSpace_destroy(TrafficSpace* self);
 
@@ -293,6 +298,16 @@ inline std::optional<ecitygml::TrafficDirectionValue> ecitygml::TrafficSpace::tr
 inline std::unique_ptr<ecitygml::OccupancyIterator> ecitygml::TrafficSpace::occupancies() const DIPLOMAT_LIFETIME_BOUND {
     auto result = ecitygml::capi::ecitygml_TrafficSpace_occupancies(this->AsFFI());
     return std::unique_ptr<ecitygml::OccupancyIterator>(ecitygml::OccupancyIterator::FromFFI(result));
+}
+
+inline std::unique_ptr<ecitygml::TrafficSpaceReferenceIterator> ecitygml::TrafficSpace::predecessors() const DIPLOMAT_LIFETIME_BOUND {
+    auto result = ecitygml::capi::ecitygml_TrafficSpace_predecessors(this->AsFFI());
+    return std::unique_ptr<ecitygml::TrafficSpaceReferenceIterator>(ecitygml::TrafficSpaceReferenceIterator::FromFFI(result));
+}
+
+inline std::unique_ptr<ecitygml::TrafficSpaceReferenceIterator> ecitygml::TrafficSpace::successors() const DIPLOMAT_LIFETIME_BOUND {
+    auto result = ecitygml::capi::ecitygml_TrafficSpace_successors(this->AsFFI());
+    return std::unique_ptr<ecitygml::TrafficSpaceReferenceIterator>(ecitygml::TrafficSpaceReferenceIterator::FromFFI(result));
 }
 
 inline const ecitygml::capi::TrafficSpace* ecitygml::TrafficSpace::AsFFI() const {

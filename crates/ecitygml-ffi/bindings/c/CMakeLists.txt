@@ -31,9 +31,21 @@ enable_testing()
 # on leaks (LeakSanitizer; not available on macOS). Reads of destroyed objects inside the Rust library are not
 # detected, as it isn't instrumented (that needs nightly Rust with -Zsanitizer=address).
 set(SANITIZERS -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
-foreach(test test_gml_reader test_geometry test_traffic_space)
-    add_executable(${test} tests/${test}.c)
-    target_include_directories(${test} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+# The conformance suite (tests/conformance, see crates/ecitygml/tests/conformance/README.md) and the API suite
+# (tests/api, see crates/ecitygml/tests/api/README.md): every file is a test executable of its own, named after its
+# folder.
+file(GLOB conformance_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/*.c")
+file(GLOB api_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/api/*.c")
+set(test_sources ${conformance_sources} ${api_sources})
+foreach(source ${test_sources})
+    get_filename_component(test "${source}" NAME_WE)
+    get_filename_component(folder "${source}" DIRECTORY)
+    get_filename_component(folder "${folder}" NAME)
+    if(folder STREQUAL "conformance" OR folder STREQUAL "api")
+        set(test "${folder}_${test}")
+    endif()
+    add_executable(${test} "${source}")
+    target_include_directories(${test} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     target_link_libraries(${test} PRIVATE "${ECITYGML_FFI}" unity m)
     target_compile_definitions(${test} PRIVATE ECITYGML_FIXTURES="${FIXTURES}")
     target_compile_options(${test} PRIVATE -Wall -Wextra -Werror ${SANITIZERS})

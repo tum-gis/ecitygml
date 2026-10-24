@@ -1,6 +1,6 @@
 """Runs the scripts in examples/snippets/ (short programs giving a first impression of the bindings) and compares their output with the
-expected output shared by all languages: for every `tests/expected/snippets/<snippet>/<fixture>.txt`,
-the snippet runs on `tests/fixtures/<fixture>.gml` and must print that text."""
+expected output shared by all languages: for every `tests/expected/snippets/<snippet>/<dataset>/<fixture>.txt`,
+the snippet runs on `tests/fixtures/<dataset>/<fixture>.gml` and must print that text."""
 
 import subprocess
 import sys
@@ -15,7 +15,10 @@ FIXTURES = Path(__file__).parents[5] / "tests" / "fixtures"
 # Snippets that write a file, and its extension (the snippet's second argument).
 OUTPUT_EXTENSIONS = {"translate_to_local_coordinates": ".gml"}
 
-CASES = sorted((path.parent.name, path.stem) for path in EXPECTED.glob("*/*.txt"))
+# The fixture of `<program>/<dataset>/<fixture>.txt` is `<dataset>/<fixture>`, as in `tests/fixtures`.
+CASES = sorted(
+    (path.parent.parent.name, f"{path.parent.name}/{path.stem}") for path in EXPECTED.glob("*/*/*.txt")
+)
 
 
 @pytest.mark.parametrize(("snippet", "fixture"), CASES, ids=[f"{s}-{f}" for s, f in CASES])

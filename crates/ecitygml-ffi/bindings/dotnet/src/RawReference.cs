@@ -9,6 +9,9 @@ namespace Ecitygml.Raw;
 internal partial struct Reference
 {
 
+    [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_Reference_from_traffic_space_reference", CallingConvention = CallingConvention.Cdecl)]
+    internal static unsafe extern Reference* FromTrafficSpaceReference(TrafficSpaceReference* reference);
+
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_Reference_href", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern HRef* Href(Reference* handle);
 

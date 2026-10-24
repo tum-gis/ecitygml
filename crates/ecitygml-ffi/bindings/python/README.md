@@ -9,20 +9,18 @@ Build and test with `mise run build:bindings:python` and `mise run test:bindings
 
 ## Tests
 
-- `test_city_model.py`, `test_examples.py`: the bindings' own tests and examples.
-- The other `test_*.py` files are ported from the tests of the former PyO3 bindings (removed; see
-  the git history), with the same file names (except `test_city_model.py` →
-  `test_iter_features.py`) and expected values. `conftest.py` translates the former API: filters
-  such as `iter_features(Building)` become `try_from`, boundaries are converted with
-  `AbstractFeatureKindRef.from_space_boundary`, properties are unwrapped with `.object()`.
+- `conformance/`, `api/`: the Python suites of the [conformance](../../../ecitygml/tests/conformance/README.md) and
+  [API](../../../ecitygml/tests/api/README.md) suites, which every language implements from the same case lists.
+  `api/test_python.py` holds the Python-only cases (return types, class getters, enums, value types).
+- `test_examples.py`, `test_snippets.py`: run `examples/` and compare their output with the expected output shared by
+  all languages.
 
-Objects returned by `try_from` don't keep their city model alive, so the tests keep every model
-referenced (module-scoped fixtures or local variables).
+Objects returned by `try_from` don't keep their city model alive, so the tests keep every model referenced.
 
 ### Not ported
 
-Former tests that weren't ported, because they need something the Diplomat bindings don't have
-(by design, or not in the Rust API):
+The tests of the former PyO3 bindings (removed; see the git history) are part of these suites, except those that need
+something the Diplomat bindings don't have (by design, or not in the Rust API):
 
 | Missing | Former tests |
 |---|---|

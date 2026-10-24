@@ -1,0 +1,246 @@
+//! The cases of `types.md`. `matrix_index_out_of_range` is scoped out (an `nalgebra` matrix has no fallible `get`).
+
+use crate::{fixture, read};
+use ecitygml::model::building::{AsAbstractBuilding, Building};
+use ecitygml::model::common::{FeatureType, HasFeatureType, IterFeatures, LevelOfDetail};
+use ecitygml::model::construction::{
+    DoorSurface, GroundSurface, RoofSurface, WallSurface, WindowSurface,
+};
+use ecitygml::model::core::refs::{AbstractFeatureKindRef, AbstractFeatureWithLifespanKindRef};
+use ecitygml::model::core::{AsAbstractFeature, AsAbstractFeatureWithLifespan, CityModel};
+use ecitygml::model::transportation::{
+    AuxiliaryTrafficArea, AuxiliaryTrafficSpace, Road, Section, TrafficArea, TrafficSpace,
+};
+use egml::model::base::AsAbstractGml;
+use egml::model::geometry::DirectPosition;
+use egml::model::xs::{Date, DateTime};
+
+const FZK_LOD1: &str = "fzk-haus/FZK-Haus-LoD1-KIT-IAI-KHH-B36-V1__v3.gml";
+const FZK_LOD2: &str = "fzk-haus/FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3.gml";
+const FZK_LOD3: &str = "fzk-haus/FZK-Haus-LoD3-KIT-IAI-KHH-B36-V1__v3.gml";
+const TUM: &str = "tum-main-entrance/TUM-Main-Entrance.gml";
+const ASAM_ROAD_SHAPE: &str = "asam-opendrive/ASAM-UC_RoadShape.gml";
+const ASAM_JUNCTION: &str = "asam-opendrive/ASAM-Ex_Bidirectional_Junction.gml";
+const SIG3D: &str = "http://www.sig3d.org/codelists/citygml/2.0/building/2.0/_AbstractBuilding_";
+
+fn first_of<'a, T>(city_model: &'a CityModel) -> &'a T
+where
+    &'a T: TryFrom<AbstractFeatureKindRef<'a>>,
+{
+    city_model
+        .iter_features()
+        .find_map(|feature| <&T>::try_from(feature).ok())
+        .expect("should have a feature of the type")
+}
+
+#[test]
+fn direct_position_new() {
+    let position = DirectPosition::new(1.0, 2.0, 3.0).expect("should be finite");
+    assert_eq!((position.x(), position.y(), position.z()), (1.0, 2.0, 3.0));
+    let error = DirectPosition::new(f64::NAN, 0.0, 0.0).unwrap_err();
+    assert!(error.to_string().contains("non-finite"), "{error}");
+}
+
+#[test]
+fn level_of_detail_index() {
+    let all = [
+        LevelOfDetail::Zero,
+        LevelOfDetail::One,
+        LevelOfDetail::Two,
+        LevelOfDetail::Three,
+    ];
+    for (index, lod) in all.into_iter().enumerate() {
+        assert_eq!(lod.as_index(), index);
+        assert_eq!(LevelOfDetail::try_from(index as u8).unwrap(), lod);
+    }
+    let error = LevelOfDetail::try_from(4).unwrap_err();
+    assert!(error.to_string().contains('4'), "{error}");
+}
+
+#[test]
+fn feature_type_name() {
+    assert_eq!(FeatureType::Building.to_string(), "Building");
+    assert_eq!(FeatureType::TinRelief.to_string(), "TinRelief");
+}
+
+#[test]
+fn date_from_parts() {
+    let date = Date::from_parts(2020, 1, 2, 3600).expect("should be a valid date");
+    assert_eq!(
+        (date.year(), date.month(), date.day(), date.offset_seconds()),
+        (2020, 1, 2, 3600)
+    );
+    let start = date.start_of_day();
+    assert_eq!((start.hour(), start.minute(), start.second()), (0, 0, 0));
+    assert_eq!(start.as_chrono().to_rfc3339(), "2020-01-02T00:00:00+01:00");
+
+    let error = Date::from_parts(2021, 2, 30, 0).unwrap_err();
+    assert!(
+        error.to_string().contains("do not form a valid date"),
+        "{error}"
+    );
+}
+
+#[test]
+fn date_time_from_parts() {
+    let date_time = DateTime::from_parts(2017, 1, 23, 13, 14, 15, 500_000_000, -7200)
+        .expect("should be a valid date and time");
+    assert_eq!(
+        (date_time.year(), date_time.month(), date_time.day()),
+        (2017, 1, 23)
+    );
+    assert_eq!(
+        (date_time.hour(), date_time.minute(), date_time.second()),
+        (13, 14, 15)
+    );
+    assert_eq!(date_time.nanosecond(), 500_000_000);
+    assert_eq!(date_time.offset_seconds(), -7200);
+    let chrono = date_time.as_chrono();
+    assert_eq!(chrono.timestamp(), 1485184455);
+    assert_eq!(chrono.timestamp_subsec_nanos(), 500_000_000);
+    assert_eq!(chrono.to_rfc3339(), "2017-01-23T13:14:15.500-02:00");
+
+    let error = DateTime::from_parts(2020, 1, 1, 0, 0, 0, 0, 30).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("timezone offset of 30 s is invalid"),
+        "{error}"
+    );
+}
+
+#[test]
+fn date_time_read() {
+    let city_model = read(&fixture(FZK_LOD2));
+    let created = first_of::<Building>(&city_model)
+        .creation_date()
+        .expect("should have a creation date");
+    assert_eq!(
+        created.as_chrono().to_rfc3339(),
+        "2017-01-23T00:00:00+01:00"
+    );
+}
+
+/// Asserts that `<&$ty>::try_from` accepts exactly the features of `FeatureType::$ty`.
+macro_rules! assert_try_from_matches {
+    ($city_model:expr, $($ty:ident),+) => {
+        for feature in $city_model.iter_features() {
+            let feature_type = feature.feature_type();
+            $(
+                assert_eq!(
+                    <&$ty>::try_from(feature).is_ok(),
+                    feature_type == FeatureType::$ty,
+                    "{} as {feature_type:?}",
+                    stringify!($ty)
+                );
+            )+
+        }
+    };
+}
+
+#[test]
+fn try_from_matches_feature_type() {
+    let city_model = read(&fixture(FZK_LOD3));
+    assert_try_from_matches!(
+        city_model,
+        Building,
+        WallSurface,
+        RoofSurface,
+        GroundSurface,
+        DoorSurface,
+        WindowSurface
+    );
+    let city_model = read(&fixture(ASAM_ROAD_SHAPE));
+    assert_try_from_matches!(
+        city_model,
+        Road,
+        Section,
+        TrafficSpace,
+        TrafficArea,
+        AuxiliaryTrafficSpace,
+        AuxiliaryTrafficArea
+    );
+}
+
+#[test]
+fn feature_from_city_object() {
+    let city_model = read(&fixture(ASAM_JUNCTION));
+    let city_object = city_model
+        .iter_city_objects()
+        .next()
+        .expect("should have a city object");
+    assert_eq!(city_object.feature_type(), FeatureType::Road);
+    let feature = AbstractFeatureKindRef::AbstractFeatureWithLifespanKind(
+        AbstractFeatureWithLifespanKindRef::AbstractCityObjectKind(city_object),
+    );
+    assert_eq!(feature.feature_type(), FeatureType::Road);
+    let road = <&Road>::try_from(feature).expect("should be a road");
+    assert_eq!(
+        road.feature_id().as_str(),
+        "UUID_8a13804c-cbd7-3a2f-9d46-e4d528a4bb4f"
+    );
+    assert!(<&Building>::try_from(feature).is_err());
+}
+
+#[test]
+fn gml_id() {
+    let city_model = read(&fixture(FZK_LOD1));
+    let generated = city_model.feature_id().as_str();
+    assert!(
+        generated.starts_with("ecitygml-gen-feature-"),
+        "{generated}"
+    );
+    assert_eq!(city_model.id().map(|id| id.as_str()), Some(generated));
+
+    let city_model = read(&fixture(FZK_LOD2));
+    let wall = first_of::<WallSurface>(&city_model);
+    let id = "GML_5856d7ad-5e34-498a-817b-9544bfbb1475";
+    assert_eq!(wall.id().map(|id| id.as_str()), Some(id));
+    assert_eq!(wall.feature_id().as_str(), id);
+
+    let city_model = read(&fixture(TUM));
+    assert_eq!(
+        first_of::<Building>(&city_model).id().map(|id| id.as_str()),
+        Some("DEBY_LOD2_4959457")
+    );
+}
+
+#[test]
+fn code_space() {
+    let city_model = read(&fixture(FZK_LOD2));
+    let building = first_of::<Building>(&city_model);
+    let class = building.class().expect("should have a class").code();
+    assert_eq!(class.value(), "1000");
+    assert_eq!(
+        class.code_space().map(|uri| uri.as_str()),
+        Some(format!("{SIG3D}class.xml").as_str())
+    );
+    let [function] = building.functions() else {
+        panic!("expected one function");
+    };
+    assert_eq!(
+        function.code().code_space().map(|uri| uri.as_str()),
+        Some(format!("{SIG3D}function.xml").as_str())
+    );
+    let [usage] = building.usages() else {
+        panic!("expected one usage");
+    };
+    assert_eq!(
+        usage.code().code_space().map(|uri| uri.as_str()),
+        Some(format!("{SIG3D}usage.xml").as_str())
+    );
+
+    let city_model = read(&fixture(TUM));
+    let [function] = first_of::<Building>(&city_model).functions() else {
+        panic!("expected one function");
+    };
+    assert_eq!(function.value(), "31001_3020");
+    assert!(function.code().code_space().is_none());
+
+    let city_model = read(&fixture(FZK_LOD1));
+    let [name] = city_model.names() else {
+        panic!("expected one name");
+    };
+    assert_eq!(name.value(), "AC14-FZK-Haus");
+    assert!(name.code_space().is_none());
+}

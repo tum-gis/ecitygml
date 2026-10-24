@@ -14,6 +14,10 @@
 namespace ecitygml {
 namespace capi { struct HRef; }
 class HRef;
+namespace capi { struct Reference; }
+class Reference;
+namespace capi { struct TrafficSpaceReference; }
+class TrafficSpaceReference;
 } // namespace ecitygml
 
 
@@ -31,6 +35,11 @@ namespace ecitygml {
  */
 class Reference {
 public:
+
+  /**
+   * An owned copy of a traffic space reference (Rust: `From<&TrafficSpaceReference>`).
+   */
+  inline static std::unique_ptr<ecitygml::Reference> from_traffic_space_reference(const ecitygml::TrafficSpaceReference& reference);
 
   inline const ecitygml::HRef* href() const DIPLOMAT_LIFETIME_BOUND;
 

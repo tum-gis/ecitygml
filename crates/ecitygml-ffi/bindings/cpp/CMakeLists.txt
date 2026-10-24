@@ -22,22 +22,15 @@ FetchContent_MakeAvailable(Catch2)
 
 find_library(ECITYGML_FFI ecitygml_ffi PATHS "${ECITYGML_FFI_LIBRARY_DIR}" NO_DEFAULT_PATH REQUIRED)
 
+# The conformance suite (tests/conformance, see crates/ecitygml/tests/conformance/README.md) and the API suite
+# (tests/api, see crates/ecitygml/tests/api/README.md) are part of the same test executable.
+file(GLOB conformance_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/*.cpp")
+file(GLOB api_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/api/*.cpp")
 add_executable(ecitygml_ffi_tests
-    tests/test_auxiliary_traffic.cpp
-    tests/test_bridge.cpp
-    tests/test_building.cpp
-    tests/test_city_model.cpp
-    tests/test_construction.cpp
-    tests/test_geometry.cpp
-    tests/test_gml_reader.cpp
-    tests/test_physical_space.cpp
-    tests/test_road.cpp
-    tests/test_space_boundary.cpp
-    tests/test_traffic_area.cpp
-    tests/test_traffic_space.cpp
-    tests/test_vegetation_furniture_relief.cpp
+    ${conformance_sources}
+    ${api_sources}
 )
-target_include_directories(ecitygml_ffi_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(ecitygml_ffi_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 target_link_libraries(ecitygml_ffi_tests PRIVATE "${ECITYGML_FFI}" Catch2::Catch2WithMain)
 target_compile_options(ecitygml_ffi_tests PRIVATE -Wall -Wextra)
 target_compile_definitions(ecitygml_ffi_tests PRIVATE ECITYGML_FIXTURES="${FIXTURES}")

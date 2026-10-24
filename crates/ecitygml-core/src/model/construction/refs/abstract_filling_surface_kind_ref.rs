@@ -5,6 +5,7 @@ use crate::model::construction::{
     AbstractFillingSurface, AbstractFillingSurfaceKind, AsAbstractFillingSurface, DoorSurface,
     WindowSurface,
 };
+use egml::model::common::ComputeEnvelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractFillingSurfaceKindRef<'a> {
@@ -84,3 +85,12 @@ impl_try_from_thematic_surface_kind_ref_for_enum!(
     AbstractFillingSurfaceKind,
     AbstractFillingSurfaceKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractFillingSurfaceKindRef<'a> {
+    fn compute_envelope(&self) -> Option<egml::model::geometry::Envelope> {
+        match self {
+            AbstractFillingSurfaceKindRef::DoorSurface(x) => x.compute_envelope(),
+            AbstractFillingSurfaceKindRef::WindowSurface(x) => x.compute_envelope(),
+        }
+    }
+}

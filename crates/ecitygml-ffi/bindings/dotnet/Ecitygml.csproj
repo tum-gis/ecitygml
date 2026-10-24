@@ -9,7 +9,8 @@
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../../../'))</RepositoryRoot>
-    <!-- Debug build of crates/ecitygml-ffi (`cargo build -p ecitygml-ffi`), unless overridden with -p:NativeLibraryDir=... -->
+    <!-- Debug build of crates/ecitygml-ffi (`cargo build -p ecitygml-ffi`), unless overridden with -p:NativeLibraryDir=...
+         or the environment variable NativeLibraryDir (set by `mise run build:bindings:dotnet` with the release flag). -->
     <NativeLibraryDir Condition="'$(NativeLibraryDir)' == ''">$(RepositoryRoot)target/debug/</NativeLibraryDir>
   </PropertyGroup>
   <ItemGroup>
@@ -17,13 +18,14 @@
   </ItemGroup>
 
   <!-- The generated code loads the native library `ecitygml_ffi` (DllImport) from the application's directory:
-       copied there for every project referencing this one (the tests and examples). -->
+       copied there for every project referencing this one (the tests and examples). Always, not only when newer:
+       switching between the debug and release build can make it older than the copy. -->
   <ItemGroup>
-    <None Include="$(NativeLibraryDir)libecitygml_ffi.dylib" Link="libecitygml_ffi.dylib" CopyToOutputDirectory="PreserveNewest"
+    <None Include="$(NativeLibraryDir)libecitygml_ffi.dylib" Link="libecitygml_ffi.dylib" CopyToOutputDirectory="Always"
           Condition="Exists('$(NativeLibraryDir)libecitygml_ffi.dylib')" />
-    <None Include="$(NativeLibraryDir)libecitygml_ffi.so" Link="libecitygml_ffi.so" CopyToOutputDirectory="PreserveNewest"
+    <None Include="$(NativeLibraryDir)libecitygml_ffi.so" Link="libecitygml_ffi.so" CopyToOutputDirectory="Always"
           Condition="Exists('$(NativeLibraryDir)libecitygml_ffi.so')" />
-    <None Include="$(NativeLibraryDir)ecitygml_ffi.dll" Link="ecitygml_ffi.dll" CopyToOutputDirectory="PreserveNewest"
+    <None Include="$(NativeLibraryDir)ecitygml_ffi.dll" Link="ecitygml_ffi.dll" CopyToOutputDirectory="Always"
           Condition="Exists('$(NativeLibraryDir)ecitygml_ffi.dll')" />
   </ItemGroup>
 </Project>

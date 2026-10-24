@@ -30,6 +30,7 @@ pub fn deserialize_city_object_relation_property(
     if let Some(index) = index.first(CityGmlElement::CityObjectRelation.into()) {
         object = Some(deserialize_city_object_relation(
             &xml_document[index.range()],
+            config,
         )?);
     }
 

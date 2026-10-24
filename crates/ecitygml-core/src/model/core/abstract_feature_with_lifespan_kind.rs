@@ -101,3 +101,6 @@ macro_rules! impl_try_from_for_feature_with_lifespan_kind {
         $crate::impl_try_from_for_feature_with_lifespan_kind!($variant, $variant);
     };
 }
+impl_try_from_for_feature_with_lifespan_kind!(AbstractAppearanceKind);
+impl_try_from_for_feature_with_lifespan_kind!(CityModel);
+impl_try_from_for_feature_with_lifespan_kind!(AbstractCityObjectKind);

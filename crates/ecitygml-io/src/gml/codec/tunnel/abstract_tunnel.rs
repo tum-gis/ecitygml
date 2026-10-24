@@ -3,9 +3,15 @@ use crate::gml::codec::construction::{
     deserialize_abstract_construction, serialize_abstract_construction,
     serialize_abstract_construction_attributes,
 };
+use crate::gml::codec::tunnel::hollow_space_property::{
+    deserialize_hollow_space_property, serialize_hollow_space_property,
+};
 use crate::gml::codec::tunnel::tunnel_constructive_element_property::{
     deserialize_tunnel_constructive_element_property,
     serialize_tunnel_constructive_element_property,
+};
+use crate::gml::codec::tunnel::tunnel_furniture_property::{
+    deserialize_tunnel_furniture_property, serialize_tunnel_furniture_property,
 };
 use crate::gml::codec::tunnel::tunnel_installation_property::{
     deserialize_tunnel_installation_property, serialize_tunnel_installation_property,
@@ -32,6 +38,8 @@ pub fn deserialize_abstract_tunnel(
     let mut abstract_construction_result = None;
     let mut tunnel_installations_result = None;
     let mut tunnel_constructive_elements_result = None;
+    let mut hollow_spaces_result = None;
+    let mut tunnel_furniture_result = None;
 
     rayon::scope(|s| {
         s.spawn(|_| {
@@ -57,6 +65,24 @@ pub fn deserialize_abstract_tunnel(
                 CityGmlElement::TunnelConstructiveElementProperty.into(),
                 config,
                 deserialize_tunnel_constructive_element_property,
+            ));
+        });
+        s.spawn(|_| {
+            hollow_spaces_result = Some(collect_children(
+                xml_document,
+                index,
+                CityGmlElement::HollowSpaceProperty.into(),
+                config,
+                deserialize_hollow_space_property,
+            ));
+        });
+        s.spawn(|_| {
+            tunnel_furniture_result = Some(collect_children(
+                xml_document,
+                index,
+                CityGmlElement::TunnelFurnitureProperty.into(),
+                config,
+                deserialize_tunnel_furniture_property,
             ));
         });
     });
@@ -91,6 +117,12 @@ pub fn deserialize_abstract_tunnel(
     abstract_tunnel.set_tunnel_constructive_elements(
         tunnel_constructive_elements_result
             .expect("rayon::scope guarantees all spawns complete")?,
+    );
+    abstract_tunnel.set_hollow_spaces(
+        hollow_spaces_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
+    abstract_tunnel.set_tunnel_furniture(
+        tunnel_furniture_result.expect("rayon::scope guarantees all spawns complete")?,
     );
 
     Ok(abstract_tunnel)
@@ -134,6 +166,12 @@ pub fn serialize_abstract_tunnel(
     }
     for prop in abstract_tunnel.tunnel_constructive_elements() {
         serialize_tunnel_constructive_element_property(prop, xml_fragment_writer)?;
+    }
+    for prop in abstract_tunnel.hollow_spaces() {
+        serialize_hollow_space_property(prop, xml_fragment_writer)?;
+    }
+    for prop in abstract_tunnel.tunnel_furniture() {
+        serialize_tunnel_furniture_property(prop, xml_fragment_writer)?;
     }
 
     Ok(())

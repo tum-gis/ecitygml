@@ -100,6 +100,8 @@ macro_rules! impl_try_from_for_space_boundary_kind {
     };
 }
 impl_try_from_for_space_boundary_kind!(ReliefFeature);
+impl_try_from_for_space_boundary_kind!(AbstractThematicSurfaceKind);
+impl_try_from_for_space_boundary_kind!(AbstractReliefComponentKind);
 
 impl IterFeatures for AbstractSpaceBoundaryKind {
     fn iter_features(&self) -> Box<dyn Iterator<Item = AbstractFeatureKindRef<'_>> + '_> {

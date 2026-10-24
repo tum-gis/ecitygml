@@ -1,4 +1,6 @@
 //! `GenericAttributeKind`, any generic attribute, and its iterator.
+//! Not bound yet: the values of `DateAttribute`, `CodeAttribute` and `UriAttribute` (their `name` is
+//! available).
 
 #[diplomat::bridge]
 #[diplomat::abi_rename = "ecitygml_{0}"]

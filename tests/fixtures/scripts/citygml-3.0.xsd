@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The CityGML 3.0 modules the hand-written fixtures in tests/fixtures/synthetic use, from the official schema
+     repository; `mise run check:fixtures` validates the files against it with xmllint (needs network access). -->
+<schema xmlns="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:ecitygml:fixtures" elementFormDefault="qualified">
+  <import namespace="http://www.opengis.net/citygml/3.0" schemaLocation="http://schemas.opengis.net/citygml/3.0/core.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/building/3.0" schemaLocation="http://schemas.opengis.net/citygml/building/3.0/building.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/bridge/3.0" schemaLocation="http://schemas.opengis.net/citygml/bridge/3.0/bridge.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/tunnel/3.0" schemaLocation="http://schemas.opengis.net/citygml/tunnel/3.0/tunnel.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/vegetation/3.0" schemaLocation="http://schemas.opengis.net/citygml/vegetation/3.0/vegetation.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/cityfurniture/3.0" schemaLocation="http://schemas.opengis.net/citygml/cityfurniture/3.0/cityFurniture.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/transportation/3.0" schemaLocation="http://schemas.opengis.net/citygml/transportation/3.0/transportation.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/generics/3.0" schemaLocation="http://schemas.opengis.net/citygml/generics/3.0/generics.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/construction/3.0" schemaLocation="http://schemas.opengis.net/citygml/construction/3.0/construction.xsd"/>
+  <import namespace="http://www.opengis.net/citygml/relief/3.0" schemaLocation="http://schemas.opengis.net/citygml/relief/3.0/relief.xsd"/>
+</schema>

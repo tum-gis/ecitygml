@@ -79,11 +79,13 @@ macro_rules! impl_try_from_for_surface_data_kind {
                 }
             }
         }
+        $crate::impl_try_from_for_feature_kind!(AbstractSurfaceDataKind, $type);
     };
     ($variant:ident) => {
         $crate::impl_try_from_for_surface_data_kind!($variant, $variant);
     };
 }
+impl_try_from_for_surface_data_kind!(AbstractTextureKind);
 impl_try_from_for_surface_data_kind!(X3DMaterial);
 
 impl IterFeatures for AbstractSurfaceDataKind {

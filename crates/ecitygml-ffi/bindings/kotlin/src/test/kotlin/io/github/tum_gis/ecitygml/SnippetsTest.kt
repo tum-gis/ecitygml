@@ -44,7 +44,7 @@ private fun run(fileClass: String, args: List<String>): Pair<Int, String> {
 /**
  * Runs the snippets in src/examples/…/snippets (short programs giving a first impression of the bindings) and
  * compares their output with the expected output shared by all languages: for every
- * `tests/expected/snippets/<snippet>/<fixture>.txt`, the snippet runs on `tests/fixtures/<fixture>.gml` and must print
+ * `tests/expected/snippets/<snippet>/<dataset>/<fixture>.txt`, the snippet runs on `tests/fixtures/<dataset>/<fixture>.gml` and must print
  * that text; for snippets that write a file, it must match `<fixture><extension>` there if that exists.
  */
 class SnippetsTest {
@@ -52,15 +52,17 @@ class SnippetsTest {
     fun expectedOutputs(): List<DynamicTest> =
         expected.listFiles()!!.sorted().flatMap { directory ->
             val fileClass = snippets.getValue(directory.name)
-            directory.listFiles { file -> file.extension == "txt" }!!.sorted().map { case ->
-                DynamicTest.dynamicTest("${directory.name} ${case.nameWithoutExtension}") {
+            // `<dataset>/<fixture>.txt`: the fixture is `<dataset>/<fixture>`, as below tests/fixtures.
+            directory.walk().filter { it.isFile && it.extension == "txt" }.sorted().toList().map { case ->
+                val fixture = "${case.parentFile.name}/${case.nameWithoutExtension}"
+                DynamicTest.dynamicTest("${directory.name} $fixture") {
                     val extension = outputExtensions[directory.name]
                     val output = extension?.let { Files.createTempFile("ecitygml-snippet", it).toFile() }
-                    val arguments = listOfNotNull("$fixtures/${case.nameWithoutExtension}.gml", output?.path)
+                    val arguments = listOfNotNull("$fixtures/$fixture.gml", output?.path)
                     val (exitCode, out) = run(fileClass, arguments)
                     assertEquals(0, exitCode)
                     assertEquals(case.readText(), out)
-                    val expectedFile = File(directory, case.nameWithoutExtension + (extension ?: ""))
+                    val expectedFile = File(case.parentFile, case.nameWithoutExtension + (extension ?: ""))
                     if (output != null && expectedFile.exists()) {
                         assertTrue(expectedFile.readBytes().contentEquals(output.readBytes()), "$output differs from $expectedFile")
                     }

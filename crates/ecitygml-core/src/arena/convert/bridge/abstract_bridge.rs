@@ -1,6 +1,8 @@
 use crate::arena::city_model_arena::CityModelArena;
 use crate::arena::convert::bridge::bridge_constructive_element_property::flatten_bridge_constructive_element_property;
+use crate::arena::convert::bridge::bridge_furniture_property::flatten_bridge_furniture_property;
 use crate::arena::convert::bridge::bridge_installation_property::flatten_bridge_installation_property;
+use crate::arena::convert::bridge::bridge_room_property::flatten_bridge_room_property;
 use crate::arena::convert::construction::flatten_abstract_construction;
 use crate::model::bridge::{AbstractBridge, AsAbstractBridgeMut};
 use crate::model::construction::AsAbstractConstructionMut;
@@ -19,5 +21,11 @@ pub fn flatten_abstract_bridge(
     }
     for prop in abstract_bridge.bridge_constructive_elements_mut() {
         flatten_bridge_constructive_element_property(prop, city_model_arena);
+    }
+    for prop in abstract_bridge.bridge_rooms_mut() {
+        flatten_bridge_room_property(prop, city_model_arena);
+    }
+    for prop in abstract_bridge.bridge_furniture_mut() {
+        flatten_bridge_furniture_property(prop, city_model_arena);
     }
 }

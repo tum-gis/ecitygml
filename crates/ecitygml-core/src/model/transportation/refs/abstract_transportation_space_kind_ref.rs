@@ -5,6 +5,8 @@ use crate::model::transportation::{
     AbstractTransportationSpace, AbstractTransportationSpaceKind, AsAbstractTransportationSpace,
     Intersection, Railway, Road, Section, Square, Track, Waterway,
 };
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractTransportationSpaceKindRef<'a> {
@@ -116,3 +118,17 @@ impl_try_from_unoccupied_space_kind_ref_for_enum!(
     AbstractTransportationSpaceKind,
     AbstractTransportationSpaceKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractTransportationSpaceKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractTransportationSpaceKindRef::Section(x) => x.compute_envelope(),
+            AbstractTransportationSpaceKindRef::Intersection(x) => x.compute_envelope(),
+            AbstractTransportationSpaceKindRef::Road(x) => x.compute_envelope(),
+            AbstractTransportationSpaceKindRef::Track(x) => x.compute_envelope(),
+            AbstractTransportationSpaceKindRef::Railway(x) => x.compute_envelope(),
+            AbstractTransportationSpaceKindRef::Waterway(x) => x.compute_envelope(),
+            AbstractTransportationSpaceKindRef::Square(x) => x.compute_envelope(),
+        }
+    }
+}

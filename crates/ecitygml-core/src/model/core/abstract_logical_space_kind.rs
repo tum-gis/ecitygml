@@ -6,6 +6,7 @@ use crate::model::common::{FeatureType, ForEachFeatureMut, HasFeatureType, IterF
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
 use crate::model::core::{AbstractLogicalSpace, AsAbstractLogicalSpace, AsAbstractLogicalSpaceMut};
+use crate::model::generics::GenericLogicalSpace;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
@@ -14,6 +15,7 @@ use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 pub enum AbstractLogicalSpaceKind {
     AbstractBuildingSubdivisionKind(AbstractBuildingSubdivisionKind),
     CityObjectGroup(CityObjectGroup),
+    GenericLogicalSpace(GenericLogicalSpace),
 }
 
 impl AsAbstractLogicalSpace for AbstractLogicalSpaceKind {
@@ -23,6 +25,7 @@ impl AsAbstractLogicalSpace for AbstractLogicalSpaceKind {
                 x.abstract_logical_space()
             }
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.abstract_logical_space(),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.abstract_logical_space(),
         }
     }
 }
@@ -34,6 +37,7 @@ impl AsAbstractLogicalSpaceMut for AbstractLogicalSpaceKind {
                 x.abstract_logical_space_mut()
             }
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.abstract_logical_space_mut(),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.abstract_logical_space_mut(),
         }
     }
 }
@@ -46,6 +50,7 @@ impl HasFeatureType for AbstractLogicalSpaceKind {
         match self {
             Self::AbstractBuildingSubdivisionKind(x) => x.feature_type(),
             Self::CityObjectGroup(x) => x.feature_type(),
+            Self::GenericLogicalSpace(x) => x.feature_type(),
         }
     }
 }
@@ -66,6 +71,7 @@ macro_rules! impl_from_for_logical_space_kind {
 }
 impl_from_for_logical_space_kind!(AbstractBuildingSubdivisionKind);
 impl_from_for_logical_space_kind!(CityObjectGroup);
+impl_from_for_logical_space_kind!(GenericLogicalSpace);
 
 #[macro_export]
 macro_rules! impl_try_from_for_logical_space_kind {
@@ -88,13 +94,16 @@ macro_rules! impl_try_from_for_logical_space_kind {
         $crate::impl_try_from_for_logical_space_kind!($variant, $variant);
     };
 }
+impl_try_from_for_logical_space_kind!(AbstractBuildingSubdivisionKind);
 impl_try_from_for_logical_space_kind!(CityObjectGroup);
+impl_try_from_for_logical_space_kind!(GenericLogicalSpace);
 
 impl IterFeatures for AbstractLogicalSpaceKind {
     fn iter_features(&self) -> Box<dyn Iterator<Item = AbstractFeatureKindRef<'_>> + '_> {
         match self {
             AbstractLogicalSpaceKind::AbstractBuildingSubdivisionKind(x) => x.iter_features(),
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.iter_features(),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.iter_features(),
         }
     }
 }
@@ -106,6 +115,7 @@ impl ForEachFeatureMut for AbstractLogicalSpaceKind {
                 x.for_each_feature_mut(f)
             }
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.for_each_feature_mut(f),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.for_each_feature_mut(f),
         }
     }
 }
@@ -115,6 +125,7 @@ impl ComputeEnvelope for AbstractLogicalSpaceKind {
         match self {
             AbstractLogicalSpaceKind::AbstractBuildingSubdivisionKind(x) => x.compute_envelope(),
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.compute_envelope(),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.compute_envelope(),
         }
     }
 }
@@ -124,6 +135,7 @@ impl ApplyTransform for AbstractLogicalSpaceKind {
         match self {
             AbstractLogicalSpaceKind::AbstractBuildingSubdivisionKind(x) => x.apply_transform(m),
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.apply_transform(m),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.apply_transform(m),
         }
     }
 
@@ -133,6 +145,7 @@ impl ApplyTransform for AbstractLogicalSpaceKind {
                 x.apply_isometry(isometry)
             }
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.apply_isometry(isometry),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.apply_isometry(isometry),
         }
     }
 
@@ -142,6 +155,7 @@ impl ApplyTransform for AbstractLogicalSpaceKind {
                 x.apply_translation(vector)
             }
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.apply_translation(vector),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.apply_translation(vector),
         }
     }
 
@@ -151,6 +165,7 @@ impl ApplyTransform for AbstractLogicalSpaceKind {
                 x.apply_rotation(rotation)
             }
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.apply_rotation(rotation),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.apply_rotation(rotation),
         }
     }
 
@@ -158,6 +173,7 @@ impl ApplyTransform for AbstractLogicalSpaceKind {
         match self {
             AbstractLogicalSpaceKind::AbstractBuildingSubdivisionKind(x) => x.apply_scale(scale),
             AbstractLogicalSpaceKind::CityObjectGroup(x) => x.apply_scale(scale),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => x.apply_scale(scale),
         }
     }
 }

@@ -4,6 +4,8 @@ use crate::model::common::HasFeatureType;
 use crate::model::tunnel::{
     AbstractTunnel, AbstractTunnelKind, AsAbstractTunnel, Tunnel, TunnelPart,
 };
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractTunnelKindRef<'a> {
@@ -76,3 +78,12 @@ macro_rules! impl_try_from_tunnel_kind_ref {
 impl_try_from_tunnel_kind_ref!(Tunnel);
 impl_try_from_tunnel_kind_ref!(TunnelPart);
 impl_try_from_construction_kind_ref_for_enum!(AbstractTunnelKind, AbstractTunnelKindRef);
+
+impl<'a> ComputeEnvelope for AbstractTunnelKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractTunnelKindRef::Tunnel(x) => x.compute_envelope(),
+            AbstractTunnelKindRef::TunnelPart(x) => x.compute_envelope(),
+        }
+    }
+}

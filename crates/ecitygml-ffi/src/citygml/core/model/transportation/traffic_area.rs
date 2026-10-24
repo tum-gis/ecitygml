@@ -43,6 +43,7 @@ pub mod ffi {
         }
 
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
+        #[diplomat::attr(dart, rename = "classifier")] // `class` is reserved in Dart, which has no escaping
         pub fn class<'a>(&'a self) -> Option<&'a TrafficAreaClassValue> {
             self.0
                 .class()

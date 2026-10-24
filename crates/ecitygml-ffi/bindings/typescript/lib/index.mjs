@@ -214,6 +214,10 @@ export { TrafficSpaceProperty } from "./TrafficSpaceProperty.mjs"
 
 export { TrafficSpacePropertyIterator } from "./TrafficSpacePropertyIterator.mjs"
 
+export { TrafficSpaceReference } from "./TrafficSpaceReference.mjs"
+
+export { TrafficSpaceReferenceIterator } from "./TrafficSpaceReferenceIterator.mjs"
+
 export { AuxiliaryTrafficAreaClassValue } from "./AuxiliaryTrafficAreaClassValue.mjs"
 
 export { AuxiliaryTrafficAreaFunctionValue } from "./AuxiliaryTrafficAreaFunctionValue.mjs"

@@ -4,7 +4,7 @@ use crate::model::city_furniture::CityFurniture;
 use crate::model::common::{FeatureType, ForEachFeatureMut, HasFeatureType, IterFeatures};
 use crate::model::construction::{
     AbstractConstructionKind, AbstractConstructiveElementKind, AbstractFillingElementKind,
-    AbstractInstallationKind,
+    AbstractFurnitureKind, AbstractInstallationKind,
 };
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
@@ -25,6 +25,7 @@ pub enum AbstractOccupiedSpaceKind {
     AbstractConstructiveElementKind(AbstractConstructiveElementKind),
     AbstractFillingElementKind(AbstractFillingElementKind),
     GenericOccupiedSpace(GenericOccupiedSpace),
+    AbstractFurnitureKind(AbstractFurnitureKind),
     AbstractInstallationKind(AbstractInstallationKind),
     AbstractVegetationObjectKind(AbstractVegetationObjectKind),
     WaterBody(WaterBody),
@@ -39,6 +40,7 @@ impl AsAbstractOccupiedSpace for AbstractOccupiedSpaceKind {
             Self::AbstractFillingElementKind(x) => x.abstract_occupied_space(),
             Self::GenericOccupiedSpace(x) => x.abstract_occupied_space(),
             Self::AbstractVegetationObjectKind(x) => x.abstract_occupied_space(),
+            Self::AbstractFurnitureKind(x) => x.abstract_occupied_space(),
             Self::AbstractInstallationKind(x) => x.abstract_occupied_space(),
             Self::WaterBody(x) => x.abstract_occupied_space(),
         }
@@ -54,6 +56,7 @@ impl AsAbstractOccupiedSpaceMut for AbstractOccupiedSpaceKind {
             Self::AbstractFillingElementKind(x) => x.abstract_occupied_space_mut(),
             Self::GenericOccupiedSpace(x) => x.abstract_occupied_space_mut(),
             Self::AbstractVegetationObjectKind(x) => x.abstract_occupied_space_mut(),
+            Self::AbstractFurnitureKind(x) => x.abstract_occupied_space_mut(),
             Self::AbstractInstallationKind(x) => x.abstract_occupied_space_mut(),
             Self::WaterBody(x) => x.abstract_occupied_space_mut(),
         }
@@ -71,6 +74,7 @@ impl HasFeatureType for AbstractOccupiedSpaceKind {
             Self::AbstractConstructiveElementKind(x) => x.feature_type(),
             Self::AbstractFillingElementKind(x) => x.feature_type(),
             Self::GenericOccupiedSpace(x) => x.feature_type(),
+            Self::AbstractFurnitureKind(x) => x.feature_type(),
             Self::AbstractInstallationKind(x) => x.feature_type(),
             Self::AbstractVegetationObjectKind(x) => x.feature_type(),
             Self::WaterBody(x) => x.feature_type(),
@@ -97,6 +101,7 @@ impl_from_for_occupied_space_kind!(AbstractConstructionKind);
 impl_from_for_occupied_space_kind!(AbstractConstructiveElementKind);
 impl_from_for_occupied_space_kind!(AbstractFillingElementKind);
 impl_from_for_occupied_space_kind!(GenericOccupiedSpace);
+impl_from_for_occupied_space_kind!(AbstractFurnitureKind);
 impl_from_for_occupied_space_kind!(AbstractInstallationKind);
 impl_from_for_occupied_space_kind!(AbstractVegetationObjectKind);
 impl_from_for_occupied_space_kind!(WaterBody);
@@ -123,7 +128,13 @@ macro_rules! impl_try_from_for_occupied_space_kind {
     };
 }
 impl_try_from_for_occupied_space_kind!(CityFurniture);
+impl_try_from_for_occupied_space_kind!(AbstractConstructionKind);
+impl_try_from_for_occupied_space_kind!(AbstractConstructiveElementKind);
+impl_try_from_for_occupied_space_kind!(AbstractFillingElementKind);
 impl_try_from_for_occupied_space_kind!(GenericOccupiedSpace);
+impl_try_from_for_occupied_space_kind!(AbstractFurnitureKind);
+impl_try_from_for_occupied_space_kind!(AbstractInstallationKind);
+impl_try_from_for_occupied_space_kind!(AbstractVegetationObjectKind);
 impl_try_from_for_occupied_space_kind!(WaterBody);
 
 impl IterFeatures for AbstractOccupiedSpaceKind {
@@ -134,6 +145,7 @@ impl IterFeatures for AbstractOccupiedSpaceKind {
             AbstractOccupiedSpaceKind::AbstractConstructiveElementKind(x) => x.iter_features(),
             AbstractOccupiedSpaceKind::AbstractFillingElementKind(x) => x.iter_features(),
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => x.iter_features(),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => x.iter_features(),
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => x.iter_features(),
             AbstractOccupiedSpaceKind::AbstractVegetationObjectKind(x) => x.iter_features(),
             AbstractOccupiedSpaceKind::WaterBody(x) => x.iter_features(),
@@ -151,6 +163,7 @@ impl ForEachFeatureMut for AbstractOccupiedSpaceKind {
             }
             AbstractOccupiedSpaceKind::AbstractFillingElementKind(x) => x.for_each_feature_mut(f),
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => x.for_each_feature_mut(f),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => x.for_each_feature_mut(f),
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => x.for_each_feature_mut(f),
             AbstractOccupiedSpaceKind::AbstractVegetationObjectKind(x) => x.for_each_feature_mut(f),
             AbstractOccupiedSpaceKind::WaterBody(x) => x.for_each_feature_mut(f),
@@ -166,6 +179,7 @@ impl ComputeEnvelope for AbstractOccupiedSpaceKind {
             AbstractOccupiedSpaceKind::AbstractConstructiveElementKind(x) => x.compute_envelope(),
             AbstractOccupiedSpaceKind::AbstractFillingElementKind(x) => x.compute_envelope(),
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => x.compute_envelope(),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => x.compute_envelope(),
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => x.compute_envelope(),
             AbstractOccupiedSpaceKind::AbstractVegetationObjectKind(x) => x.compute_envelope(),
             AbstractOccupiedSpaceKind::WaterBody(x) => x.compute_envelope(),
@@ -181,6 +195,7 @@ impl ApplyTransform for AbstractOccupiedSpaceKind {
             AbstractOccupiedSpaceKind::AbstractConstructiveElementKind(x) => x.apply_transform(m),
             AbstractOccupiedSpaceKind::AbstractFillingElementKind(x) => x.apply_transform(m),
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => x.apply_transform(m),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => x.apply_transform(m),
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => x.apply_transform(m),
             AbstractOccupiedSpaceKind::AbstractVegetationObjectKind(x) => x.apply_transform(m),
             AbstractOccupiedSpaceKind::WaterBody(x) => x.apply_transform(m),
@@ -196,6 +211,7 @@ impl ApplyTransform for AbstractOccupiedSpaceKind {
             }
             AbstractOccupiedSpaceKind::AbstractFillingElementKind(x) => x.apply_isometry(isometry),
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => x.apply_isometry(isometry),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => x.apply_isometry(isometry),
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => x.apply_isometry(isometry),
             AbstractOccupiedSpaceKind::AbstractVegetationObjectKind(x) => {
                 x.apply_isometry(isometry)
@@ -213,6 +229,7 @@ impl ApplyTransform for AbstractOccupiedSpaceKind {
             }
             AbstractOccupiedSpaceKind::AbstractFillingElementKind(x) => x.apply_translation(vector),
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => x.apply_translation(vector),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => x.apply_translation(vector),
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => x.apply_translation(vector),
             AbstractOccupiedSpaceKind::AbstractVegetationObjectKind(x) => {
                 x.apply_translation(vector)
@@ -230,6 +247,7 @@ impl ApplyTransform for AbstractOccupiedSpaceKind {
             }
             AbstractOccupiedSpaceKind::AbstractFillingElementKind(x) => x.apply_rotation(rotation),
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => x.apply_rotation(rotation),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => x.apply_rotation(rotation),
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => x.apply_rotation(rotation),
             AbstractOccupiedSpaceKind::AbstractVegetationObjectKind(x) => {
                 x.apply_rotation(rotation)
@@ -245,6 +263,7 @@ impl ApplyTransform for AbstractOccupiedSpaceKind {
             AbstractOccupiedSpaceKind::AbstractConstructiveElementKind(x) => x.apply_scale(scale),
             AbstractOccupiedSpaceKind::AbstractFillingElementKind(x) => x.apply_scale(scale),
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => x.apply_scale(scale),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => x.apply_scale(scale),
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => x.apply_scale(scale),
             AbstractOccupiedSpaceKind::AbstractVegetationObjectKind(x) => x.apply_scale(scale),
             AbstractOccupiedSpaceKind::WaterBody(x) => x.apply_scale(scale),

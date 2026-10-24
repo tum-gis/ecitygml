@@ -4,6 +4,8 @@ use crate::model::bridge::{
 };
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractBridgeKindRef<'a> {
@@ -76,3 +78,12 @@ macro_rules! impl_try_from_bridge_kind_ref {
 impl_try_from_bridge_kind_ref!(Bridge);
 impl_try_from_bridge_kind_ref!(BridgePart);
 impl_try_from_construction_kind_ref_for_enum!(AbstractBridgeKind, AbstractBridgeKindRef);
+
+impl<'a> ComputeEnvelope for AbstractBridgeKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractBridgeKindRef::Bridge(x) => x.compute_envelope(),
+            AbstractBridgeKindRef::BridgePart(x) => x.compute_envelope(),
+        }
+    }
+}

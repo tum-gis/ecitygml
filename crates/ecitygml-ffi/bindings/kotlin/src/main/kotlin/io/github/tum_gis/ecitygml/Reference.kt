@@ -7,6 +7,7 @@ import com.sun.jna.Structure
 
 internal interface ReferenceLib: Library {
     fun ecitygml_Reference_destroy(handle: Pointer)
+    fun ecitygml_Reference_from_traffic_space_reference(reference: Pointer): Pointer
     fun ecitygml_Reference_href(handle: Pointer): Pointer?
 }
 /** A reference to an object by `xlink:href`, borrowed from a city model.
@@ -37,6 +38,18 @@ class Reference internal constructor (
     companion object {
         internal val libClass: Class<ReferenceLib> = ReferenceLib::class.java
         internal val lib: ReferenceLib = Native.load("ecitygml_ffi", libClass)
+        @JvmStatic
+        
+        /** An owned copy of a traffic space reference (Rust: `From<&TrafficSpaceReference>`).
+        */
+        fun fromTrafficSpaceReference(reference: TrafficSpaceReference): Reference {
+            
+            val returnVal = lib.ecitygml_Reference_from_traffic_space_reference(reference.handle);
+            val selfEdges: List<Any> = listOf()
+            val handle = returnVal 
+            val returnOpaque = Reference(handle, selfEdges, true)
+            return returnOpaque
+        }
     }
     
     fun href(): HRef? {

@@ -1,7 +1,7 @@
 //! Runs the examples and snippets (`examples/`) and compares their output with the expected output shared by all
-//! languages: for every `tests/expected/{examples,snippets}/<name>/<fixture>.txt` at the repository root, the program
-//! runs on `tests/fixtures/<fixture>.gml` and must print that text. Examples that write a file get a temporary output
-//! path; if `<fixture><extension>` exists next to the expected text, the file must match it.
+//! languages: for every `tests/expected/{examples,snippets}/<name>/<dataset>/<fixture>.txt` at the repository root,
+//! the program runs on `tests/fixtures/<dataset>/<fixture>.gml` and must print that text. Examples that write a file
+//! get a temporary output path; if `<fixture><extension>` exists next to the expected text, the file must match it.
 //!
 //! `cargo test` builds the examples before running the tests; a test selection that skips them (e.g.
 //! `cargo test --test examples`) needs `cargo build --examples` first.
@@ -45,7 +45,8 @@ fn run(name: &str, args: &[&Path]) -> Output {
         .expect("the example should start")
 }
 
-/// The test cases: (program, fixture, expected output) for every `<kind>/<program>/<fixture>.txt`.
+/// The test cases: (program, fixture as `<dataset>/<fixture>`, expected output) for every
+/// `<kind>/<program>/<dataset>/<fixture>.txt`.
 fn cases(kind: &str) -> Vec<(String, String, PathBuf)> {
     let directory = repository_root().join("tests/expected").join(kind);
     let mut cases = Vec::new();
@@ -53,19 +54,26 @@ fn cases(kind: &str) -> Vec<(String, String, PathBuf)> {
         .expect("the expected outputs should exist")
         .flatten()
     {
-        for file in std::fs::read_dir(program.path())
+        for dataset in std::fs::read_dir(program.path())
             .expect("should be a directory")
             .flatten()
         {
-            let path = file.path();
-            if path.extension().is_some_and(|extension| extension == "txt") {
-                let program = program.file_name().to_string_lossy().into_owned();
-                let fixture = path
-                    .file_stem()
-                    .expect("should have a name")
-                    .to_string_lossy()
-                    .into_owned();
-                cases.push((program, fixture, path));
+            for file in std::fs::read_dir(dataset.path())
+                .expect("should be a dataset directory")
+                .flatten()
+            {
+                let path = file.path();
+                if path.extension().is_some_and(|extension| extension == "txt") {
+                    let program = program.file_name().to_string_lossy().into_owned();
+                    let fixture = format!(
+                        "{}/{}",
+                        dataset.file_name().to_string_lossy(),
+                        path.file_stem()
+                            .expect("should have a name")
+                            .to_string_lossy()
+                    );
+                    cases.push((program, fixture, path));
+                }
             }
         }
     }
@@ -86,8 +94,9 @@ fn failures(kind: &str) -> Vec<String> {
             .map(|(_, extension)| *extension);
         let output_file = extension.map(|extension| {
             std::env::temp_dir().join(format!(
-                "ecitygml-example-{}-{program}-{fixture}{extension}",
-                std::process::id()
+                "ecitygml-example-{}-{program}-{}{extension}",
+                std::process::id(),
+                fixture.replace('/', "-")
             ))
         });
         let args: Vec<&Path> = std::iter::once(input.as_path())
@@ -110,7 +119,8 @@ fn failures(kind: &str) -> Vec<String> {
                 expected.display()
             ));
         } else if let (Some(output_file), Some(extension)) = (&output_file, extension) {
-            let expected_file = expected.with_file_name(format!("{fixture}{extension}"));
+            // Next to the expected text: `<fixture>.txt` -> `<fixture><extension>`.
+            let expected_file = expected.with_extension(extension.trim_start_matches('.'));
             if expected_file.exists()
                 && std::fs::read(output_file).ok() != std::fs::read(&expected_file).ok()
             {

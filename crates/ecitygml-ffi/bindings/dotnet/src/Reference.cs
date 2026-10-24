@@ -48,6 +48,22 @@ public partial class Reference
     }
 
     /// <returns>
+    /// A <c>Reference</c> allocated on Rust side.
+    /// </returns>
+    public static Reference FromTrafficSpaceReference(TrafficSpaceReference reference)
+    {
+        unsafe
+        {
+            if (reference == null) throw new ArgumentNullException(nameof(reference));
+            Raw.TrafficSpaceReference* referenceRaw = reference.AsFFI();
+            if (referenceRaw == null) throw new ObjectDisposedException(nameof(TrafficSpaceReference));
+            Raw.Reference* result = Raw.Reference.FromTrafficSpaceReference(referenceRaw);
+            GC.KeepAlive(reference);
+            return new Reference(result);
+        }
+    }
+
+    /// <returns>
     /// A <c>HRef</c> allocated on Rust side.
     /// </returns>
     /// <remarks>

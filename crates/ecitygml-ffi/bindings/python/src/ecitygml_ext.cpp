@@ -111,6 +111,8 @@ void add_TrafficArea_binding(nb::module_);
 void add_TrafficSpace_binding(nb::module_);
 void add_TrafficSpaceProperty_binding(nb::module_);
 void add_TrafficSpacePropertyIterator_binding(nb::module_);
+void add_TrafficSpaceReference_binding(nb::module_);
+void add_TrafficSpaceReferenceIterator_binding(nb::module_);
 void add_AuxiliaryTrafficAreaClassValue_binding(nb::module_);
 void add_AuxiliaryTrafficAreaFunctionValue_binding(nb::module_);
 void add_AuxiliaryTrafficAreaFunctionValueIterator_binding(nb::module_);
@@ -386,6 +388,8 @@ NB_MODULE(ecitygml, mod)
     add_TrafficSpace_binding(mod);
     add_TrafficSpaceProperty_binding(mod);
     add_TrafficSpacePropertyIterator_binding(mod);
+    add_TrafficSpaceReference_binding(mod);
+    add_TrafficSpaceReferenceIterator_binding(mod);
     add_AuxiliaryTrafficAreaClassValue_binding(mod);
     add_AuxiliaryTrafficAreaFunctionValue_binding(mod);
     add_AuxiliaryTrafficAreaFunctionValueIterator_binding(mod);

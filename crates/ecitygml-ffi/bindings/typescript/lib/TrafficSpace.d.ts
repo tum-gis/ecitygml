@@ -20,6 +20,7 @@ import type { SpaceType } from "./SpaceType"
 import type { TrafficDirectionValue } from "./TrafficDirectionValue"
 import type { TrafficSpaceClassValue } from "./TrafficSpaceClassValue"
 import type { TrafficSpaceFunctionValueIterator } from "./TrafficSpaceFunctionValueIterator"
+import type { TrafficSpaceReferenceIterator } from "./TrafficSpaceReferenceIterator"
 import type { TrafficSpaceUsageValueIterator } from "./TrafficSpaceUsageValueIterator"
 import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
@@ -128,4 +129,8 @@ export class TrafficSpace {
     trafficDirection(): TrafficDirectionValue | null;
 
     occupancies(): OccupancyIterator;
+
+    predecessors(): TrafficSpaceReferenceIterator;
+
+    successors(): TrafficSpaceReferenceIterator;
 }

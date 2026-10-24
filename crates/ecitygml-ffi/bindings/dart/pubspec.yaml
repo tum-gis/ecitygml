@@ -1,0 +1,16 @@
+name: ecitygml
+description: Dart bindings for ecitygml (CityGML 3.0), generated with Diplomat.
+version: 0.0.1-alpha.206
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  code_assets: ^2.1.0
+  ffi: ^2.2.0
+  hooks: ^2.2.0
+  meta: ^1.19.0
+
+dev_dependencies:
+  test: ^1.26.0

@@ -3,8 +3,14 @@ use crate::gml::codec::bridge::bridge_constructive_element_property::{
     deserialize_bridge_constructive_element_property,
     serialize_bridge_constructive_element_property,
 };
+use crate::gml::codec::bridge::bridge_furniture_property::{
+    deserialize_bridge_furniture_property, serialize_bridge_furniture_property,
+};
 use crate::gml::codec::bridge::bridge_installation_property::{
     deserialize_bridge_installation_property, serialize_bridge_installation_property,
+};
+use crate::gml::codec::bridge::bridge_room_property::{
+    deserialize_bridge_room_property, serialize_bridge_room_property,
 };
 use crate::gml::codec::common::{deserialize_bool, serialize_bool};
 use crate::gml::codec::construction::{
@@ -33,6 +39,8 @@ pub fn deserialize_abstract_bridge(
     let mut abstract_construction_result = None;
     let mut bridge_installations_result = None;
     let mut bridge_constructive_elements_result = None;
+    let mut bridge_rooms_result = None;
+    let mut bridge_furniture_result = None;
 
     rayon::scope(|s| {
         s.spawn(|_| {
@@ -58,6 +66,24 @@ pub fn deserialize_abstract_bridge(
                 CityGmlElement::BridgeConstructiveElementProperty.into(),
                 config,
                 deserialize_bridge_constructive_element_property,
+            ));
+        });
+        s.spawn(|_| {
+            bridge_rooms_result = Some(collect_children(
+                xml_document,
+                index,
+                CityGmlElement::BridgeRoomProperty.into(),
+                config,
+                deserialize_bridge_room_property,
+            ));
+        });
+        s.spawn(|_| {
+            bridge_furniture_result = Some(collect_children(
+                xml_document,
+                index,
+                CityGmlElement::BridgeFurnitureProperty.into(),
+                config,
+                deserialize_bridge_furniture_property,
             ));
         });
     });
@@ -98,6 +124,12 @@ pub fn deserialize_abstract_bridge(
     abstract_bridge.set_bridge_constructive_elements(
         bridge_constructive_elements_result
             .expect("rayon::scope guarantees all spawns complete")?,
+    );
+    abstract_bridge.set_bridge_rooms(
+        bridge_rooms_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
+    abstract_bridge.set_bridge_furniture(
+        bridge_furniture_result.expect("rayon::scope guarantees all spawns complete")?,
     );
 
     Ok(abstract_bridge)
@@ -150,6 +182,12 @@ pub fn serialize_abstract_bridge(
     }
     for prop in abstract_bridge.bridge_constructive_elements() {
         serialize_bridge_constructive_element_property(prop, xml_fragment_writer)?;
+    }
+    for prop in abstract_bridge.bridge_rooms() {
+        serialize_bridge_room_property(prop, xml_fragment_writer)?;
+    }
+    for prop in abstract_bridge.bridge_furniture() {
+        serialize_bridge_furniture_property(prop, xml_fragment_writer)?;
     }
 
     Ok(())

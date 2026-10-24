@@ -1,4 +1,6 @@
 use crate::model::common::{ForEachFeatureMut, IterFeatures};
+use crate::model::construction::construction_event::ConstructionEvent;
+use crate::model::construction::elevation::Elevation;
 use crate::model::construction::height::Height;
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
@@ -16,6 +18,8 @@ pub struct AbstractConstruction {
     pub(crate) abstract_occupied_space: AbstractOccupiedSpace,
     date_of_construction: Option<Date>,
     date_of_demolition: Option<Date>,
+    construction_events: Vec<ConstructionEvent>,
+    elevations: Vec<Elevation>,
     heights: Vec<Height>,
     occupancies: Vec<Occupancy>,
 }
@@ -30,6 +34,8 @@ impl AbstractConstruction {
             abstract_occupied_space,
             date_of_construction: None,
             date_of_demolition: None,
+            construction_events: Vec::new(),
+            elevations: Vec::new(),
             heights: Vec::new(),
             occupancies: Vec::new(),
         }
@@ -45,6 +51,14 @@ pub trait AsAbstractConstruction: AsAbstractOccupiedSpace {
 
     fn date_of_demolition(&self) -> Option<&Date> {
         self.abstract_construction().date_of_demolition.as_ref()
+    }
+
+    fn construction_events(&self) -> &[ConstructionEvent] {
+        self.abstract_construction().construction_events.as_ref()
+    }
+
+    fn elevations(&self) -> &[Elevation] {
+        self.abstract_construction().elevations.as_ref()
     }
 
     fn heights(&self) -> &[Height] {
@@ -65,6 +79,47 @@ pub trait AsAbstractConstructionMut: AsAbstractOccupiedSpaceMut + AsAbstractCons
 
     fn set_date_of_demolition(&mut self, date_of_demolition: Option<Date>) {
         self.abstract_construction_mut().date_of_demolition = date_of_demolition;
+    }
+
+    fn construction_events_mut(&mut self) -> &mut Vec<ConstructionEvent> {
+        &mut self.abstract_construction_mut().construction_events
+    }
+
+    fn set_construction_events(&mut self, values: Vec<ConstructionEvent>) {
+        self.abstract_construction_mut().construction_events = values;
+    }
+
+    fn push_construction_event(&mut self, construction_event: ConstructionEvent) {
+        self.abstract_construction_mut()
+            .construction_events
+            .push(construction_event);
+    }
+
+    fn extend_construction_events(
+        &mut self,
+        construction_events: impl IntoIterator<Item = ConstructionEvent>,
+    ) {
+        self.abstract_construction_mut()
+            .construction_events
+            .extend(construction_events);
+    }
+
+    fn elevations_mut(&mut self) -> &mut Vec<Elevation> {
+        &mut self.abstract_construction_mut().elevations
+    }
+
+    fn set_elevations(&mut self, values: Vec<Elevation>) {
+        self.abstract_construction_mut().elevations = values;
+    }
+
+    fn push_elevation(&mut self, elevation: Elevation) {
+        self.abstract_construction_mut().elevations.push(elevation);
+    }
+
+    fn extend_elevations(&mut self, elevations: impl IntoIterator<Item = Elevation>) {
+        self.abstract_construction_mut()
+            .elevations
+            .extend(elevations);
     }
 
     fn heights_mut(&mut self) -> &mut Vec<Height> {
@@ -182,5 +237,57 @@ impl ApplyTransform for AbstractConstruction {
 
     fn apply_scale(&mut self, scale: Scale3<f64>) {
         self.abstract_occupied_space.apply_scale(scale);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use egml::model::basic_types::Code;
+
+    fn event(name: &str) -> ConstructionEvent {
+        ConstructionEvent::new(
+            Code::new(name).into(),
+            Date::from_parts(2015, 6, 1, 0).expect("valid date"),
+        )
+    }
+
+    #[test]
+    fn test_construction_events_accessors() {
+        let mut abstract_construction =
+            AbstractConstruction::new(Id::try_from("construction").expect("valid id"));
+        assert!(abstract_construction.construction_events().is_empty());
+
+        abstract_construction.push_construction_event(event("construction"));
+        abstract_construction.extend_construction_events([event("renovation")]);
+        assert_eq!(abstract_construction.construction_events().len(), 2);
+
+        abstract_construction.set_construction_events(vec![event("demolition")]);
+        assert_eq!(
+            abstract_construction.construction_events(),
+            &[event("demolition")]
+        );
+    }
+
+    #[test]
+    fn test_elevations_accessors() {
+        use crate::model::construction::ElevationValue;
+
+        let elevation = |value: f64| {
+            Elevation::new(
+                Code::new("generalGroundSurface").into(),
+                ElevationValue::new(vec![value]).expect("should work"),
+            )
+        };
+        let mut abstract_construction =
+            AbstractConstruction::new(Id::try_from("construction").expect("valid id"));
+        assert!(abstract_construction.elevations().is_empty());
+
+        abstract_construction.push_elevation(elevation(105.3));
+        abstract_construction.extend_elevations([elevation(106.0)]);
+        assert_eq!(abstract_construction.elevations().len(), 2);
+
+        abstract_construction.set_elevations(vec![elevation(107.0)]);
+        assert_eq!(abstract_construction.elevations(), &[elevation(107.0)]);
     }
 }

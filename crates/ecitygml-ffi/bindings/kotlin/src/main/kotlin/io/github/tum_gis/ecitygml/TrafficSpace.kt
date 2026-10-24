@@ -42,6 +42,8 @@ internal interface TrafficSpaceLib: Library {
     fun ecitygml_TrafficSpace_granularity(handle: Pointer): Int
     fun ecitygml_TrafficSpace_traffic_direction(handle: Pointer): OptionInt
     fun ecitygml_TrafficSpace_occupancies(handle: Pointer): Pointer
+    fun ecitygml_TrafficSpace_predecessors(handle: Pointer): Pointer
+    fun ecitygml_TrafficSpace_successors(handle: Pointer): Pointer
 }
 /** A traffic space, borrowed from a city model.
 */
@@ -455,6 +457,28 @@ class TrafficSpace internal constructor (
         val selfEdges: List<Any> = listOf()
         val handle = returnVal 
         val returnOpaque = OccupancyIterator(handle, selfEdges, aEdges, true)
+        return returnOpaque
+    }
+    
+    fun predecessors(): TrafficSpaceReferenceIterator {
+        // This lifetime edge depends on lifetimes: 'a
+        val aEdges: MutableList<Any> = mutableListOf(this);
+        
+        val returnVal = lib.ecitygml_TrafficSpace_predecessors(handle);
+        val selfEdges: List<Any> = listOf()
+        val handle = returnVal 
+        val returnOpaque = TrafficSpaceReferenceIterator(handle, selfEdges, aEdges, true)
+        return returnOpaque
+    }
+    
+    fun successors(): TrafficSpaceReferenceIterator {
+        // This lifetime edge depends on lifetimes: 'a
+        val aEdges: MutableList<Any> = mutableListOf(this);
+        
+        val returnVal = lib.ecitygml_TrafficSpace_successors(handle);
+        val selfEdges: List<Any> = listOf()
+        val handle = returnVal 
+        val returnOpaque = TrafficSpaceReferenceIterator(handle, selfEdges, aEdges, true)
         return returnOpaque
     }
 

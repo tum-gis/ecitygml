@@ -33,8 +33,8 @@ private val examples: Map<String, Pair<(Array<String>) -> Int, String?>> = mapOf
 
 /**
  * Runs the examples in src/examples and compares their output with the expected output shared by all
- * languages: for every `tests/expected/examples/<example>/<fixture>.txt`, the example runs on
- * `tests/fixtures/<fixture>.gml` and must print that text; if `<fixture><extension>` exists there too,
+ * languages: for every `tests/expected/examples/<example>/<dataset>/<fixture>.txt`, the example runs on
+ * `tests/fixtures/<dataset>/<fixture>.gml` and must print that text; if `<fixture><extension>` exists there too,
  * the written file must match it.
  */
 class ExamplesTest {
@@ -57,14 +57,16 @@ class ExamplesTest {
     fun expectedOutputs(): List<DynamicTest> =
         expected.listFiles()!!.sorted().flatMap { directory ->
             val (run, extension) = examples.getValue(directory.name)
-            directory.listFiles { file -> file.extension == "txt" }!!.sorted().map { case ->
-                DynamicTest.dynamicTest("${directory.name} ${case.nameWithoutExtension}") {
+            // `<dataset>/<fixture>.txt`: the fixture is `<dataset>/<fixture>`, as below tests/fixtures.
+            directory.walk().filter { it.isFile && it.extension == "txt" }.sorted().toList().map { case ->
+                val fixture = "${case.parentFile.name}/${case.nameWithoutExtension}"
+                DynamicTest.dynamicTest("${directory.name} $fixture") {
                     val output = extension?.let { Files.createTempFile("ecitygml-example", it).toFile() }
-                    val arguments = listOfNotNull("$fixtures/${case.nameWithoutExtension}.gml", output?.path)
+                    val arguments = listOfNotNull("$fixtures/$fixture.gml", output?.path)
                     val (exitCode, out, err) = captured { run(arguments.toTypedArray()) }
                     assertEquals(0, exitCode, err)
                     assertEquals(case.readText(), out)
-                    val expectedFile = File(directory, case.nameWithoutExtension + (extension ?: ""))
+                    val expectedFile = File(case.parentFile, case.nameWithoutExtension + (extension ?: ""))
                     if (output != null && expectedFile.exists()) {
                         assertEquals(expectedFile.readText(), output.readText())
                     }

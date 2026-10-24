@@ -44,7 +44,7 @@ impl DeserializationConfig {
         &self.gml_config
     }
 
-    #[expect(dead_code, reason = "not used yet")]
+    #[cfg_attr(not(test), expect(dead_code, reason = "not used outside tests yet"))]
     pub fn set_gml_config(&mut self, gml_config: egml::io::util::DeserializationConfig) {
         self.gml_config = gml_config;
     }

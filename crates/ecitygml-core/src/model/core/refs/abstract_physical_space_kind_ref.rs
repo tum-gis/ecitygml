@@ -6,6 +6,8 @@ use crate::model::core::{
     AbstractOccupiedSpaceKind, AbstractPhysicalSpace, AbstractPhysicalSpaceKind,
     AbstractUnoccupiedSpaceKind, AsAbstractPhysicalSpace,
 };
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractPhysicalSpaceKindRef<'a> {
@@ -108,3 +110,12 @@ macro_rules! impl_try_from_physical_space_kind_ref_for_enum {
     };
 }
 impl_try_from_space_kind_ref_for_enum!(AbstractPhysicalSpaceKind, AbstractPhysicalSpaceKindRef);
+
+impl<'a> ComputeEnvelope for AbstractPhysicalSpaceKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractPhysicalSpaceKindRef::AbstractOccupiedSpaceKind(x) => x.compute_envelope(),
+            AbstractPhysicalSpaceKindRef::AbstractUnoccupiedSpaceKind(x) => x.compute_envelope(),
+        }
+    }
+}

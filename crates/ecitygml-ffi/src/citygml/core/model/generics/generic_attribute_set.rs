@@ -1,4 +1,5 @@
 //! `GenericAttributeSet`, mirroring `ecitygml::model::generics::GenericAttributeSet`.
+//! Not bound yet: code_space.
 
 #[diplomat::bridge]
 #[diplomat::abi_rename = "ecitygml_{0}"]

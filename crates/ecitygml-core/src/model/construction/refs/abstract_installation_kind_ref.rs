@@ -7,6 +7,8 @@ use crate::model::construction::{
     AbstractInstallation, AbstractInstallationKind, AsAbstractInstallation,
 };
 use crate::model::tunnel::TunnelInstallation;
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractInstallationKindRef<'a> {
@@ -92,3 +94,13 @@ impl_try_from_occupied_space_kind_ref_for_enum!(
     AbstractInstallationKind,
     AbstractInstallationKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractInstallationKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractInstallationKindRef::BuildingInstallation(x) => x.compute_envelope(),
+            AbstractInstallationKindRef::BridgeInstallation(x) => x.compute_envelope(),
+            AbstractInstallationKindRef::TunnelInstallation(x) => x.compute_envelope(),
+        }
+    }
+}

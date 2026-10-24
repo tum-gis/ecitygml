@@ -4,7 +4,10 @@ use crate::model::construction::{
     AbstractConstruction, AsAbstractConstruction, AsAbstractConstructionMut,
 };
 
-use crate::model::bridge::{BridgeConstructiveElementProperty, BridgeInstallationProperty};
+use crate::model::bridge::{
+    BridgeConstructiveElementProperty, BridgeFurnitureProperty, BridgeInstallationProperty,
+    BridgeRoomProperty,
+};
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
 use egml::model::base::Id;
@@ -21,6 +24,8 @@ pub struct AbstractBridge {
     is_movable: Option<bool>,
     bridge_installations: Vec<BridgeInstallationProperty>,
     bridge_constructive_elements: Vec<BridgeConstructiveElementProperty>,
+    bridge_rooms: Vec<BridgeRoomProperty>,
+    bridge_furniture: Vec<BridgeFurnitureProperty>,
 }
 
 impl AbstractBridge {
@@ -37,6 +42,8 @@ impl AbstractBridge {
             is_movable: None,
             bridge_installations: Vec::new(),
             bridge_constructive_elements: Vec::new(),
+            bridge_rooms: Vec::new(),
+            bridge_furniture: Vec::new(),
         }
     }
 }
@@ -88,6 +95,14 @@ pub trait AsAbstractBridge: AsAbstractConstruction {
 
     fn bridge_constructive_elements(&self) -> &[BridgeConstructiveElementProperty] {
         &self.abstract_bridge().bridge_constructive_elements
+    }
+
+    fn bridge_rooms(&self) -> &[BridgeRoomProperty] {
+        &self.abstract_bridge().bridge_rooms
+    }
+
+    fn bridge_furniture(&self) -> &[BridgeFurnitureProperty] {
+        &self.abstract_bridge().bridge_furniture
     }
 }
 
@@ -217,6 +232,45 @@ pub trait AsAbstractBridgeMut: AsAbstractConstructionMut + AsAbstractBridge {
             .bridge_constructive_elements
             .extend(elements);
     }
+
+    fn bridge_rooms_mut(&mut self) -> &mut [BridgeRoomProperty] {
+        &mut self.abstract_bridge_mut().bridge_rooms
+    }
+
+    fn set_bridge_rooms(&mut self, bridge_rooms: Vec<BridgeRoomProperty>) {
+        self.abstract_bridge_mut().bridge_rooms = bridge_rooms;
+    }
+
+    fn push_bridge_room(&mut self, bridge_room: BridgeRoomProperty) {
+        self.abstract_bridge_mut().bridge_rooms.push(bridge_room);
+    }
+
+    fn extend_bridge_rooms(&mut self, bridge_rooms: impl IntoIterator<Item = BridgeRoomProperty>) {
+        self.abstract_bridge_mut().bridge_rooms.extend(bridge_rooms);
+    }
+
+    fn bridge_furniture_mut(&mut self) -> &mut [BridgeFurnitureProperty] {
+        &mut self.abstract_bridge_mut().bridge_furniture
+    }
+
+    fn set_bridge_furniture(&mut self, bridge_furniture: Vec<BridgeFurnitureProperty>) {
+        self.abstract_bridge_mut().bridge_furniture = bridge_furniture;
+    }
+
+    fn push_bridge_furniture(&mut self, bridge_furniture: BridgeFurnitureProperty) {
+        self.abstract_bridge_mut()
+            .bridge_furniture
+            .push(bridge_furniture);
+    }
+
+    fn extend_bridge_furniture(
+        &mut self,
+        bridge_furniture: impl IntoIterator<Item = BridgeFurnitureProperty>,
+    ) {
+        self.abstract_bridge_mut()
+            .bridge_furniture
+            .extend(bridge_furniture);
+    }
 }
 
 impl AsAbstractBridge for AbstractBridge {
@@ -282,6 +336,18 @@ impl IterFeatures for AbstractBridge {
                         .iter()
                         .filter_map(|x| x.object())
                         .flat_map(|x| x.iter_features()),
+                )
+                .chain(
+                    self.bridge_rooms
+                        .iter()
+                        .filter_map(|x| x.object())
+                        .flat_map(|x| x.iter_features()),
+                )
+                .chain(
+                    self.bridge_furniture
+                        .iter()
+                        .filter_map(|x| x.object())
+                        .flat_map(|x| x.iter_features()),
                 ),
         )
     }
@@ -297,6 +363,16 @@ impl ForEachFeatureMut for AbstractBridge {
             }
         }
         for prop in &mut self.bridge_constructive_elements {
+            if let Some(x) = prop.object_mut() {
+                x.for_each_feature_mut(f);
+            }
+        }
+        for prop in &mut self.bridge_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.for_each_feature_mut(f);
+            }
+        }
+        for prop in &mut self.bridge_furniture {
             if let Some(x) = prop.object_mut() {
                 x.for_each_feature_mut(f);
             }
@@ -324,6 +400,16 @@ impl ApplyTransform for AbstractBridge {
                 x.apply_transform(m);
             }
         }
+        for prop in &mut self.bridge_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.apply_transform(m);
+            }
+        }
+        for prop in &mut self.bridge_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_transform(m);
+            }
+        }
     }
 
     fn apply_isometry(&mut self, isometry: Isometry3<f64>) {
@@ -335,6 +421,16 @@ impl ApplyTransform for AbstractBridge {
             }
         }
         for prop in &mut self.bridge_constructive_elements {
+            if let Some(x) = prop.object_mut() {
+                x.apply_isometry(isometry);
+            }
+        }
+        for prop in &mut self.bridge_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.apply_isometry(isometry);
+            }
+        }
+        for prop in &mut self.bridge_furniture {
             if let Some(x) = prop.object_mut() {
                 x.apply_isometry(isometry);
             }
@@ -354,6 +450,16 @@ impl ApplyTransform for AbstractBridge {
                 x.apply_translation(vector);
             }
         }
+        for prop in &mut self.bridge_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.apply_translation(vector);
+            }
+        }
+        for prop in &mut self.bridge_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_translation(vector);
+            }
+        }
     }
 
     fn apply_rotation(&mut self, rotation: Rotation3<f64>) {
@@ -369,6 +475,16 @@ impl ApplyTransform for AbstractBridge {
                 x.apply_rotation(rotation);
             }
         }
+        for prop in &mut self.bridge_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.apply_rotation(rotation);
+            }
+        }
+        for prop in &mut self.bridge_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_rotation(rotation);
+            }
+        }
     }
 
     fn apply_scale(&mut self, scale: Scale3<f64>) {
@@ -380,6 +496,16 @@ impl ApplyTransform for AbstractBridge {
             }
         }
         for prop in &mut self.bridge_constructive_elements {
+            if let Some(x) = prop.object_mut() {
+                x.apply_scale(scale);
+            }
+        }
+        for prop in &mut self.bridge_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.apply_scale(scale);
+            }
+        }
+        for prop in &mut self.bridge_furniture {
             if let Some(x) = prop.object_mut() {
                 x.apply_scale(scale);
             }

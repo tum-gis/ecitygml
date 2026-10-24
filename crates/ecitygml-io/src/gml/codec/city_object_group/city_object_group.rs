@@ -11,9 +11,11 @@ use crate::gml::util::{
 };
 use ecitygml_core::model::city_object_group::{CityObjectGroup, Role};
 use ecitygml_core::model::core::AsAbstractLogicalSpace;
+use egml::io::codec::base::{deserialize_reference, serialize_reference};
 use egml::io::codec::basic::{deserialize_code, serialize_code};
 use egml::io::util::collect_children;
 use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
+use egml::model::base::Reference;
 use egml::model::basic_types::Code;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
@@ -52,6 +54,12 @@ pub fn deserialize_city_object_group(
         .map(|x| deserialize_code(xml_document[x.range()].as_ref()))
         .collect::<Result<_, _>>()?;
     city_object_group.set_usages(usages.into_iter().map(Into::into).collect());
+
+    let parent = index
+        .first(CityGmlElement::ParentProperty.into())
+        .map(|x| deserialize_reference(&xml_document[x.range()]))
+        .transpose()?;
+    city_object_group.set_parent_opt(parent.map(Into::into));
 
     let group_members: Vec<Role> = collect_children(
         xml_document,
@@ -109,6 +117,15 @@ pub fn serialize_city_object_group(
         )?;
     }
 
+    if let Some(parent) = city_object_group.parent() {
+        serialize_reference(
+            &Reference::from(parent),
+            xml_fragment_writer,
+            CityGmlNamespace::CityObjectGroup,
+            CityGmlElement::ParentProperty,
+        )?;
+    }
+
     let child_writers = city_object_group
         .group_members()
         .par_iter()
@@ -141,7 +158,8 @@ mod tests {
     use super::*;
     use ecitygml_core::model::core::AsAbstractFeature;
     use egml::io::util::Formatting;
-    use egml::model::base::{AsAbstractGml, Id};
+    use egml::model::base::{AsAbstractGml, HasAssociationAttributes, Id};
+    use egml::model::xlink::HRef;
 
     #[test]
     fn test_deserialize_basic_city_object_group() {
@@ -251,6 +269,37 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["Parent"]
         );
+        assert_eq!(
+            Reference::from(city_object_group.group_members()[0].group_member()).href(),
+            Some(&HRef::from("#GMLID_SO0286258_965_2893"))
+        );
+        assert!(city_object_group.parent().is_none());
+    }
+
+    #[test]
+    fn test_deserialize_city_object_group_with_parent() {
+        let xml_document =
+            b"<grp:CityObjectGroup gml:id=\"UUID_f488e8ce-b953-4b35-a3fe-a394fb203868\">
+      <grp:groupMember>
+        <grp:Role>
+          <grp:groupMember xlink:href=\"#GMLID_SO0286258_965_2893\"/>
+        </grp:Role>
+      </grp:groupMember>
+      <grp:parent xlink:href=\"#GMLID_BUILDING_1\"/>
+    </grp:CityObjectGroup>";
+
+        let city_object_group = deserialize_city_object_group(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(city_object_group.group_members().len(), 1);
+        assert_eq!(
+            Reference::from(city_object_group.parent().expect("should have a parent")).href(),
+            Some(&HRef::from("#GMLID_BUILDING_1"))
+        );
     }
 
     #[test]
@@ -261,10 +310,14 @@ mod tests {
             Id::try_from("UUID_f488e8ce-b953-4b35-a3fe-a394fb203868").expect("should work"),
         );
 
-        let mut role_with_value = Role::new();
+        let mut role_with_value =
+            Role::new(Reference::new(HRef::from("#GMLID_SO0286258_965_2893")).into());
         role_with_value.set_role("Parent".to_string());
         city_object_group.push_group_member(role_with_value);
-        city_object_group.push_group_member(Role::new());
+        city_object_group.push_group_member(Role::new(
+            Reference::new(HRef::from("#GMLID_SO0124800_3522_13577")).into(),
+        ));
+        city_object_group.set_parent(Reference::new(HRef::from("#GMLID_BUILDING_1")).into());
 
         let mut xml_fragment_writer =
             XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
@@ -289,5 +342,10 @@ mod tests {
         assert_eq!(round_tripped.group_members().len(), 2);
         assert_eq!(round_tripped.group_members()[0].role(), Some("Parent"));
         assert_eq!(round_tripped.group_members()[1].role(), None);
+        assert_eq!(
+            round_tripped.group_members(),
+            city_object_group.group_members()
+        );
+        assert_eq!(round_tripped.parent(), city_object_group.parent());
     }
 }

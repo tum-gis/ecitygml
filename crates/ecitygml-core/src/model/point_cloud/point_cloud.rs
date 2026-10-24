@@ -6,13 +6,14 @@ use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;
 use egml::model::geometry::aggregates::MultiPointProperty;
+use egml::model::xs::AnyUri;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PointCloud {
     pub(crate) abstract_point_cloud: AbstractPointCloud,
     mime_type: Option<MimeTypeValue>,
-    point_file: Option<String>,
+    point_file: Option<AnyUri>,
     point_file_srs_name: Option<String>,
     points: Option<MultiPointProperty>,
 }
@@ -48,15 +49,15 @@ impl PointCloud {
         self.mime_type = None;
     }
 
-    pub fn point_file(&self) -> Option<&str> {
-        self.point_file.as_deref()
+    pub fn point_file(&self) -> Option<&AnyUri> {
+        self.point_file.as_ref()
     }
 
-    pub fn set_point_file(&mut self, point_file: String) {
-        self.point_file = Some(point_file);
+    pub fn set_point_file(&mut self, point_file: impl Into<AnyUri>) {
+        self.point_file = Some(point_file.into());
     }
 
-    pub fn set_point_file_opt(&mut self, point_file: Option<String>) {
+    pub fn set_point_file_opt(&mut self, point_file: Option<AnyUri>) {
         self.point_file = point_file;
     }
 

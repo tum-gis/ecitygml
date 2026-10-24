@@ -82,7 +82,7 @@ pub fn serialize_building_attributes(building: &Building) -> Vec<(String, String
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ecitygml_core::model::building::AsAbstractBuildingMut;
+    use ecitygml_core::model::building::{AsAbstractBuilding, AsAbstractBuildingMut};
     use ecitygml_core::model::construction::{AbstractConstructionSurfaceKind, WallSurface};
     use ecitygml_core::model::core::{
         AbstractSpaceBoundaryKind, AbstractThematicSurfaceKind, AsAbstractCityObject,
@@ -275,5 +275,91 @@ mod tests {
 
         // println!("{}", String::from_utf8_lossy(&gml));
         println!();
+    }
+
+    #[test]
+    fn test_round_trip_building_furniture_on_building_and_in_room() {
+        let xml_document = b"
+    <bldg:Building gml:id=\"UUID_building-1\">
+      <bldg:buildingRoom>
+        <bldg:BuildingRoom gml:id=\"UUID_building-room-1\">
+          <bldg:class>5000</bldg:class>
+          <bldg:buildingFurniture>
+            <bldg:BuildingFurniture gml:id=\"UUID_room-furniture-1\">
+              <bldg:class>7000</bldg:class>
+            </bldg:BuildingFurniture>
+          </bldg:buildingFurniture>
+        </bldg:BuildingRoom>
+      </bldg:buildingRoom>
+      <bldg:buildingFurniture>
+        <bldg:BuildingFurniture gml:id=\"UUID_building-furniture-1\">
+          <bldg:class>7100</bldg:class>
+          <bldg:function>7110</bldg:function>
+          <bldg:usage>7200</bldg:usage>
+        </bldg:BuildingFurniture>
+      </bldg:buildingFurniture>
+    </bldg:Building>";
+
+        let building = deserialize_building(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(building.building_furniture().len(), 1);
+        let building_furniture = building.building_furniture()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(
+            building_furniture.feature_id(),
+            &Id::try_from("UUID_building-furniture-1").expect("should work")
+        );
+        assert_eq!(
+            building_furniture
+                .class()
+                .expect("should be set")
+                .code()
+                .value(),
+            "7100"
+        );
+        assert_eq!(building_furniture.functions().len(), 1);
+        assert_eq!(building_furniture.usages().len(), 1);
+
+        let building_room = building.building_rooms()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(building_room.building_furniture().len(), 1);
+        let room_furniture = building_room.building_furniture()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(
+            room_furniture.feature_id(),
+            &Id::try_from("UUID_room-furniture-1").expect("should work")
+        );
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_building(&building, &mut xml_fragment_writer).expect("should serialize");
+        let xml = {
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        };
+
+        let round_tripped = deserialize_building(
+            &xml,
+            &XmlDocumentIndex::from_scan(&xml, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should round trip");
+
+        assert_eq!(
+            round_tripped.building_furniture(),
+            building.building_furniture()
+        );
+        assert_eq!(round_tripped.building_rooms(), building.building_rooms());
     }
 }

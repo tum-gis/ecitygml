@@ -4,6 +4,7 @@ use crate::model::common::HasFeatureType;
 use crate::model::construction::{
     AbstractFillingElement, AbstractFillingElementKind, AsAbstractFillingElement, Door, Window,
 };
+use egml::model::common::ComputeEnvelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractFillingElementKindRef<'a> {
@@ -83,3 +84,12 @@ impl_try_from_occupied_space_kind_ref_for_enum!(
     AbstractFillingElementKind,
     AbstractFillingElementKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractFillingElementKindRef<'a> {
+    fn compute_envelope(&self) -> Option<egml::model::geometry::Envelope> {
+        match self {
+            AbstractFillingElementKindRef::Door(x) => x.compute_envelope(),
+            AbstractFillingElementKindRef::Window(x) => x.compute_envelope(),
+        }
+    }
+}

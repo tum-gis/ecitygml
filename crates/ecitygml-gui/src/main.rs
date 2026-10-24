@@ -12,7 +12,7 @@ use scene::Scene;
 use three_d::egui;
 use three_d::{
     Camera, Event, FrameOutput, GUI, InnerSpace, MouseButton, OrbitControl, PhysicalPoint,
-    Viewport, Window, degrees, vec3,
+    ToneMapping, Viewport, Window, degrees, vec3,
 };
 
 /// Number of idle frames before the selection overlay is rebuilt.
@@ -34,6 +34,8 @@ fn main() -> Result<()> {
         0.1,
         100_000.0,
     );
+    // The default ACES curve darkens and desaturates the flat feature-type colors.
+    camera.tone_mapping = ToneMapping::None;
     let mut orbit = OrbitControl::new(vec3(0.0, 0.0, 0.0), 1.0, 100_000.0);
     let mut gui = GUI::new(&context);
     gui.context().set_visuals(three_d::egui::Visuals::light());

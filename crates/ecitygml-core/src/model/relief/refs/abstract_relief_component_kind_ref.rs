@@ -4,6 +4,8 @@ use crate::model::common::HasFeatureType;
 use crate::model::relief::{
     AbstractReliefComponent, AbstractReliefComponentKind, AsAbstractReliefComponent, TinRelief,
 };
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractReliefComponentKindRef<'a> {
@@ -77,3 +79,11 @@ impl_try_from_space_boundary_kind_ref_for_enum!(
     AbstractReliefComponentKind,
     AbstractReliefComponentKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractReliefComponentKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractReliefComponentKindRef::TinRelief(x) => x.compute_envelope(),
+        }
+    }
+}

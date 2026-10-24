@@ -18,4 +18,5 @@ pub mod section_property;
 pub mod traffic_area;
 pub mod traffic_space;
 pub mod traffic_space_property;
+pub mod traffic_space_reference;
 pub mod values;

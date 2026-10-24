@@ -155,7 +155,10 @@ impl ApplyTransform for Bridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::bridge::{BridgePart, BridgePartProperty};
+    use crate::model::bridge::{
+        AsAbstractBridgeMut, BridgeFurniture, BridgeFurnitureProperty, BridgePart,
+        BridgePartProperty, BridgeRoom, BridgeRoomProperty,
+    };
     use crate::model::common::{FeatureType, ForEachFeatureMut, HasFeatureType, IterFeatures};
 
     fn bridge_with_part() -> Bridge {
@@ -185,6 +188,83 @@ mod tests {
         assert_eq!(
             feature_types,
             vec![FeatureType::Bridge, FeatureType::BridgePart]
+        );
+    }
+
+    fn bridge_with_room() -> Bridge {
+        let mut bridge = Bridge::new(Id::try_from("bridge").expect("valid id"));
+        bridge.push_bridge_room(BridgeRoomProperty::from_object(BridgeRoom::new(
+            Id::try_from("bridge_room").expect("valid id"),
+        )));
+        bridge
+    }
+
+    #[test]
+    fn test_iter_features_yields_bridge_and_its_rooms() {
+        let feature_types: Vec<FeatureType> = bridge_with_room()
+            .iter_features()
+            .map(|f| f.feature_type())
+            .collect();
+        assert_eq!(
+            feature_types,
+            vec![FeatureType::Bridge, FeatureType::BridgeRoom]
+        );
+    }
+
+    #[test]
+    fn test_for_each_feature_mut_visits_bridge_and_its_rooms() {
+        let mut feature_types = Vec::new();
+        bridge_with_room().for_each_feature_mut(&mut |f| feature_types.push(f.feature_type()));
+        assert_eq!(
+            feature_types,
+            vec![FeatureType::Bridge, FeatureType::BridgeRoom]
+        );
+    }
+
+    fn bridge_with_furniture_on_bridge_and_in_room() -> Bridge {
+        let mut room = BridgeRoom::new(Id::try_from("bridge_room").expect("valid id"));
+        room.push_bridge_furniture(BridgeFurnitureProperty::from_object(BridgeFurniture::new(
+            Id::try_from("room_furniture").expect("valid id"),
+        )));
+
+        let mut bridge = Bridge::new(Id::try_from("bridge").expect("valid id"));
+        bridge.push_bridge_room(BridgeRoomProperty::from_object(room));
+        bridge.push_bridge_furniture(BridgeFurnitureProperty::from_object(BridgeFurniture::new(
+            Id::try_from("bridge_furniture").expect("valid id"),
+        )));
+        bridge
+    }
+
+    #[test]
+    fn test_iter_features_yields_furniture_on_bridge_and_in_rooms() {
+        let feature_types: Vec<FeatureType> = bridge_with_furniture_on_bridge_and_in_room()
+            .iter_features()
+            .map(|f| f.feature_type())
+            .collect();
+        assert_eq!(
+            feature_types,
+            vec![
+                FeatureType::Bridge,
+                FeatureType::BridgeRoom,
+                FeatureType::BridgeFurniture,
+                FeatureType::BridgeFurniture
+            ]
+        );
+    }
+
+    #[test]
+    fn test_for_each_feature_mut_visits_furniture_on_bridge_and_in_rooms() {
+        let mut feature_types = Vec::new();
+        bridge_with_furniture_on_bridge_and_in_room()
+            .for_each_feature_mut(&mut |f| feature_types.push(f.feature_type()));
+        assert_eq!(
+            feature_types,
+            vec![
+                FeatureType::Bridge,
+                FeatureType::BridgeRoom,
+                FeatureType::BridgeFurniture,
+                FeatureType::BridgeFurniture
+            ]
         );
     }
 }

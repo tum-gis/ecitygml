@@ -14,8 +14,10 @@ use egml::io::codec::basic::{deserialize_code, serialize_code};
 use egml::io::codec::geometry::aggregates::{
     deserialize_multi_point_property, serialize_multi_point_property,
 };
+use egml::io::codec::xs::{deserialize_any_uri, serialize_any_uri};
 use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 use egml::model::basic_types::Code;
+use egml::model::xs::AnyUri;
 
 pub fn deserialize_point_cloud(
     xml_document: &[u8],
@@ -60,9 +62,9 @@ pub fn deserialize_point_cloud(
         .transpose()?;
     point_cloud.set_mime_type_opt(mime_type.map(Into::into));
 
-    let point_file: Option<String> = index
+    let point_file: Option<AnyUri> = index
         .first(CityGmlElement::PointFileProperty.into())
-        .map(|x| deserialize_string(&xml_document[x.range()]))
+        .map(|x| deserialize_any_uri(&xml_document[x.range()]))
         .transpose()?;
     point_cloud.set_point_file_opt(point_file);
 
@@ -101,7 +103,7 @@ pub fn serialize_point_cloud(
     }
 
     if let Some(point_file) = point_cloud.point_file() {
-        serialize_string(
+        serialize_any_uri(
             point_file,
             xml_fragment_writer,
             CityGmlNamespace::PointCloud,
@@ -162,7 +164,10 @@ mod tests {
             point_cloud.feature_id(),
             &Id::try_from("test-point-cloud-001").expect("should work")
         );
-        assert_eq!(point_cloud.point_file(), Some("abc.las"));
+        assert_eq!(
+            point_cloud.point_file().map(AnyUri::as_str),
+            Some("abc.las")
+        );
         assert_eq!(point_cloud.point_file_srs_name(), Some("EPSG:25832"));
         assert!(point_cloud.mime_type().is_none());
         assert!(point_cloud.points().is_none());
@@ -322,5 +327,46 @@ mod tests {
             point_cloud.point_file_srs_name(),
             round_tripped.point_file_srs_name()
         );
+    }
+
+    #[test]
+    fn test_round_trip_point_cloud_point_file_as_any_uri() {
+        let xml_document = b"<pcl:PointCloud gml:id=\"PC_1\">
+  <pcl:pointFile>
+      https://example.org/scans?tile=7&amp;format=las
+  </pcl:pointFile>
+</pcl:PointCloud>";
+
+        let point_cloud = deserialize_point_cloud(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+        assert_eq!(
+            point_cloud.point_file().map(AnyUri::as_str),
+            Some("https://example.org/scans?tile=7&format=las")
+        );
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_point_cloud(&point_cloud, &mut xml_fragment_writer).expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+        assert!(xml.contains("?tile=7&amp;format=las"));
+
+        let round_tripped = deserialize_point_cloud(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+        assert_eq!(round_tripped.point_file(), point_cloud.point_file());
     }
 }

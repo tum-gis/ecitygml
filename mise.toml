@@ -28,8 +28,16 @@ mise run --jobs 1 'test:bindings:*'
 # --- Code quality ---
 
 [tasks.check]
-description = "Run all read-only checks (formatting, clippy for native and WebAssembly, documentation)"
-depends = ["check:fmt", "check:clippy", "check:wasm", "check:doc"]
+description = "Run all read-only checks (formatting, clippy for native and WebAssembly, documentation, conformance suites)"
+depends = ["check:fmt", "check:clippy", "check:wasm", "check:doc", "check:cases"]
+
+[tasks."check:cases"]
+description = "Check that every suite's conformance and API tests match the case lists in crates/ecitygml/tests/{conformance,api}"
+run = "cargo test -p ecitygml --test case_list_check"
+
+[tasks."check:fixtures"]
+description = "Validate the hand-written fixtures in tests/fixtures/synthetic against the CityGML 3.0 schemas (xmllint; fetches the schemas from schemas.opengis.net)"
+run = "xmllint --noout --schema tests/fixtures/scripts/citygml-3.0.xsd tests/fixtures/synthetic/*.gml"
 
 [tasks."check:fmt"]
 description = "Check the formatting"
@@ -134,13 +142,14 @@ description = "Generate the bindings of all languages from the Diplomat bridges 
 tools = { "cargo:diplomat-tool" = "0.16.1" }
 dir = "crates/ecitygml-ffi"
 run = '''
-rm -rf bindings/c/include bindings/cpp/include bindings/python/src bindings/kotlin/src/main bindings/typescript/lib bindings/dotnet/src
+rm -rf bindings/c/include bindings/cpp/include bindings/python/src bindings/kotlin/src/main bindings/typescript/lib bindings/dotnet/src bindings/dart/lib/src
 diplomat-tool --silent c bindings/c/include
 diplomat-tool --silent cpp bindings/cpp/include
 diplomat-tool --silent nanobind bindings/python/src
 diplomat-tool --silent kotlin bindings/kotlin
 diplomat-tool --silent js bindings/typescript/lib
 diplomat-tool --silent dotnet bindings/dotnet/src
+diplomat-tool --silent dart bindings/dart/lib/src
 '''
 
 [tasks."check:bindings"]
@@ -157,39 +166,59 @@ fi
 '''
 
 [tasks."build:bindings:c"]
-description = "Build the C unit tests and examples against the C bindings (committed headers, see check:bindings)"
+description = "Build the C unit tests and examples against the C bindings (committed headers, see check:bindings) in target/bindings-c (debug) or target/bindings-c-release"
 # mise installs CMake on demand (e.g. in CI)
 tools = { cmake = "4" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-cargo build -p ecitygml-ffi
-cmake -S crates/ecitygml-ffi/bindings/c -B target/bindings-c -DCMAKE_BUILD_TYPE=Debug
-cmake --build target/bindings-c
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+if [ "$profile" = release ]; then build_dir=target/bindings-c-release; build_type=Release; else build_dir=target/bindings-c; build_type=Debug; fi
+cargo build -p ecitygml-ffi $release_flag
+cmake -S crates/ecitygml-ffi/bindings/c -B "$build_dir" -DCMAKE_BUILD_TYPE="$build_type" -DECITYGML_FFI_LIBRARY_DIR="$PWD/target/$profile"
+cmake --build "$build_dir"
 '''
 
 [tasks."test:bindings:c"]
 description = "Test the C bindings: unit tests and examples on fixtures (CTest)"
-depends = "build:bindings:c"
 tools = { cmake = "4" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-ctest --test-dir target/bindings-c --output-on-failure
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+if [ "$profile" = release ]; then build_dir=target/bindings-c-release; else build_dir=target/bindings-c; fi
+mise run build:bindings:c $release_flag
+ctest --test-dir "$build_dir" --output-on-failure
 '''
 
 [tasks."build:bindings:cpp"]
-description = "Build the C++ unit tests and examples against the C++ bindings (committed headers, see check:bindings)"
+description = "Build the C++ unit tests and examples against the C++ bindings (committed headers, see check:bindings) in target/bindings-cpp (debug) or target/bindings-cpp-release"
 # mise installs CMake on demand (e.g. in CI); the unit tests fetch Catch2 when configuring
 tools = { cmake = "4" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-cargo build -p ecitygml-ffi
-cmake -S crates/ecitygml-ffi/bindings/cpp -B target/bindings-cpp -DCMAKE_BUILD_TYPE=Debug
-cmake --build target/bindings-cpp
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+if [ "$profile" = release ]; then build_dir=target/bindings-cpp-release; build_type=Release; else build_dir=target/bindings-cpp; build_type=Debug; fi
+cargo build -p ecitygml-ffi $release_flag
+cmake -S crates/ecitygml-ffi/bindings/cpp -B "$build_dir" -DCMAKE_BUILD_TYPE="$build_type" -DECITYGML_FFI_LIBRARY_DIR="$PWD/target/$profile"
+cmake --build "$build_dir"
 '''
 
 [tasks."test:bindings:cpp"]
 description = "Test the C++ bindings: unit tests (Catch2) and examples on fixtures (CTest)"
-depends = "build:bindings:cpp"
 tools = { cmake = "4" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-ctest --test-dir target/bindings-cpp --output-on-failure
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+if [ "$profile" = release ]; then build_dir=target/bindings-cpp-release; else build_dir=target/bindings-cpp; fi
+mise run build:bindings:cpp $release_flag
+ctest --test-dir "$build_dir" --output-on-failure
 '''
 
 [tasks."setup:bindings:python"]
@@ -205,16 +234,25 @@ uv pip install --python .venv pytest
 [tasks."build:bindings:python"]
 description = "Build the Python bindings (nanobind, statically linked) into the venv (see setup:bindings:python)"
 tools = { uv = "latest" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-cargo build -p ecitygml-ffi --release
-uv pip install --python crates/ecitygml-ffi/bindings/python/.venv --reinstall ./crates/ecitygml-ffi/bindings/python
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+cargo build -p ecitygml-ffi $release_flag
+uv pip install --python crates/ecitygml-ffi/bindings/python/.venv --reinstall \
+    -C cmake.define.ECITYGML_FFI_LIBRARY_DIR="$PWD/target/$profile" ./crates/ecitygml-ffi/bindings/python
 '''
 
 [tasks."test:bindings:python"]
 description = "Test the Python bindings (pytest)"
-depends = "build:bindings:python"
-dir = "crates/ecitygml-ffi/bindings/python"
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+mise run build:bindings:python $release_flag
+cd crates/ecitygml-ffi/bindings/python
 .venv/bin/python -m pytest tests
 '''
 
@@ -222,51 +260,107 @@ run = '''
 description = "Build the Kotlin bindings (committed sources, see check:bindings)"
 # mise installs these on demand (e.g. in CI)
 tools = { java = "openjdk-21", gradle = "9.8.0" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-cargo build -p ecitygml-ffi
-gradle --project-dir crates/ecitygml-ffi/bindings/kotlin build -x test
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+cargo build -p ecitygml-ffi $release_flag
+gradle --project-dir crates/ecitygml-ffi/bindings/kotlin build -x test -PnativeLibraryDir="$PWD/target/$profile"
 '''
 
 [tasks."test:bindings:kotlin"]
-description = "Test the Kotlin bindings (JUnit; loads target/debug/libecitygml_ffi via JNA)"
-depends = "build:bindings:kotlin"
+description = "Test the Kotlin bindings (JUnit; loads target/<profile>/libecitygml_ffi via JNA)"
 tools = { java = "openjdk-21", gradle = "9.8.0" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-gradle --project-dir crates/ecitygml-ffi/bindings/kotlin test
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+mise run build:bindings:kotlin $release_flag
+gradle --project-dir crates/ecitygml-ffi/bindings/kotlin test -PnativeLibraryDir="$PWD/target/$profile"
 '''
 
 [tasks."build:bindings:typescript"]
 description = "Build the WebAssembly module for the TypeScript bindings (committed sources, see check:bindings)"
 tools = { node = "22" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
 # Pure Rust: the FFI crate builds without the `zstd` feature (C code) for WebAssembly.
 # The 32 MiB stack is set in .cargo/config.toml.
-cargo build -p ecitygml-ffi --release --target wasm32-unknown-unknown
+cargo build -p ecitygml-ffi $release_flag --target wasm32-unknown-unknown
 '''
 
 [tasks."test:bindings:typescript"]
-description = "Test the TypeScript bindings (Node >= 22.18 runs the .ts tests directly)"
-depends = "build:bindings:typescript"
+description = "Test the TypeScript bindings (Node >= 22.18 runs the .ts tests directly; ECITYGML_FFI_PROFILE selects the module)"
 tools = { node = "22" }
-dir = "crates/ecitygml-ffi/bindings/typescript"
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-node --test
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+mise run build:bindings:typescript $release_flag
+cd crates/ecitygml-ffi/bindings/typescript
+ECITYGML_FFI_PROFILE="$profile" node --test
 '''
 
 [tasks."build:bindings:dotnet"]
 description = "Build the C# (.NET) bindings and their tests (committed sources, see check:bindings)"
 tools = { dotnet = "10" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
-cargo build -p ecitygml-ffi
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+cargo build -p ecitygml-ffi $release_flag
+# An environment variable, so that the snippets the tests run with `dotnet run --file` get it too.
+export NativeLibraryDir="$PWD/target/$profile/"
 dotnet build crates/ecitygml-ffi/bindings/dotnet/tests/Ecitygml.Tests.csproj -nologo
 '''
 
 [tasks."test:bindings:dotnet"]
-description = "Test the C# (.NET) bindings (xUnit; loads target/debug/libecitygml_ffi)"
-depends = "build:bindings:dotnet"
+description = "Test the C# (.NET) bindings (xUnit; loads target/<profile>/libecitygml_ffi)"
 tools = { dotnet = "10" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
 run = '''
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+mise run build:bindings:dotnet $release_flag
+export NativeLibraryDir="$PWD/target/$profile/"
 dotnet test crates/ecitygml-ffi/bindings/dotnet/tests/Ecitygml.Tests.csproj -nologo
+'''
+
+[tasks."build:bindings:dart"]
+description = "Build the library for the Dart bindings and fetch their packages (committed sources, see check:bindings)"
+tools = { dart = "3.13" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
+run = '''
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+cargo build -p ecitygml-ffi $release_flag
+# Read by the build hook (hook/build.dart), which doesn't see the environment.
+mkdir -p target/bindings-dart
+echo "$profile" > target/bindings-dart/profile
+dart pub get --directory crates/ecitygml-ffi/bindings/dart
+'''
+
+[tasks."test:bindings:dart"]
+description = "Test the Dart bindings (package:test; the build hook bundles target/<profile>/libecitygml_ffi)"
+tools = { dart = "3.13" }
+usage = '''
+flag "-r --release" help="Use the release build of the library, with optimizations (default: debug)"
+'''
+run = '''
+if [ "${usage_release}" = 'true' ]; then profile=release; release_flag=--release; else profile=debug; release_flag=; fi
+mise run build:bindings:dart $release_flag
+cd crates/ecitygml-ffi/bindings/dart
+dart analyze --fatal-infos
+dart test
 '''
 
 # --- Maintenance ---

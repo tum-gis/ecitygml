@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text;
 using Ecitygml.Diplomat;
+using Xunit;
 
 namespace Ecitygml.Tests;
 
@@ -16,6 +17,16 @@ internal static class Helpers
 
     /// <summary>`GmlReader::from_path(path)?.finish()`, as in Rust. Paths are UTF-8 bytes in the bindings.</summary>
     public static CityModel Read(string name) => GmlReader.FromPath(Encoding.UTF8.GetBytes(Fixture(name))).Finish();
+
+    /// <summary>A fixture with <paramref name="anchor"/> replaced (to inject content no fixture has).</summary>
+    public static CityModel ReadReplaced(string name, string anchor, string replacement)
+    {
+        var text = File.ReadAllText(Fixture(name));
+        Assert.Contains(anchor, text);
+        var index = text.IndexOf(anchor, StringComparison.Ordinal);
+        var content = text[..index] + replacement + text[(index + anchor.Length)..];
+        return GmlReader.create(Encoding.UTF8.GetBytes(content), CitygmlFormat.Gml).Finish();
+    }
 
     /// <summary>A borrowed string (UTF-8 bytes still owned by Rust), copied into a .NET string.</summary>
     public static string Str(DiplomatBorrowedSpan<byte> text) => Encoding.UTF8.GetString(text.Clone());

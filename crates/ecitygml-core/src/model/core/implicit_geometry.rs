@@ -4,6 +4,7 @@ use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::primitives::PointProperty;
 use egml::model::geometry::{AbstractGeometryProperty, Envelope};
+use egml::model::xs::AnyUri;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -11,7 +12,7 @@ pub struct ImplicitGeometry {
     object_id: Id,
     transformation_matrix: TransformationMatrix4x4,
     mime_type: Option<MimeTypeValue>,
-    library_object: Option<String>,
+    library_object: Option<AnyUri>,
     reference_point: PointProperty,
     relative_geometry: Option<Box<AbstractGeometryProperty>>,
     appearances: Vec<AbstractAppearanceProperty>,
@@ -66,15 +67,15 @@ impl ImplicitGeometry {
         self.mime_type = None;
     }
 
-    pub fn library_object(&self) -> Option<&str> {
-        self.library_object.as_deref()
+    pub fn library_object(&self) -> Option<&AnyUri> {
+        self.library_object.as_ref()
     }
 
-    pub fn set_library_object(&mut self, library_object: String) {
-        self.library_object = Some(library_object);
+    pub fn set_library_object(&mut self, library_object: impl Into<AnyUri>) {
+        self.library_object = Some(library_object.into());
     }
 
-    pub fn set_library_object_opt(&mut self, library_object: Option<String>) {
+    pub fn set_library_object_opt(&mut self, library_object: Option<AnyUri>) {
         self.library_object = library_object;
     }
 

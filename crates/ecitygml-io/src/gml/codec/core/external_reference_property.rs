@@ -47,6 +47,7 @@ pub fn serialize_external_reference_property(
 mod tests {
     use super::*;
     use egml::io::util::Formatting;
+    use egml::model::xs::AnyUri;
 
     #[test]
     fn test_deserialize_external_reference_property() {
@@ -60,9 +61,15 @@ mod tests {
         let external_reference =
             deserialize_external_reference_property(xml_document).expect("should work");
 
-        assert_eq!(external_reference.target_resource, "DEHHALKA70002P5E");
         assert_eq!(
-            external_reference.information_system.as_deref(),
+            external_reference.target_resource.as_str(),
+            "DEHHALKA70002P5E"
+        );
+        assert_eq!(
+            external_reference
+                .information_system
+                .as_ref()
+                .map(AnyUri::as_str),
             Some("http://example.com")
         );
     }
@@ -70,8 +77,8 @@ mod tests {
     #[test]
     fn test_serialize_external_reference_property() {
         let external_reference = ExternalReference {
-            target_resource: "DEHHALKA70002P5E".to_string(),
-            information_system: Some("http://example.com".to_string()),
+            target_resource: AnyUri::new("DEHHALKA70002P5E"),
+            information_system: Some(AnyUri::new("http://example.com")),
             relation_type: None,
         };
 

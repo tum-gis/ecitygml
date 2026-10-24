@@ -3,7 +3,8 @@ use crate::model::building::values::{
     BuildingClassValue, BuildingFunctionValue, BuildingUsageValue, RoofTypeValue,
 };
 use crate::model::building::{
-    AbstractBuildingSubdivisionProperty, BuildingInstallationProperty, BuildingRoomProperty,
+    AbstractBuildingSubdivisionProperty, BuildingFurnitureProperty, BuildingInstallationProperty,
+    BuildingRoomProperty,
 };
 use crate::model::common::{CodeListValue, ForEachFeatureMut, IterFeatures};
 use crate::model::construction::{
@@ -30,6 +31,7 @@ pub struct AbstractBuilding {
     building_constructive_elements: Vec<BuildingConstructiveElementProperty>,
     building_installations: Vec<BuildingInstallationProperty>,
     building_rooms: Vec<BuildingRoomProperty>,
+    building_furniture: Vec<BuildingFurnitureProperty>,
     building_subdivisions: Vec<AbstractBuildingSubdivisionProperty>,
     addresses: Vec<AddressProperty>,
 }
@@ -51,6 +53,7 @@ impl AbstractBuilding {
             building_constructive_elements: Vec::new(),
             building_installations: Vec::new(),
             building_rooms: Vec::new(),
+            building_furniture: Vec::new(),
             building_subdivisions: Vec::new(),
             addresses: Vec::new(),
         }
@@ -122,6 +125,10 @@ pub trait AsAbstractBuilding: AsAbstractConstruction {
 
     fn building_rooms(&self) -> &[BuildingRoomProperty] {
         &self.abstract_building().building_rooms
+    }
+
+    fn building_furniture(&self) -> &[BuildingFurnitureProperty] {
+        &self.abstract_building().building_furniture
     }
 
     fn building_subdivisions(&self) -> &[AbstractBuildingSubdivisionProperty] {
@@ -309,6 +316,29 @@ pub trait AsAbstractBuildingMut: AsAbstractConstructionMut + AsAbstractBuilding 
         self.abstract_building_mut().building_rooms.extend(rooms);
     }
 
+    fn building_furniture_mut(&mut self) -> &mut [BuildingFurnitureProperty] {
+        &mut self.abstract_building_mut().building_furniture
+    }
+
+    fn set_building_furniture(&mut self, building_furniture: Vec<BuildingFurnitureProperty>) {
+        self.abstract_building_mut().building_furniture = building_furniture;
+    }
+
+    fn push_building_furniture(&mut self, building_furniture: BuildingFurnitureProperty) {
+        self.abstract_building_mut()
+            .building_furniture
+            .push(building_furniture);
+    }
+
+    fn extend_building_furniture(
+        &mut self,
+        building_furniture: impl IntoIterator<Item = BuildingFurnitureProperty>,
+    ) {
+        self.abstract_building_mut()
+            .building_furniture
+            .extend(building_furniture);
+    }
+
     fn building_subdivisions_mut(&mut self) -> &mut [AbstractBuildingSubdivisionProperty] {
         &mut self.abstract_building_mut().building_subdivisions
     }
@@ -420,6 +450,12 @@ impl IterFeatures for AbstractBuilding {
                         .flat_map(|x| x.iter_features()),
                 )
                 .chain(
+                    self.building_furniture
+                        .iter()
+                        .filter_map(|x| x.object())
+                        .flat_map(|x| x.iter_features()),
+                )
+                .chain(
                     self.building_subdivisions
                         .iter()
                         .filter_map(|x| x.object())
@@ -444,6 +480,11 @@ impl ForEachFeatureMut for AbstractBuilding {
             }
         }
         for prop in &mut self.building_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.for_each_feature_mut(f);
+            }
+        }
+        for prop in &mut self.building_furniture {
             if let Some(x) = prop.object_mut() {
                 x.for_each_feature_mut(f);
             }
@@ -481,6 +522,11 @@ impl ApplyTransform for AbstractBuilding {
                 x.apply_transform(m);
             }
         }
+        for prop in &mut self.building_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_transform(m);
+            }
+        }
         for prop in &mut self.building_subdivisions {
             if let Some(x) = prop.object_mut() {
                 x.apply_transform(m);
@@ -502,6 +548,11 @@ impl ApplyTransform for AbstractBuilding {
             }
         }
         for prop in &mut self.building_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.apply_isometry(isometry);
+            }
+        }
+        for prop in &mut self.building_furniture {
             if let Some(x) = prop.object_mut() {
                 x.apply_isometry(isometry);
             }
@@ -531,6 +582,11 @@ impl ApplyTransform for AbstractBuilding {
                 x.apply_translation(vector);
             }
         }
+        for prop in &mut self.building_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_translation(vector);
+            }
+        }
         for prop in &mut self.building_subdivisions {
             if let Some(x) = prop.object_mut() {
                 x.apply_translation(vector);
@@ -556,6 +612,11 @@ impl ApplyTransform for AbstractBuilding {
                 x.apply_rotation(rotation);
             }
         }
+        for prop in &mut self.building_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_rotation(rotation);
+            }
+        }
         for prop in &mut self.building_subdivisions {
             if let Some(x) = prop.object_mut() {
                 x.apply_rotation(rotation);
@@ -577,6 +638,11 @@ impl ApplyTransform for AbstractBuilding {
             }
         }
         for prop in &mut self.building_rooms {
+            if let Some(x) = prop.object_mut() {
+                x.apply_scale(scale);
+            }
+        }
+        for prop in &mut self.building_furniture {
             if let Some(x) = prop.object_mut() {
                 x.apply_scale(scale);
             }

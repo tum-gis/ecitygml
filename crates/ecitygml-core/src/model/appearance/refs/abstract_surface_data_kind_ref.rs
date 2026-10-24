@@ -6,6 +6,8 @@ use crate::model::appearance::{
 };
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractSurfaceDataKindRef<'a> {
@@ -79,6 +81,7 @@ macro_rules! impl_try_from_for_surface_data_kind_ref {
                 }
             }
         }
+        $crate::impl_try_from_for_feature_kind_ref!(AbstractSurfaceDataKind, $type);
     };
     ($variant:ident) => {
         $crate::impl_try_from_for_surface_data_kind_ref!($variant, $variant);
@@ -109,3 +112,12 @@ macro_rules! impl_try_from_surface_data_kind_ref_for_enum {
     };
 }
 impl_try_from_feature_kind_ref_for_enum!(AbstractSurfaceDataKind, AbstractSurfaceDataKindRef);
+
+impl<'a> ComputeEnvelope for AbstractSurfaceDataKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractSurfaceDataKindRef::AbstractTextureKind(x) => x.compute_envelope(),
+            AbstractSurfaceDataKindRef::X3DMaterial(x) => x.compute_envelope(),
+        }
+    }
+}

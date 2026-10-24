@@ -2,6 +2,7 @@
 //!
 //! Like all abstract-type macros (see `src/gml/core/model/feature/abstract_feature.rs`): each type invokes the
 //! macro of every abstract supertype itself and includes this file with `#[diplomat::include(...)]`.
+//! Not bound yet: construction_events, elevations.
 
 #[diplomat::macro_rules]
 macro_rules! impl_abstract_construction_methods {

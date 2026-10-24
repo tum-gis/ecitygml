@@ -19,6 +19,7 @@ pub mod ffi {
     use crate::citygml::core::model::core::refs::abstract_feature_kind_ref::ffi::AbstractFeatureKindRef;
     use crate::citygml::core::model::transportation::enums::granularity_value::ffi::GranularityValue;
     use crate::citygml::core::model::transportation::enums::traffic_direction_value::ffi::TrafficDirectionValue;
+    use crate::citygml::core::model::transportation::traffic_space_reference::ffi::TrafficSpaceReferenceIterator;
     use crate::citygml::core::model::transportation::values::traffic_space_class_value::ffi::TrafficSpaceClassValue;
     use crate::citygml::core::model::transportation::values::traffic_space_function_value::ffi::TrafficSpaceFunctionValueIterator;
     use crate::citygml::core::model::transportation::values::traffic_space_usage_value::ffi::TrafficSpaceUsageValueIterator;
@@ -47,6 +48,7 @@ pub mod ffi {
         }
 
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
+        #[diplomat::attr(dart, rename = "classifier")] // `class` is reserved in Dart, which has no escaping
         pub fn class<'a>(&'a self) -> Option<&'a TrafficSpaceClassValue> {
             self.0
                 .class()
@@ -75,6 +77,16 @@ pub mod ffi {
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
         pub fn occupancies<'a>(&'a self) -> Box<OccupancyIterator<'a>> {
             Box::new(OccupancyIterator(self.0.occupancies().iter()))
+        }
+
+        #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
+        pub fn predecessors<'a>(&'a self) -> Box<TrafficSpaceReferenceIterator<'a>> {
+            Box::new(TrafficSpaceReferenceIterator(self.0.predecessors().iter()))
+        }
+
+        #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
+        pub fn successors<'a>(&'a self) -> Box<TrafficSpaceReferenceIterator<'a>> {
+            Box::new(TrafficSpaceReferenceIterator(self.0.successors().iter()))
         }
     }
 }

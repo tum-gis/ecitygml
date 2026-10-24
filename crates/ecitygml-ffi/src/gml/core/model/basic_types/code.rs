@@ -21,7 +21,7 @@ pub mod ffi {
         #[diplomat::attr(dotnet, disable)]
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
         pub fn code_space<'a>(&'a self) -> Option<&'a str> {
-            self.0.code_space()
+            self.0.code_space().map(egml::model::xs::AnyUri::as_str)
         }
     }
 

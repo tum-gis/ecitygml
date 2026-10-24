@@ -3,11 +3,11 @@ use crate::model::city_furniture::CityFurniture;
 use crate::model::common::{FeatureType, HasFeatureType};
 use crate::model::construction::refs::{
     AbstractConstructionKindRefMut, AbstractConstructiveElementKindRefMut,
-    AbstractFillingElementKindRefMut, AbstractInstallationKindRefMut,
+    AbstractFillingElementKindRefMut, AbstractFurnitureKindRefMut, AbstractInstallationKindRefMut,
 };
 use crate::model::construction::{
     AbstractConstructionKind, AbstractConstructiveElementKind, AbstractFillingElementKind,
-    AbstractInstallationKind,
+    AbstractFurnitureKind, AbstractInstallationKind,
 };
 use crate::model::core::{
     AbstractOccupiedSpace, AbstractOccupiedSpaceKind, AsAbstractOccupiedSpace,
@@ -26,6 +26,7 @@ pub enum AbstractOccupiedSpaceKindRefMut<'a> {
     AbstractConstructiveElementKind(AbstractConstructiveElementKindRefMut<'a>),
     AbstractFillingElementKind(AbstractFillingElementKindRefMut<'a>),
     GenericOccupiedSpace(&'a mut GenericOccupiedSpace),
+    AbstractFurnitureKind(AbstractFurnitureKindRefMut<'a>),
     AbstractInstallationKind(AbstractInstallationKindRefMut<'a>),
     AbstractVegetationObjectKind(AbstractVegetationObjectKindRefMut<'a>),
     WaterBody(&'a mut WaterBody),
@@ -45,6 +46,9 @@ impl<'a> From<&'a mut AbstractOccupiedSpaceKind> for AbstractOccupiedSpaceKindRe
                 Self::AbstractFillingElementKind(x.into())
             }
             AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => Self::GenericOccupiedSpace(x),
+            AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => {
+                Self::AbstractFurnitureKind(x.into())
+            }
             AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => {
                 Self::AbstractInstallationKind(x.into())
             }
@@ -64,6 +68,7 @@ impl<'a> AsAbstractOccupiedSpace for AbstractOccupiedSpaceKindRefMut<'a> {
             Self::AbstractConstructiveElementKind(x) => x.abstract_occupied_space(),
             Self::AbstractFillingElementKind(x) => x.abstract_occupied_space(),
             Self::GenericOccupiedSpace(x) => x.abstract_occupied_space(),
+            Self::AbstractFurnitureKind(x) => x.abstract_occupied_space(),
             Self::AbstractInstallationKind(x) => x.abstract_occupied_space(),
             Self::AbstractVegetationObjectKind(x) => x.abstract_occupied_space(),
             Self::WaterBody(x) => x.abstract_occupied_space(),
@@ -79,6 +84,7 @@ impl<'a> AsAbstractOccupiedSpaceMut for AbstractOccupiedSpaceKindRefMut<'a> {
             Self::AbstractConstructiveElementKind(x) => x.abstract_occupied_space_mut(),
             Self::AbstractFillingElementKind(x) => x.abstract_occupied_space_mut(),
             Self::GenericOccupiedSpace(x) => x.abstract_occupied_space_mut(),
+            Self::AbstractFurnitureKind(x) => x.abstract_occupied_space_mut(),
             Self::AbstractInstallationKind(x) => x.abstract_occupied_space_mut(),
             Self::AbstractVegetationObjectKind(x) => x.abstract_occupied_space_mut(),
             Self::WaterBody(x) => x.abstract_occupied_space_mut(),
@@ -96,6 +102,7 @@ impl<'a> HasFeatureType for AbstractOccupiedSpaceKindRefMut<'a> {
             Self::AbstractConstructiveElementKind(x) => x.feature_type(),
             Self::AbstractFillingElementKind(x) => x.feature_type(),
             Self::GenericOccupiedSpace(x) => x.feature_type(),
+            Self::AbstractFurnitureKind(x) => x.feature_type(),
             Self::AbstractInstallationKind(x) => x.feature_type(),
             Self::AbstractVegetationObjectKind(x) => x.feature_type(),
             Self::WaterBody(x) => x.feature_type(),
@@ -124,6 +131,7 @@ impl_from_for_occupied_space_kind_ref_mut!(AbstractConstructionKind);
 impl_from_for_occupied_space_kind_ref_mut!(AbstractConstructiveElementKind);
 impl_from_for_occupied_space_kind_ref_mut!(AbstractFillingElementKind);
 impl_from_for_occupied_space_kind_ref_mut!(GenericOccupiedSpace);
+impl_from_for_occupied_space_kind_ref_mut!(AbstractFurnitureKind);
 impl_from_for_occupied_space_kind_ref_mut!(AbstractInstallationKind);
 impl_from_for_occupied_space_kind_ref_mut!(AbstractVegetationObjectKind);
 impl_from_for_occupied_space_kind_ref_mut!(WaterBody);
@@ -195,6 +203,7 @@ impl<'a> RecomputeBoundingShape for AbstractOccupiedSpaceKindRefMut<'a> {
             Self::AbstractConstructiveElementKind(x) => x.recompute_bounding_shape(),
             Self::AbstractFillingElementKind(x) => x.recompute_bounding_shape(),
             Self::GenericOccupiedSpace(x) => x.recompute_bounding_shape(),
+            Self::AbstractFurnitureKind(x) => x.recompute_bounding_shape(),
             Self::AbstractInstallationKind(x) => x.recompute_bounding_shape(),
             Self::AbstractVegetationObjectKind(x) => x.recompute_bounding_shape(),
             Self::WaterBody(x) => x.recompute_bounding_shape(),

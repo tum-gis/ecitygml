@@ -3,6 +3,8 @@ use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::core::{AbstractPointCloud, AbstractPointCloudKind, AsAbstractPointCloud};
 use crate::model::point_cloud::PointCloud;
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractPointCloudKindRef<'a> {
@@ -69,3 +71,11 @@ macro_rules! impl_try_from_point_cloud_kind_ref {
 }
 impl_try_from_point_cloud_kind_ref!(PointCloud);
 impl_try_from_feature_kind_ref_for_enum!(AbstractPointCloudKind, AbstractPointCloudKindRef);
+
+impl<'a> ComputeEnvelope for AbstractPointCloudKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractPointCloudKindRef::PointCloud(x) => x.compute_envelope(),
+        }
+    }
+}

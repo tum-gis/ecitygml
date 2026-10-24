@@ -4,7 +4,9 @@ use crate::gml::util::{
     CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
 };
 use ecitygml_core::model::city_object_group::Role;
+use egml::io::codec::base::{deserialize_reference, serialize_reference};
 use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter, XmlNamespaceContext};
+use egml::model::base::Reference;
 
 pub fn deserialize_role(
     xml_document: &[u8],
@@ -17,7 +19,21 @@ pub fn deserialize_role(
         index
     };
 
-    let mut role = Role::new();
+    let group_member = index
+        .first(CityGmlElement::GroupMemberProperty.into())
+        .map(|x| deserialize_reference(&xml_document[x.range()]))
+        .transpose()?
+        .ok_or_else(|| {
+            Error::ElementNotFound(
+                XmlNamespaceContext::default()
+                    .qualify(
+                        CityGmlNamespace::CityObjectGroup,
+                        CityGmlElement::GroupMemberProperty,
+                    )
+                    .to_string(),
+            )
+        })?;
+    let mut role = Role::new(group_member.into());
 
     let value = index
         .first(CityGmlElement::RoleProperty.into())
@@ -43,6 +59,13 @@ pub fn serialize_role(
             CityGmlElement::RoleProperty,
         )?;
     }
+
+    serialize_reference(
+        &Reference::from(role.group_member()),
+        xml_fragment_writer,
+        CityGmlNamespace::CityObjectGroup,
+        CityGmlElement::GroupMemberProperty,
+    )?;
 
     xml_fragment_writer.write_end_event(CityGmlNamespace::CityObjectGroup, CityGmlElement::Role)?;
 
@@ -94,6 +117,8 @@ pub fn serialize_role_property(
 mod tests {
     use super::*;
     use egml::io::util::{Formatting, XmlDocumentIndex};
+    use egml::model::base::HasAssociationAttributes;
+    use egml::model::xlink::HRef;
 
     #[test]
     fn test_deserialize_role_with_role_value() {
@@ -110,6 +135,10 @@ mod tests {
         .expect("should work");
 
         assert_eq!(role.role(), Some("Parent"));
+        assert_eq!(
+            Reference::from(role.group_member()).href(),
+            Some(&HRef::from("#GMLID_SO0286258_965_2893"))
+        );
     }
 
     #[test]
@@ -126,6 +155,25 @@ mod tests {
         .expect("should work");
 
         assert!(role.role().is_none());
+        assert_eq!(
+            Reference::from(role.group_member()).href(),
+            Some(&HRef::from("#GMLID_SO0286258_965_2893"))
+        );
+    }
+
+    #[test]
+    fn test_deserialize_role_without_group_member_fails() {
+        let xml_document = b"<grp:Role>
+      <grp:role>Parent</grp:role>
+    </grp:Role>";
+
+        let result = deserialize_role(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        );
+
+        assert!(matches!(result, Err(Error::ElementNotFound(_))));
     }
 
     #[test]
@@ -147,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_round_trip_role() {
-        let mut role = Role::new();
+        let mut role = Role::new(Reference::new(HRef::from("#GMLID_SO0286258_965_2893")).into());
         role.set_role("Parent".to_string());
 
         let mut xml_fragment_writer =

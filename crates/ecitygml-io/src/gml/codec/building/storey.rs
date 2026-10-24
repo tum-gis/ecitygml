@@ -170,6 +170,18 @@ mod tests {
             storey.feature_id(),
             &Id::try_from("test-id").expect("should work")
         );
+        let element = storey
+            .building_constructive_elements()
+            .first()
+            .and_then(|x| x.object())
+            .expect("should have the constructive element");
+        assert_eq!(
+            element.feature_id(),
+            &Id::try_from(
+                "_FZK-Haus-Storey-Construction-tex-Windows_BD.CvWEAVLAPO2cqWPW8xrz_BP.Um20q9TChr2VYbrcN9zj"
+            )
+            .expect("should work")
+        );
         /*assert_eq!(
             storey.name().first().expect("should work"),
             "AC14-FZK-Haus"

@@ -1,5 +1,6 @@
 use crate::Error;
 use crate::Error::AttributeWithoutName;
+use crate::gml::codec::common::deserialize_string;
 use crate::gml::util::{CityGmlElement, CityGmlNamespace};
 use ecitygml_core::model::generics::DoubleAttribute;
 use egml::io::util::{ChunkedSink, XmlFragmentWriter};
@@ -10,43 +11,40 @@ pub fn deserialize_double_attribute(xml_document: &[u8]) -> Result<DoubleAttribu
     let mut reader = Reader::from_reader(xml_document);
     reader.config_mut().trim_text(true);
 
-    #[derive(PartialEq)]
-    enum Current {
-        None,
-        Name,
-        Value,
+    // Consume the root `<DoubleAttribute>` element's own start tag.
+    loop {
+        match reader.read_event()? {
+            Event::Start(_) => break,
+            Event::Eof => {
+                return Err(Error::ElementNotFound("DoubleAttribute".to_string()));
+            }
+            _ => {}
+        }
     }
 
-    let mut current = Current::None;
     let mut name: Option<String> = None;
     let mut value: Option<f64> = None;
 
+    // Each child is read as a whole element, so that entities such as `&amp;` are unescaped instead of splitting
+    // the text into several events.
     loop {
         match reader.read_event()? {
             Event::Start(start) => {
-                current = match start.local_name().as_ref() {
-                    "name" => Current::Name,
-                    "value" => Current::Value,
-                    _ => Current::None,
-                };
-            }
-            Event::Text(text) => {
-                let text_value = text.as_ref();
-                match current {
-                    Current::Name => name = Some(text_value.trim().to_string()),
-                    Current::Value => {
-                        let parsed: f64 = text_value.trim().parse().map_err(|_| {
-                            Error::UnknownElementNode(format!(
-                                "expected f64 value, got `{text_value}`"
-                            ))
+                let pos_start = reader.buffer_position() as usize - start.len() - 2;
+                reader.read_to_end(start.name())?;
+                let pos_end = reader.buffer_position() as usize;
+                let text = deserialize_string(&xml_document[pos_start..pos_end])?;
+
+                match start.local_name().as_ref() {
+                    "name" => name = Some(text.trim().to_string()),
+                    "value" => {
+                        let parsed: f64 = text.trim().parse().map_err(|_| {
+                            Error::UnknownElementNode(format!("expected f64 value, got `{text}`"))
                         })?;
                         value = Some(parsed);
                     }
-                    Current::None => {}
+                    _ => {}
                 }
-            }
-            Event::End(_) => {
-                current = Current::None;
             }
             Event::Eof => break,
             _ => {}
@@ -167,5 +165,16 @@ mod tests {
         let round_tripped = deserialize_double_attribute(xml.as_bytes()).expect("should work");
 
         assert_eq!(double_attribute, round_tripped);
+    }
+
+    #[test]
+    fn test_deserialize_double_attribute_unescapes_name() {
+        let double_attribute = deserialize_double_attribute(
+            b"<gen:DoubleAttribute><gen:name>width &amp; depth</gen:name><gen:value>2.5</gen:value></gen:DoubleAttribute>",
+        )
+        .expect("should work");
+
+        assert_eq!(double_attribute.name, "width & depth");
+        assert_eq!(double_attribute.value, 2.5);
     }
 }

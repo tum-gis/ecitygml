@@ -7,6 +7,9 @@ use crate::gml::codec::building::building_constructive_element_property::{
     deserialize_building_constructive_element_property,
     serialize_building_constructive_element_property,
 };
+use crate::gml::codec::building::building_furniture_property::{
+    deserialize_building_furniture_property, serialize_building_furniture_property,
+};
 use crate::gml::codec::building::building_installation_property::{
     deserialize_building_installation_property, serialize_building_installation_property,
 };
@@ -40,6 +43,7 @@ pub fn deserialize_abstract_building(
 
     let mut abstract_construction_result = None;
     let mut building_rooms_result = None;
+    let mut building_furniture_result = None;
     let mut building_installations_result = None;
     let mut building_constructive_elements_result = None;
     let mut building_subdivisions_result = None;
@@ -60,6 +64,15 @@ pub fn deserialize_abstract_building(
                 CityGmlElement::BuildingRoomProperty.into(),
                 config,
                 deserialize_building_room_property,
+            ));
+        });
+        s.spawn(|_| {
+            building_furniture_result = Some(collect_children(
+                xml_document,
+                index,
+                CityGmlElement::BuildingFurnitureProperty.into(),
+                config,
+                deserialize_building_furniture_property,
             ));
         });
         s.spawn(|_| {
@@ -152,6 +165,9 @@ pub fn deserialize_abstract_building(
     abstract_building.set_building_rooms(
         building_rooms_result.expect("rayon::scope guarantees all spawns complete")?,
     );
+    abstract_building.set_building_furniture(
+        building_furniture_result.expect("rayon::scope guarantees all spawns complete")?,
+    );
     abstract_building.set_building_subdivisions(
         building_subdivisions_result.expect("rayon::scope guarantees all spawns complete")?,
     );
@@ -226,6 +242,9 @@ pub fn serialize_abstract_building(
 
     for prop in abstract_building.building_rooms() {
         serialize_building_room_property(prop, xml_fragment_writer)?;
+    }
+    for prop in abstract_building.building_furniture() {
+        serialize_building_furniture_property(prop, xml_fragment_writer)?;
     }
 
     for prop in abstract_building.building_installations() {

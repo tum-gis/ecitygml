@@ -88,3 +88,118 @@ impl ApplyTransform for Storey {
         self.abstract_building_subdivision.apply_scale(scale);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::building::{
+        BuildingConstructiveElement, BuildingConstructiveElementProperty, BuildingFurniture,
+        BuildingFurnitureProperty, BuildingInstallation, BuildingInstallationProperty,
+        BuildingRoom, BuildingRoomProperty,
+    };
+    use crate::model::common::{FeatureType, HasFeatureType};
+    use crate::model::construction::{Elevation, ElevationValue};
+    use egml::model::basic_types::Code;
+    use egml::model::feature::{AsAbstractFeature, AsAbstractFeatureMut, BoundingShape};
+    use egml::model::geometry::DirectPosition;
+
+    fn id(value: &str) -> Id {
+        Id::try_from(value).expect("valid id")
+    }
+
+    fn envelope(offset: f64) -> Option<BoundingShape> {
+        let corner = |value: f64| DirectPosition::new(value, value, value).expect("finite");
+        let envelope = Envelope::new(corner(offset), corner(offset + 1.0)).expect("valid envelope");
+        Some(BoundingShape::new(envelope))
+    }
+
+    /// A storey with one feature of each nested kind, each with its own envelope.
+    fn storey_with_nested_features() -> Storey {
+        let mut element = BuildingConstructiveElement::new(id("element"));
+        element.set_bounded_by(envelope(1.0));
+        let mut furniture = BuildingFurniture::new(id("furniture"));
+        furniture.set_bounded_by(envelope(2.0));
+        let mut installation = BuildingInstallation::new(id("installation"));
+        installation.set_bounded_by(envelope(3.0));
+        let mut room = BuildingRoom::new(id("room"));
+        room.set_bounded_by(envelope(4.0));
+
+        let mut storey = Storey::new(id("storey"));
+        storey.set_bounded_by(envelope(0.0));
+        storey.push_building_constructive_element(
+            BuildingConstructiveElementProperty::from_object(element),
+        );
+        storey.push_building_furniture(BuildingFurnitureProperty::from_object(furniture));
+        storey.push_building_installation(BuildingInstallationProperty::from_object(installation));
+        storey.push_building_room(BuildingRoomProperty::from_object(room));
+        storey
+    }
+
+    const NESTED_IN_SCHEMA_ORDER: [FeatureType; 5] = [
+        FeatureType::Storey,
+        FeatureType::BuildingConstructiveElement,
+        FeatureType::BuildingFurniture,
+        FeatureType::BuildingInstallation,
+        FeatureType::BuildingRoom,
+    ];
+
+    #[test]
+    fn test_iter_features_yields_nested_features() {
+        let feature_types: Vec<FeatureType> = storey_with_nested_features()
+            .iter_features()
+            .map(|f| f.feature_type())
+            .collect();
+        assert_eq!(feature_types, NESTED_IN_SCHEMA_ORDER);
+    }
+
+    #[test]
+    fn test_for_each_feature_mut_visits_nested_features() {
+        let mut feature_types = Vec::new();
+        storey_with_nested_features()
+            .for_each_feature_mut(&mut |f| feature_types.push(f.feature_type()));
+        assert_eq!(feature_types, NESTED_IN_SCHEMA_ORDER);
+    }
+
+    #[test]
+    fn test_apply_translation_moves_nested_features_once() {
+        let mut storey = storey_with_nested_features();
+        storey.apply_translation(Vector3::new(10.0, 20.0, 30.0));
+
+        let lower_corners: Vec<[f64; 3]> = storey
+            .iter_features()
+            .filter_map(|feature| {
+                let lower = *feature.bounded_by()?.envelope()?.lower_corner();
+                Some([lower.x(), lower.y(), lower.z()])
+            })
+            .collect();
+        let moved = |offset: f64| [offset + 10.0, offset + 20.0, offset + 30.0];
+        assert_eq!(
+            lower_corners,
+            [moved(0.0), moved(1.0), moved(2.0), moved(3.0), moved(4.0)]
+        );
+    }
+
+    #[test]
+    fn test_elevations_and_sort_key_accessors() {
+        let elevation = |value: f64| {
+            Elevation::new(
+                Code::new("lowestGroundPoint").into(),
+                ElevationValue::new(vec![value]).expect("should work"),
+            )
+        };
+        let mut storey = Storey::new(id("storey"));
+        assert!(storey.elevations().is_empty());
+        assert_eq!(storey.sort_key(), None);
+
+        storey.push_elevation(elevation(0.0));
+        storey.extend_elevations([elevation(2.7)]);
+        assert_eq!(storey.elevations(), &[elevation(0.0), elevation(2.7)]);
+        storey.set_elevations(vec![elevation(5.4)]);
+        assert_eq!(storey.elevations(), &[elevation(5.4)]);
+
+        storey.set_sort_key(2.0);
+        assert_eq!(storey.sort_key(), Some(2.0));
+        storey.clear_sort_key();
+        assert_eq!(storey.sort_key(), None);
+    }
+}

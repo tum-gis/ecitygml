@@ -89,6 +89,7 @@ macro_rules! impl_try_from_for_texture_kind_ref_mut {
                 }
             }
         }
+        $crate::impl_try_from_for_surface_data_kind_ref_mut!(AbstractTextureKind, $type);
     };
     ($variant:ident) => {
         $crate::impl_try_from_for_texture_kind_ref_mut!($variant, $variant);

@@ -7,8 +7,8 @@ namespace Ecitygml.Tests;
 /// <summary>
 /// Runs the snippets in examples/snippets/ (short programs giving a first impression of the bindings, file-based apps run with
 /// <c>dotnet run --file</c>) and compares their output with the expected output shared by all languages: for every
-/// `tests/expected/snippets/&lt;snippet&gt;/&lt;fixture&gt;.txt`, the snippet runs on
-/// `tests/fixtures/&lt;fixture&gt;.gml` and must print that text.
+/// `tests/expected/snippets/&lt;snippet&gt;/&lt;dataset&gt;/&lt;fixture&gt;.txt`, the snippet runs on
+/// `tests/fixtures/&lt;dataset&gt;/&lt;fixture&gt;.gml` and must print that text.
 /// </summary>
 public class SnippetsTests
 {
@@ -39,9 +39,12 @@ public class SnippetsTests
         var cases = new TheoryData<string, string>();
         foreach (var directory in Directory.GetDirectories(Expected).Order())
         {
-            foreach (var file in Directory.GetFiles(directory, "*.txt").Order())
+            // `<dataset>/<fixture>.txt`: the fixture is `<dataset>/<fixture>`, as below tests/fixtures.
+            foreach (var file in Directory.GetFiles(directory, "*.txt", SearchOption.AllDirectories).Order())
             {
-                cases.Add(Path.GetFileName(directory), Path.GetFileNameWithoutExtension(file));
+                cases.Add(
+                    Path.GetFileName(directory),
+                    $"{Path.GetFileName(Path.GetDirectoryName(file))}/{Path.GetFileNameWithoutExtension(file)}");
             }
         }
         return cases;

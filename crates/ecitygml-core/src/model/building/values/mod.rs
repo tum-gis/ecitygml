@@ -17,6 +17,7 @@ mod building_subdivision_function_value;
 mod building_subdivision_usage_value;
 mod building_usage_value;
 mod roof_type_value;
+mod room_elevation_reference_value;
 
 pub use building_class_value::*;
 pub use building_constructive_element_class_value::*;
@@ -37,3 +38,4 @@ pub use building_subdivision_function_value::*;
 pub use building_subdivision_usage_value::*;
 pub use building_usage_value::*;
 pub use roof_type_value::*;
+pub use room_elevation_reference_value::*;

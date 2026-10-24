@@ -46,7 +46,7 @@ inline std::unique_ptr<ecitygml::CityModel> read_modified(const std::string& nam
 
 /// A model with the FZK LoD2 header and `member` as its only city object (no fixture has one).
 inline std::unique_ptr<ecitygml::CityModel> read_member(const std::string& member) {
-    std::ifstream input(fixture("FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3.gml"));
+    std::ifstream input(fixture("fzk-haus/FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3.gml"));
     std::stringstream buffer;
     buffer << input.rdbuf();
     const std::string text = buffer.str();

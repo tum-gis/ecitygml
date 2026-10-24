@@ -1,5 +1,4 @@
 use crate::Error;
-use crate::gml::codec::common::serialize_string;
 use crate::gml::codec::core::abstract_appearance_property::{
     deserialize_abstract_appearance_property, serialize_abstract_appearance_property,
 };
@@ -17,12 +16,14 @@ use egml::io::codec::geometry::primitives::{deserialize_point_property, serializ
 use egml::io::codec::geometry::{
     deserialize_abstract_geometry_property, serialize_abstract_geometry_property,
 };
+use egml::io::codec::xs::{deserialize_any_uri, serialize_any_uri};
 use egml::io::util::{
     ChunkedSink, GmlAttribute, XmlDocumentIndex, XmlElement, XmlFragmentWriter, collect_children,
     deserialize_gml_attributes,
 };
 use egml::model::base::Id;
 use egml::model::basic_types::Code;
+use egml::model::xs::AnyUri;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -61,7 +62,7 @@ pub fn deserialize_implicit_geometry(
 
     let mut transformation_matrix: Option<TransformationMatrix4x4> = None;
     let mut mime_type: Option<Code> = None;
-    let mut library_object: Option<String> = None;
+    let mut library_object: Option<AnyUri> = None;
 
     loop {
         match reader.read_event()? {
@@ -81,9 +82,10 @@ pub fn deserialize_implicit_geometry(
                     mime_type = Some(deserialize_code(&xml_document[pos_start..pos_end])?);
                 }
                 "libraryObject" => {
-                    let text = reader.read_text(start.name())?;
-                    let decoded = text.as_ref();
-                    library_object = Some(decoded.trim().to_string());
+                    let pos_start = reader.buffer_position() as usize - start.len() - 2;
+                    reader.read_to_end(start.name())?;
+                    let pos_end = reader.buffer_position() as usize;
+                    library_object = Some(deserialize_any_uri(&xml_document[pos_start..pos_end])?);
                 }
                 _ => {
                     reader.read_to_end(start.name())?;
@@ -164,7 +166,7 @@ pub fn serialize_implicit_geometry(
     }
 
     if let Some(library_object) = implicit_geometry.library_object() {
-        serialize_string(
+        serialize_any_uri(
             library_object,
             xml_fragment_writer,
             CityGmlNamespace::Core,
@@ -522,5 +524,70 @@ mod tests {
         );
         assert!(xml.contains("MultiGeometry"), "missing <MultiGeometry>");
         assert!(xml.contains("Polygon"), "missing <Polygon>");
+    }
+
+    fn implicit_geometry_with_library_object(library_object: &str) -> ImplicitGeometry {
+        let xml_document = format!(
+            "<core:ImplicitGeometry>
+    <core:transformationMatrix>1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1</core:transformationMatrix>
+    <core:libraryObject>{library_object}</core:libraryObject>
+    <core:referencePoint>
+        <gml:Point>
+            <gml:pos srsDimension=\"3\">1.0 2.0 3.0</gml:pos>
+        </gml:Point>
+    </core:referencePoint>
+</core:ImplicitGeometry>"
+        );
+        deserialize_implicit_geometry(
+            xml_document.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml_document.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work")
+    }
+
+    #[test]
+    fn test_deserialize_implicit_geometry_library_object_unescapes_entities() {
+        let implicit_geometry = implicit_geometry_with_library_object(
+            "https://example.org/trees?species=oak&amp;lod=2",
+        );
+
+        assert_eq!(
+            implicit_geometry.library_object().map(|x| x.as_ref()),
+            Some("https://example.org/trees?species=oak&lod=2")
+        );
+    }
+
+    #[test]
+    fn test_round_trip_implicit_geometry_library_object_escapes_once() {
+        let implicit_geometry = implicit_geometry_with_library_object(
+            "https://example.org/trees?species=oak&amp;lod=2",
+        );
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_implicit_geometry(&implicit_geometry, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+        assert!(xml.contains("?species=oak&amp;lod=2"));
+        assert!(!xml.contains("&amp;amp;"));
+
+        let round_tripped = deserialize_implicit_geometry(
+            xml.as_bytes(),
+            &XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should round trip");
+        assert_eq!(
+            round_tripped.library_object(),
+            implicit_geometry.library_object()
+        );
     }
 }

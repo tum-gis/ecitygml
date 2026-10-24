@@ -12,6 +12,10 @@ use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "boxing the large variants would change the public API; the size difference is platform-dependent, so `allow` instead of `expect`"
+)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AbstractPhysicalSpaceKind {
     AbstractOccupiedSpaceKind(AbstractOccupiedSpaceKind),

@@ -3,7 +3,10 @@ use crate::model::construction::{
     AbstractConstruction, AsAbstractConstruction, AsAbstractConstructionMut,
 };
 use crate::model::tunnel::values::{TunnelClassValue, TunnelFunctionValue, TunnelUsageValue};
-use crate::model::tunnel::{TunnelConstructiveElementProperty, TunnelInstallationProperty};
+use crate::model::tunnel::{
+    HollowSpaceProperty, TunnelConstructiveElementProperty, TunnelFurnitureProperty,
+    TunnelInstallationProperty,
+};
 
 use crate::model::core::refs::AbstractFeatureKindRef;
 use crate::model::core::refs::AbstractFeatureKindRefMut;
@@ -20,6 +23,8 @@ pub struct AbstractTunnel {
     usages: Vec<TunnelUsageValue>,
     tunnel_installations: Vec<TunnelInstallationProperty>,
     tunnel_constructive_elements: Vec<TunnelConstructiveElementProperty>,
+    hollow_spaces: Vec<HollowSpaceProperty>,
+    tunnel_furniture: Vec<TunnelFurnitureProperty>,
 }
 
 impl AbstractTunnel {
@@ -35,6 +40,8 @@ impl AbstractTunnel {
             usages: Vec::new(),
             tunnel_installations: Vec::new(),
             tunnel_constructive_elements: Vec::new(),
+            hollow_spaces: Vec::new(),
+            tunnel_furniture: Vec::new(),
         }
     }
 }
@@ -82,6 +89,14 @@ pub trait AsAbstractTunnel: AsAbstractConstruction {
 
     fn tunnel_constructive_elements(&self) -> &[TunnelConstructiveElementProperty] {
         &self.abstract_tunnel().tunnel_constructive_elements
+    }
+
+    fn hollow_spaces(&self) -> &[HollowSpaceProperty] {
+        &self.abstract_tunnel().hollow_spaces
+    }
+
+    fn tunnel_furniture(&self) -> &[TunnelFurnitureProperty] {
+        &self.abstract_tunnel().tunnel_furniture
     }
 }
 
@@ -199,6 +214,50 @@ pub trait AsAbstractTunnelMut: AsAbstractConstructionMut + AsAbstractTunnel {
             .tunnel_constructive_elements
             .extend(elements);
     }
+
+    fn hollow_spaces_mut(&mut self) -> &mut [HollowSpaceProperty] {
+        &mut self.abstract_tunnel_mut().hollow_spaces
+    }
+
+    fn set_hollow_spaces(&mut self, hollow_spaces: Vec<HollowSpaceProperty>) {
+        self.abstract_tunnel_mut().hollow_spaces = hollow_spaces;
+    }
+
+    fn push_hollow_space(&mut self, hollow_space: HollowSpaceProperty) {
+        self.abstract_tunnel_mut().hollow_spaces.push(hollow_space);
+    }
+
+    fn extend_hollow_spaces(
+        &mut self,
+        hollow_spaces: impl IntoIterator<Item = HollowSpaceProperty>,
+    ) {
+        self.abstract_tunnel_mut()
+            .hollow_spaces
+            .extend(hollow_spaces);
+    }
+
+    fn tunnel_furniture_mut(&mut self) -> &mut [TunnelFurnitureProperty] {
+        &mut self.abstract_tunnel_mut().tunnel_furniture
+    }
+
+    fn set_tunnel_furniture(&mut self, tunnel_furniture: Vec<TunnelFurnitureProperty>) {
+        self.abstract_tunnel_mut().tunnel_furniture = tunnel_furniture;
+    }
+
+    fn push_tunnel_furniture(&mut self, tunnel_furniture: TunnelFurnitureProperty) {
+        self.abstract_tunnel_mut()
+            .tunnel_furniture
+            .push(tunnel_furniture);
+    }
+
+    fn extend_tunnel_furniture(
+        &mut self,
+        tunnel_furniture: impl IntoIterator<Item = TunnelFurnitureProperty>,
+    ) {
+        self.abstract_tunnel_mut()
+            .tunnel_furniture
+            .extend(tunnel_furniture);
+    }
 }
 
 impl AsAbstractTunnel for AbstractTunnel {
@@ -264,6 +323,18 @@ impl IterFeatures for AbstractTunnel {
                         .iter()
                         .filter_map(|x| x.object())
                         .flat_map(|x| x.iter_features()),
+                )
+                .chain(
+                    self.hollow_spaces
+                        .iter()
+                        .filter_map(|x| x.object())
+                        .flat_map(|x| x.iter_features()),
+                )
+                .chain(
+                    self.tunnel_furniture
+                        .iter()
+                        .filter_map(|x| x.object())
+                        .flat_map(|x| x.iter_features()),
                 ),
         )
     }
@@ -279,6 +350,16 @@ impl ForEachFeatureMut for AbstractTunnel {
             }
         }
         for prop in &mut self.tunnel_constructive_elements {
+            if let Some(x) = prop.object_mut() {
+                x.for_each_feature_mut(f);
+            }
+        }
+        for prop in &mut self.hollow_spaces {
+            if let Some(x) = prop.object_mut() {
+                x.for_each_feature_mut(f);
+            }
+        }
+        for prop in &mut self.tunnel_furniture {
             if let Some(x) = prop.object_mut() {
                 x.for_each_feature_mut(f);
             }
@@ -306,6 +387,16 @@ impl ApplyTransform for AbstractTunnel {
                 x.apply_transform(m);
             }
         }
+        for prop in &mut self.hollow_spaces {
+            if let Some(x) = prop.object_mut() {
+                x.apply_transform(m);
+            }
+        }
+        for prop in &mut self.tunnel_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_transform(m);
+            }
+        }
     }
 
     fn apply_isometry(&mut self, isometry: Isometry3<f64>) {
@@ -317,6 +408,16 @@ impl ApplyTransform for AbstractTunnel {
             }
         }
         for prop in &mut self.tunnel_constructive_elements {
+            if let Some(x) = prop.object_mut() {
+                x.apply_isometry(isometry);
+            }
+        }
+        for prop in &mut self.hollow_spaces {
+            if let Some(x) = prop.object_mut() {
+                x.apply_isometry(isometry);
+            }
+        }
+        for prop in &mut self.tunnel_furniture {
             if let Some(x) = prop.object_mut() {
                 x.apply_isometry(isometry);
             }
@@ -336,6 +437,16 @@ impl ApplyTransform for AbstractTunnel {
                 x.apply_translation(vector);
             }
         }
+        for prop in &mut self.hollow_spaces {
+            if let Some(x) = prop.object_mut() {
+                x.apply_translation(vector);
+            }
+        }
+        for prop in &mut self.tunnel_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_translation(vector);
+            }
+        }
     }
 
     fn apply_rotation(&mut self, rotation: Rotation3<f64>) {
@@ -351,6 +462,16 @@ impl ApplyTransform for AbstractTunnel {
                 x.apply_rotation(rotation);
             }
         }
+        for prop in &mut self.hollow_spaces {
+            if let Some(x) = prop.object_mut() {
+                x.apply_rotation(rotation);
+            }
+        }
+        for prop in &mut self.tunnel_furniture {
+            if let Some(x) = prop.object_mut() {
+                x.apply_rotation(rotation);
+            }
+        }
     }
 
     fn apply_scale(&mut self, scale: Scale3<f64>) {
@@ -362,6 +483,16 @@ impl ApplyTransform for AbstractTunnel {
             }
         }
         for prop in &mut self.tunnel_constructive_elements {
+            if let Some(x) = prop.object_mut() {
+                x.apply_scale(scale);
+            }
+        }
+        for prop in &mut self.hollow_spaces {
+            if let Some(x) = prop.object_mut() {
+                x.apply_scale(scale);
+            }
+        }
+        for prop in &mut self.tunnel_furniture {
             if let Some(x) = prop.object_mut() {
                 x.apply_scale(scale);
             }

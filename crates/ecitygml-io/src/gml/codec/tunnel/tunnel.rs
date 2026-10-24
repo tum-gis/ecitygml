@@ -355,4 +355,148 @@ mod tests {
             .expect("should be parsed");
         assert_eq!(round_tripped_element.class(), element.class());
     }
+
+    #[test]
+    fn test_round_trip_tunnel_hollow_space() {
+        let xml_document = b"
+    <tun:Tunnel gml:id=\"UUID_tunnel-1\">
+      <tun:class>1000</tun:class>
+      <tun:hollowSpace>
+        <tun:HollowSpace gml:id=\"UUID_hollow-space-1\">
+          <tun:class>5000</tun:class>
+          <tun:function>5010</tun:function>
+          <tun:usage>6000</tun:usage>
+        </tun:HollowSpace>
+      </tun:hollowSpace>
+    </tun:Tunnel>";
+
+        let tunnel = deserialize_tunnel(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(
+            tunnel.class().expect("should be set").code().value(),
+            "1000"
+        );
+        assert_eq!(tunnel.hollow_spaces().len(), 1);
+        let hollow_space = tunnel.hollow_spaces()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(
+            hollow_space.feature_id(),
+            &Id::try_from("UUID_hollow-space-1").expect("should work")
+        );
+        assert_eq!(
+            hollow_space.class().expect("should be set").code().value(),
+            "5000"
+        );
+        assert_eq!(hollow_space.functions().len(), 1);
+        assert_eq!(hollow_space.usages().len(), 1);
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_tunnel(&tunnel, &mut xml_fragment_writer).expect("should serialize");
+        let xml = {
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        };
+
+        let round_tripped = deserialize_tunnel(
+            &xml,
+            &XmlDocumentIndex::from_scan(&xml, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should round trip");
+
+        assert_eq!(round_tripped.hollow_spaces(), tunnel.hollow_spaces());
+    }
+
+    #[test]
+    fn test_round_trip_tunnel_furniture_on_tunnel_and_in_hollow_space() {
+        let xml_document = b"
+    <tun:Tunnel gml:id=\"UUID_tunnel-1\">
+      <tun:hollowSpace>
+        <tun:HollowSpace gml:id=\"UUID_hollow-space-1\">
+          <tun:class>5000</tun:class>
+          <tun:tunnelFurniture>
+            <tun:TunnelFurniture gml:id=\"UUID_hollow-space-furniture-1\">
+              <tun:class>7000</tun:class>
+            </tun:TunnelFurniture>
+          </tun:tunnelFurniture>
+        </tun:HollowSpace>
+      </tun:hollowSpace>
+      <tun:tunnelFurniture>
+        <tun:TunnelFurniture gml:id=\"UUID_tunnel-furniture-1\">
+          <tun:class>7100</tun:class>
+          <tun:function>7110</tun:function>
+          <tun:usage>7200</tun:usage>
+        </tun:TunnelFurniture>
+      </tun:tunnelFurniture>
+    </tun:Tunnel>";
+
+        let tunnel = deserialize_tunnel(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(tunnel.tunnel_furniture().len(), 1);
+        let tunnel_furniture = tunnel.tunnel_furniture()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(
+            tunnel_furniture.feature_id(),
+            &Id::try_from("UUID_tunnel-furniture-1").expect("should work")
+        );
+        assert_eq!(
+            tunnel_furniture
+                .class()
+                .expect("should be set")
+                .code()
+                .value(),
+            "7100"
+        );
+        assert_eq!(tunnel_furniture.functions().len(), 1);
+        assert_eq!(tunnel_furniture.usages().len(), 1);
+
+        let hollow_space = tunnel.hollow_spaces()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(hollow_space.tunnel_furniture().len(), 1);
+        let hollow_space_furniture = hollow_space.tunnel_furniture()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(
+            hollow_space_furniture.feature_id(),
+            &Id::try_from("UUID_hollow-space-furniture-1").expect("should work")
+        );
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_tunnel(&tunnel, &mut xml_fragment_writer).expect("should serialize");
+        let xml = {
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        };
+
+        let round_tripped = deserialize_tunnel(
+            &xml,
+            &XmlDocumentIndex::from_scan(&xml, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should round trip");
+
+        assert_eq!(round_tripped.tunnel_furniture(), tunnel.tunnel_furniture());
+        assert_eq!(round_tripped.hollow_spaces(), tunnel.hollow_spaces());
+    }
 }

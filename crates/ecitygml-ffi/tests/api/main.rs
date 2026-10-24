@@ -1,30 +1,82 @@
-//! Tests of the bridge API that the generated bindings wrap one-to-one, using only what is public,
-//! like the bindings.
+//! API suite of the FFI API: the behaviour cases of `crates/ecitygml/tests/api/<area>.md`, one module per area
+//! (`geometry`, `iteration`, `reader`, `types`, `writer`), as in every binding. See `crates/ecitygml/tests/api/README.md`.
 //!
-//! The modules mirror the crate's layout (`citygml::core::model`, `citygml::io`, `gml::core::model`);
-//! this file holds the shared helpers, which every test module imports with `use crate::*;`.
+//! The modules `citygml` and `gml` mirror the crate's layout and hold the bridge tests not harmonized into case
+//! lists yet. This file holds the shared helpers, which every test module imports with `use crate::*;`.
 
+use ecitygml_ffi::citygml::core::model::common::feature_type::FeatureType;
 use ecitygml_ffi::citygml::core::model::core::city_model::CityModel;
 use ecitygml_ffi::citygml::io::gml::read::GmlReader;
 use ecitygml_ffi::error::{Error, ErrorKind};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use diplomat_runtime::{
     DiplomatWrite, diplomat_buffer_write_create, diplomat_buffer_write_destroy,
 };
 
-mod citygml;
-mod gml;
+mod geometry;
+mod iteration;
+mod reader;
+mod types;
+mod writer;
 
-const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/fixtures/");
-
-/// `GmlReader::from_path(path)?.finish()`, as in Rust.
-fn read(path: &[u8]) -> Result<Box<CityModel>, Box<Error>> {
-    GmlReader::from_path(path)?.finish()
+/// `tests/fixtures/<path>`.
+fn fixture(path: &str) -> String {
+    format!("{}/../../tests/fixtures/{path}", env!("CARGO_MANIFEST_DIR"))
 }
 
-fn read_error(path: &str) -> Box<Error> {
-    read(path.as_bytes()).err().unwrap()
+/// Reads the file at `path`, as the bindings do: `GmlReader::from_path(path)?.finish()`.
+fn read(path: &str) -> Box<CityModel> {
+    GmlReader::from_path(path.as_bytes())
+        .and_then(|mut reader| reader.finish())
+        .unwrap_or_else(|error| panic!("{path}: {}", message(&error)))
+}
+
+fn message(error: &Error) -> String {
+    written(|w| error.message(w))
+}
+
+/// Asserts the error's kind and that its message contains `part`.
+fn assert_error(error: &Error, kind: ErrorKind, part: &str) {
+    let message = message(error);
+    assert_eq!(error.kind(), kind, "{message}");
+    assert!(message.contains(part), "{message}");
+}
+
+fn feature_types(city_model: &CityModel) -> Vec<FeatureType> {
+    let mut features = city_model.iter_features();
+    std::iter::from_fn(|| features.next())
+        .map(|feature| feature.feature_type())
+        .collect()
+}
+
+/// A fresh temporary directory, unique per call (tests run in parallel threads of one process), removed on drop.
+struct TempDir(PathBuf);
+
+impl TempDir {
+    fn new() -> Self {
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("ecitygml-ffi-api-{}-{n}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("should create the temporary directory");
+        Self(dir)
+    }
+
+    /// The path of `name` in the directory, as a string.
+    fn path(&self, name: &str) -> String {
+        self.0
+            .join(name)
+            .to_str()
+            .expect("should be UTF-8")
+            .to_owned()
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 /// Collects what a method writes to a `DiplomatWrite`.
@@ -37,49 +89,4 @@ fn written(write_to: impl FnOnce(&mut DiplomatWrite)) -> String {
     };
     unsafe { diplomat_buffer_write_destroy(write) };
     text
-}
-
-/// Reads a temporary copy of FZK LoD1 with the first `from` replaced by `to`.
-fn read_modified(from: &str, to: &str) -> Box<CityModel> {
-    read_fixture_modified("FZK-Haus-LoD1-KIT-IAI-KHH-B36-V1__v3.gml", from, to)
-}
-
-/// Reads a temporary copy of a fixture with the first `from` replaced by `to`.
-fn read_fixture_modified(fixture: &str, from: &str, to: &str) -> Box<CityModel> {
-    let original = std::fs::read_to_string(format!("{FIXTURES}{fixture}")).unwrap();
-    // Unique per call: tests run in parallel threads of one process.
-    static NEXT: AtomicUsize = AtomicUsize::new(0);
-    let n = NEXT.fetch_add(1, Ordering::Relaxed);
-    let name = format!("ecitygml-ffi-{}-{n}.gml", std::process::id());
-    let path = std::env::temp_dir().join(name);
-    std::fs::write(&path, original.replacen(from, to, 1)).unwrap();
-    let city_model = read(path.to_str().unwrap().as_bytes()).unwrap();
-    std::fs::remove_file(&path).unwrap();
-    city_model
-}
-
-/// A model with the FZK LoD2 header (namespaces, envelope) and `member` as its only city object.
-fn read_member(member: &str) -> Box<CityModel> {
-    let text = std::fs::read_to_string(format!(
-        "{FIXTURES}FZK-Haus-LoD2-KIT-IAI-KHH-B36-V1__v3.gml"
-    ))
-    .unwrap();
-    let header = &text[..text.find("<cityObjectMember>").unwrap()];
-    let format = ecitygml_ffi::citygml::io::format::CitygmlFormat::Gml;
-    GmlReader::new((header.to_owned() + member).as_bytes(), format)
-        .finish()
-        .unwrap()
-}
-
-/// The first feature of a model that `try_from` accepts.
-fn first<'a, T>(
-    city_model: &'a CityModel,
-    try_from: impl Fn(
-        &ecitygml_ffi::citygml::core::model::core::refs::abstract_feature_kind_ref::AbstractFeatureKindRef<'a>,
-    ) -> Option<&'a T>,
-) -> &'a T {
-    let mut features = city_model.iter_features();
-    std::iter::from_fn(|| features.next())
-        .find_map(|f| try_from(&f))
-        .unwrap()
 }

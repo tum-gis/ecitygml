@@ -1,8 +1,12 @@
 mod abstract_tunnel;
 mod abstract_tunnel_kind;
+mod hollow_space;
+mod hollow_space_property;
 mod tunnel;
 mod tunnel_constructive_element;
 mod tunnel_constructive_element_property;
+mod tunnel_furniture;
+mod tunnel_furniture_property;
 mod tunnel_installation;
 mod tunnel_installation_property;
 mod tunnel_part;
@@ -10,7 +14,9 @@ mod tunnel_part_property;
 
 pub use abstract_tunnel::*;
 pub use abstract_tunnel_kind::*;
+pub use hollow_space::*;
 pub use tunnel::*;
 pub use tunnel_constructive_element::*;
+pub use tunnel_furniture::*;
 pub use tunnel_installation::*;
 pub use tunnel_part::*;

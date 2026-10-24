@@ -1,4 +1,6 @@
 use crate::Error;
+use egml::io::codec::xs::{deserialize_any_uri, serialize_any_uri};
+use egml::model::xs::AnyUri;
 
 use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
 
@@ -12,7 +14,6 @@ use crate::gml::codec::appearance::basic_types::{
 use crate::gml::codec::appearance::enums::{
     deserialize_texture_type, deserialize_wrap_mode, serialize_texture_type, serialize_wrap_mode,
 };
-use crate::gml::codec::common::{deserialize_string, serialize_string};
 use crate::gml::util::{
     CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
 };
@@ -34,9 +35,9 @@ pub fn deserialize_abstract_texture(
 
     let mut abstract_texture = AbstractTexture::from_abstract_surface_data(abstract_surface_data);
 
-    let image_uri: Option<String> = index
+    let image_uri: Option<AnyUri> = index
         .first(CityGmlElement::ImageUriProperty.into())
-        .map(|x| deserialize_string(&xml_document[x.range()]))
+        .map(|x| deserialize_any_uri(&xml_document[x.range()]))
         .transpose()?;
     abstract_texture.set_image_uri(image_uri);
 
@@ -71,7 +72,7 @@ pub fn serialize_abstract_texture(
     )?;
 
     if let Some(image_uri) = abstract_texture.image_uri() {
-        serialize_string(
+        serialize_any_uri(
             image_uri,
             xml_fragment_writer,
             CityGmlNamespace::Appearance,
@@ -136,7 +137,10 @@ mod tests {
             deserialize_abstract_texture(xml_document, &index, &DeserializationConfig::default())
                 .expect("should work");
 
-        assert_eq!(abstract_texture.image_uri(), Some("textures/wall.png"));
+        assert_eq!(
+            abstract_texture.image_uri().map(AnyUri::as_str),
+            Some("textures/wall.png")
+        );
         assert_eq!(abstract_texture.texture_type(), Some(TextureType::Specific));
         assert_eq!(abstract_texture.wrap_mode(), Some(WrapMode::Wrap));
         assert_eq!(
@@ -218,6 +222,26 @@ mod tests {
         assert_eq!(
             abstract_texture.border_color(),
             round_tripped.border_color()
+        );
+    }
+
+    #[test]
+    fn test_deserialize_abstract_texture_image_uri_as_any_uri() {
+        let xml_document = b"\
+<app:ParameterizedTexture gml:id=\"TEX_1\">
+    <app:imageURI>
+        https://example.org/textures?id=1&amp;size=2k
+    </app:imageURI>
+</app:ParameterizedTexture>";
+
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let abstract_texture =
+            deserialize_abstract_texture(xml_document, &index, &DeserializationConfig::default())
+                .expect("should work");
+
+        assert_eq!(
+            abstract_texture.image_uri().map(AnyUri::as_str),
+            Some("https://example.org/textures?id=1&size=2k")
         );
     }
 }

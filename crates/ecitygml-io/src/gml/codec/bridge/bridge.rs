@@ -360,4 +360,148 @@ mod tests {
             .expect("should be parsed");
         assert_eq!(round_tripped_element.class(), element.class());
     }
+
+    #[test]
+    fn test_round_trip_bridge_room() {
+        let xml_document = b"
+    <brid:Bridge gml:id=\"UUID_bridge-1\">
+      <brid:class>1000</brid:class>
+      <brid:bridgeRoom>
+        <brid:BridgeRoom gml:id=\"UUID_bridge-room-1\">
+          <brid:class>5000</brid:class>
+          <brid:function>5010</brid:function>
+          <brid:usage>6000</brid:usage>
+        </brid:BridgeRoom>
+      </brid:bridgeRoom>
+    </brid:Bridge>";
+
+        let bridge = deserialize_bridge(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(
+            bridge.class().expect("should be set").code().value(),
+            "1000"
+        );
+        assert_eq!(bridge.bridge_rooms().len(), 1);
+        let bridge_room = bridge.bridge_rooms()[0].object().expect("should be parsed");
+        assert_eq!(
+            bridge_room.feature_id(),
+            &Id::try_from("UUID_bridge-room-1").expect("should work")
+        );
+        assert_eq!(
+            bridge_room.class().expect("should be set").code().value(),
+            "5000"
+        );
+        assert_eq!(bridge_room.functions().len(), 1);
+        assert_eq!(bridge_room.usages().len(), 1);
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_bridge(&bridge, &mut xml_fragment_writer).expect("should serialize");
+        let xml = {
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        };
+
+        let round_tripped = deserialize_bridge(
+            &xml,
+            &XmlDocumentIndex::from_scan(&xml, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should round trip");
+
+        assert_eq!(round_tripped.bridge_rooms(), bridge.bridge_rooms());
+    }
+
+    #[test]
+    fn test_round_trip_bridge_furniture_on_bridge_and_in_room() {
+        let xml_document = b"
+    <brid:Bridge gml:id=\"UUID_bridge-1\">
+      <brid:bridgeRoom>
+        <brid:BridgeRoom gml:id=\"UUID_bridge-room-1\">
+          <brid:class>5000</brid:class>
+          <brid:bridgeFurniture>
+            <brid:BridgeFurniture gml:id=\"UUID_room-furniture-1\">
+              <brid:class>7000</brid:class>
+            </brid:BridgeFurniture>
+          </brid:bridgeFurniture>
+        </brid:BridgeRoom>
+      </brid:bridgeRoom>
+      <brid:bridgeFurniture>
+        <brid:BridgeFurniture gml:id=\"UUID_bridge-furniture-1\">
+          <brid:class>7100</brid:class>
+          <brid:function>7110</brid:function>
+          <brid:usage>7200</brid:usage>
+        </brid:BridgeFurniture>
+      </brid:bridgeFurniture>
+    </brid:Bridge>";
+
+        let bridge = deserialize_bridge(
+            xml_document,
+            &XmlDocumentIndex::from_scan(xml_document, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(bridge.bridge_furniture().len(), 1);
+        let bridge_furniture = bridge.bridge_furniture()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(
+            bridge_furniture.feature_id(),
+            &Id::try_from("UUID_bridge-furniture-1").expect("should work")
+        );
+        assert_eq!(
+            bridge_furniture
+                .class()
+                .expect("should be set")
+                .code()
+                .value(),
+            "7100"
+        );
+        assert_eq!(bridge_furniture.functions().len(), 1);
+        assert_eq!(bridge_furniture.usages().len(), 1);
+
+        let bridge_room = bridge.bridge_rooms()[0].object().expect("should be parsed");
+        assert_eq!(
+            bridge_room.class().expect("should be set").code().value(),
+            "5000"
+        );
+        assert_eq!(bridge_room.bridge_furniture().len(), 1);
+        let room_furniture = bridge_room.bridge_furniture()[0]
+            .object()
+            .expect("should be parsed");
+        assert_eq!(
+            room_furniture.feature_id(),
+            &Id::try_from("UUID_room-furniture-1").expect("should work")
+        );
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_bridge(&bridge, &mut xml_fragment_writer).expect("should serialize");
+        let xml = {
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        };
+
+        let round_tripped = deserialize_bridge(
+            &xml,
+            &XmlDocumentIndex::from_scan(&xml, None).expect("should work"),
+            &DeserializationConfig::default(),
+        )
+        .expect("should round trip");
+
+        assert_eq!(round_tripped.bridge_furniture(), bridge.bridge_furniture());
+        assert_eq!(round_tripped.bridge_rooms(), bridge.bridge_rooms());
+    }
 }

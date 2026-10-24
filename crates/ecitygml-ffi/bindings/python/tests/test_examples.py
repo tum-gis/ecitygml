@@ -1,7 +1,7 @@
 """Runs the scripts in examples/ and compares their output with the expected output shared by all
-languages: for every `tests/expected/examples/<example>/<fixture>.txt`, the example runs on
-`tests/fixtures/<fixture>.gml` and must print that text. Examples that write a file get a temporary
-output path; if `expected/<example>/<fixture><extension>` exists, the file must match it too."""
+languages: for every `tests/expected/examples/<example>/<dataset>/<fixture>.txt`, the example runs on
+`tests/fixtures/<dataset>/<fixture>.gml` and must print that text. Examples that write a file get a temporary
+output path; if `expected/<example>/<dataset>/<fixture><extension>` exists, the file must match it too."""
 
 import subprocess
 import sys
@@ -15,7 +15,10 @@ FIXTURES = Path(__file__).parents[5] / "tests" / "fixtures"
 # Examples with an output file, and its extension.
 OUTPUT_EXTENSIONS = {"06_export_obj": ".obj", "07_convert": ".gml.gz"}
 
-CASES = sorted((path.parent.name, path.stem) for path in EXPECTED.glob("*/*.txt"))
+# The fixture of `<program>/<dataset>/<fixture>.txt` is `<dataset>/<fixture>`, as in `tests/fixtures`.
+CASES = sorted(
+    (path.parent.parent.name, f"{path.parent.name}/{path.stem}") for path in EXPECTED.glob("*/*/*.txt")
+)
 
 
 def run(script: str, *args: str) -> subprocess.CompletedProcess[str]:

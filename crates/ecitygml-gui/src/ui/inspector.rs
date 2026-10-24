@@ -10,6 +10,8 @@ use ecitygml_core::model::core::{
     AsAbstractCityObject, AsAbstractOccupiedSpace, AsAbstractSpace, AsAbstractThematicSurface,
 };
 use ecitygml_core::model::generics::GenericAttributeKind;
+use egml::model::base::AsAbstractGml;
+use egml::model::basic_types::Code;
 use egml::model::feature::AsAbstractFeature;
 use std::collections::HashSet;
 use three_d::egui::{self, Context};
@@ -38,6 +40,9 @@ pub fn show(ctx: &Context, state: &AppState) {
                     .spacing([8.0, 4.0])
                     .show(ui, |ui| {
                         row(ui, "ID", &id.to_string());
+                        if !city_object.names().is_empty() {
+                            row(ui, "Name", &format_names(city_object.names()));
+                        }
                         row(ui, "Type", &city_object.feature_type().to_string());
 
                         if let Some(env) = city_object.bounded_by().and_then(|x| x.envelope()) {
@@ -128,6 +133,18 @@ fn multi_surface_lods(city_object: AbstractCityObjectKindRef<'_>) -> HashSet<Lev
     }
 }
 
+/// Joins all `gml:name` values, appending the code space where one is given.
+fn format_names(names: &[Code]) -> String {
+    names
+        .iter()
+        .map(|name| match name.code_space() {
+            Some(code_space) => format!("{} ({code_space})", name.value()),
+            None => name.value().to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn show_attribute(ui: &mut egui::Ui, attr: &GenericAttributeKind) {
     match attr {
         GenericAttributeKind::StringAttribute(a) => {
@@ -138,6 +155,19 @@ fn show_attribute(ui: &mut egui::Ui, attr: &GenericAttributeKind) {
         }
         GenericAttributeKind::DoubleAttribute(a) => {
             attribute_row(ui, &a.name, &format!("{:.6}", a.value));
+        }
+        GenericAttributeKind::DateAttribute(a) => {
+            attribute_row(ui, &a.name, &a.value.date().to_string());
+        }
+        GenericAttributeKind::CodeAttribute(a) => {
+            let display = match a.value.code_space() {
+                Some(code_space) => format!("{} ({code_space})", a.value.value()),
+                None => a.value.value().to_string(),
+            };
+            attribute_row(ui, &a.name, &display);
+        }
+        GenericAttributeKind::UriAttribute(a) => {
+            attribute_row(ui, &a.name, a.value.as_str());
         }
         GenericAttributeKind::MeasureAttribute(a) => {
             let display = if a.value.uom.is_empty() {

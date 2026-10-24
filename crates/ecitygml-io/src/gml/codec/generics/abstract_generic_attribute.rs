@@ -1,4 +1,10 @@
 use crate::Error;
+use crate::gml::codec::generics::code_attribute::{
+    deserialize_code_attribute, serialize_code_attribute,
+};
+use crate::gml::codec::generics::date_attribute::{
+    deserialize_date_attribute, serialize_date_attribute,
+};
 use crate::gml::codec::generics::double_attribute::{
     deserialize_double_attribute, serialize_double_attribute,
 };
@@ -11,13 +17,20 @@ use crate::gml::codec::generics::int_attribute::{
 use crate::gml::codec::generics::measure_attribute::{
     deserialize_measure_attribute, serialize_measure_attribute,
 };
+use crate::gml::codec::generics::uri_attribute::{
+    deserialize_uri_attribute, serialize_uri_attribute,
+};
 use crate::gml::codec::generics::{deserialize_string_attribute, serialize_string_attribute};
+use crate::gml::util::DeserializationConfig;
 use ecitygml_core::model::generics::GenericAttributeKind;
 use egml::io::util::{ChunkedSink, XmlFragmentWriter};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-pub fn deserialize_generic_attribute(xml_document: &[u8]) -> Result<GenericAttributeKind, Error> {
+pub fn deserialize_generic_attribute(
+    xml_document: &[u8],
+    config: &DeserializationConfig,
+) -> Result<GenericAttributeKind, Error> {
     let mut reader = Reader::from_reader(xml_document);
     reader.config_mut().trim_text(true);
 
@@ -34,11 +47,20 @@ pub fn deserialize_generic_attribute(xml_document: &[u8]) -> Result<GenericAttri
                     "DoubleAttribute" => Ok(GenericAttributeKind::DoubleAttribute(
                         deserialize_double_attribute(xml_document)?,
                     )),
+                    "DateAttribute" => Ok(GenericAttributeKind::DateAttribute(
+                        deserialize_date_attribute(xml_document, config)?,
+                    )),
+                    "CodeAttribute" => Ok(GenericAttributeKind::CodeAttribute(
+                        deserialize_code_attribute(xml_document, config)?,
+                    )),
+                    "UriAttribute" => Ok(GenericAttributeKind::UriAttribute(
+                        deserialize_uri_attribute(xml_document, config)?,
+                    )),
                     "MeasureAttribute" => Ok(GenericAttributeKind::MeasureAttribute(
                         deserialize_measure_attribute(xml_document)?,
                     )),
                     "GenericAttributeSet" => Ok(GenericAttributeKind::GenericAttributeSet(
-                        deserialize_generic_attribute_set(xml_document)?,
+                        deserialize_generic_attribute_set(xml_document, config)?,
                     )),
                     other => Err(Error::UnknownElementNode(other.to_string())),
                 };
@@ -63,6 +85,9 @@ pub fn serialize_generic_attribute(
         GenericAttributeKind::DoubleAttribute(x) => {
             serialize_double_attribute(x, xml_fragment_writer)
         }
+        GenericAttributeKind::DateAttribute(x) => serialize_date_attribute(x, xml_fragment_writer),
+        GenericAttributeKind::CodeAttribute(x) => serialize_code_attribute(x, xml_fragment_writer),
+        GenericAttributeKind::UriAttribute(x) => serialize_uri_attribute(x, xml_fragment_writer),
         GenericAttributeKind::MeasureAttribute(x) => {
             serialize_measure_attribute(x, xml_fragment_writer)
         }
@@ -80,6 +105,7 @@ mod tests {
     };
     use egml::io::util::Formatting;
     use egml::model::basic_types::Measure;
+    use egml::model::xs::AnyUri;
 
     #[test]
     fn test_serialize_string_attribute() {
@@ -270,7 +296,9 @@ mod tests {
             buf
         })
         .unwrap();
-        let recovered = deserialize_generic_attribute(xml.as_bytes()).unwrap();
+        let recovered =
+            deserialize_generic_attribute(xml.as_bytes(), &DeserializationConfig::default())
+                .unwrap();
 
         assert_eq!(original, recovered);
     }
@@ -293,7 +321,9 @@ mod tests {
             buf
         })
         .unwrap();
-        let recovered = deserialize_generic_attribute(xml.as_bytes()).unwrap();
+        let recovered =
+            deserialize_generic_attribute(xml.as_bytes(), &DeserializationConfig::default())
+                .unwrap();
 
         assert_eq!(original, recovered);
     }
@@ -316,7 +346,9 @@ mod tests {
             buf
         })
         .unwrap();
-        let recovered = deserialize_generic_attribute(xml.as_bytes()).unwrap();
+        let recovered =
+            deserialize_generic_attribute(xml.as_bytes(), &DeserializationConfig::default())
+                .unwrap();
 
         assert_eq!(original, recovered);
     }
@@ -342,7 +374,9 @@ mod tests {
             buf
         })
         .unwrap();
-        let recovered = deserialize_generic_attribute(xml.as_bytes()).unwrap();
+        let recovered =
+            deserialize_generic_attribute(xml.as_bytes(), &DeserializationConfig::default())
+                .unwrap();
 
         assert_eq!(original, recovered);
     }
@@ -356,7 +390,9 @@ mod tests {
     <gen:value>1100</gen:value>
   </gen:StringAttribute>";
 
-        let generic_attribute = deserialize_generic_attribute(xml_document).expect("should work");
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should work");
 
         assert_eq!(generic_attribute.name(), "attribute_name");
         assert_eq!(
@@ -372,7 +408,9 @@ mod tests {
           <gen:value>1100</gen:value>
         </gen:StringAttribute>";
 
-        let generic_attribute = deserialize_generic_attribute(xml_document).expect("should work");
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should work");
 
         match generic_attribute {
             GenericAttributeKind::StringAttribute(x) => {
@@ -390,7 +428,9 @@ mod tests {
           <gen:value>1100</gen:value>
         </gen:IntAttribute>";
 
-        let generic_attribute = deserialize_generic_attribute(xml_document).expect("should work");
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should work");
 
         match generic_attribute {
             GenericAttributeKind::IntAttribute(x) => {
@@ -408,7 +448,9 @@ mod tests {
           <gen:value>42.2</gen:value>
         </gen:DoubleAttribute>";
 
-        let generic_attribute = deserialize_generic_attribute(xml_document).expect("should work");
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should work");
 
         match generic_attribute {
             GenericAttributeKind::DoubleAttribute(x) => {
@@ -438,7 +480,8 @@ mod tests {
       </gen:GenericAttributeSet>";
 
         let generic_attribute_kind =
-            deserialize_generic_attribute(xml_document.as_ref()).expect("should work");
+            deserialize_generic_attribute(xml_document.as_ref(), &DeserializationConfig::default())
+                .expect("should work");
 
         let GenericAttributeKind::GenericAttributeSet(generic_attribute_set) =
             generic_attribute_kind
@@ -462,5 +505,186 @@ mod tests {
         };
         assert_eq!(int_attribute.name, "MyIntAttributeName");
         assert_eq!(int_attribute.value, -123);
+    }
+
+    #[test]
+    fn test_deserialize_date_attribute_as_generic_attribute() {
+        let xml_document = b"<gen:DateAttribute>
+    <gen:name>renovatedOn</gen:name>
+    <gen:value>2015-06-01</gen:value>
+</gen:DateAttribute>";
+
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should recognize a DateAttribute");
+
+        let date_attribute = generic_attribute
+            .as_date()
+            .expect("should be a DateAttribute");
+        assert_eq!(date_attribute.name, "renovatedOn");
+        assert_eq!(date_attribute.value.date().to_string(), "2015-06-01");
+    }
+
+    #[test]
+    fn test_round_trip_date_attribute_in_generic_attribute_set() {
+        let xml_document = b"<gen:GenericAttributeSet>
+    <gen:name>history</gen:name>
+    <genericAttribute>
+        <gen:DateAttribute>
+            <gen:name>renovatedOn</gen:name>
+            <gen:value>2015-06-01</gen:value>
+        </gen:DateAttribute>
+    </genericAttribute>
+</gen:GenericAttributeSet>";
+
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should work");
+        let GenericAttributeKind::GenericAttributeSet(set) = &generic_attribute else {
+            panic!("expected GenericAttributeSet");
+        };
+        assert_eq!(set.generic_attributes.len(), 1);
+        assert!(set.generic_attributes[0].as_date().is_some());
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&generic_attribute, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        assert_eq!(
+            deserialize_generic_attribute(xml.as_bytes(), &DeserializationConfig::default())
+                .expect("should round trip"),
+            generic_attribute
+        );
+    }
+
+    #[test]
+    fn test_deserialize_code_attribute_as_generic_attribute() {
+        let xml_document = b"<gen:CodeAttribute>
+    <gen:name>roofType</gen:name>
+    <gen:value codeSpace=\"https://example.org/roofTypes\">1000</gen:value>
+</gen:CodeAttribute>";
+
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should recognize a CodeAttribute");
+
+        let code_attribute = generic_attribute
+            .as_code()
+            .expect("should be a CodeAttribute");
+        assert_eq!(code_attribute.name, "roofType");
+        assert_eq!(
+            code_attribute.value.code_space().map(AnyUri::as_str),
+            Some("https://example.org/roofTypes")
+        );
+    }
+
+    #[test]
+    fn test_round_trip_code_attribute_in_generic_attribute_set() {
+        let xml_document = b"<gen:GenericAttributeSet>
+    <gen:name>classification</gen:name>
+    <genericAttribute>
+        <gen:CodeAttribute>
+            <gen:name>roofType</gen:name>
+            <gen:value codeSpace=\"https://example.org/roofTypes\">1000</gen:value>
+        </gen:CodeAttribute>
+    </genericAttribute>
+</gen:GenericAttributeSet>";
+
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should work");
+        let GenericAttributeKind::GenericAttributeSet(set) = &generic_attribute else {
+            panic!("expected GenericAttributeSet");
+        };
+        assert!(set.generic_attributes[0].as_code().is_some());
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&generic_attribute, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        assert_eq!(
+            deserialize_generic_attribute(xml.as_bytes(), &DeserializationConfig::default())
+                .expect("should round trip"),
+            generic_attribute
+        );
+    }
+
+    #[test]
+    fn test_deserialize_uri_attribute_as_generic_attribute() {
+        let xml_document = b"<gen:UriAttribute>
+    <gen:name>cadastreRecord</gen:name>
+    <gen:value>https://example.org/cadastre/4711</gen:value>
+</gen:UriAttribute>";
+
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should recognize a UriAttribute");
+
+        let uri_attribute = generic_attribute
+            .as_uri()
+            .expect("should be a UriAttribute");
+        assert_eq!(uri_attribute.name, "cadastreRecord");
+        assert_eq!(
+            uri_attribute.value.as_str(),
+            "https://example.org/cadastre/4711"
+        );
+    }
+
+    #[test]
+    fn test_round_trip_uri_attribute_in_generic_attribute_set() {
+        let xml_document = b"<gen:GenericAttributeSet>
+    <gen:name>links</gen:name>
+    <genericAttribute>
+        <gen:UriAttribute>
+            <gen:name>cadastreRecord</gen:name>
+            <gen:value>https://example.org/?id=4711&amp;view=full</gen:value>
+        </gen:UriAttribute>
+    </genericAttribute>
+</gen:GenericAttributeSet>";
+
+        let generic_attribute =
+            deserialize_generic_attribute(xml_document, &DeserializationConfig::default())
+                .expect("should work");
+        let GenericAttributeKind::GenericAttributeSet(set) = &generic_attribute else {
+            panic!("expected GenericAttributeSet");
+        };
+        assert!(set.generic_attributes[0].as_uri().is_some());
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_generic_attribute(&generic_attribute, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        assert_eq!(
+            deserialize_generic_attribute(xml.as_bytes(), &DeserializationConfig::default())
+                .expect("should round trip"),
+            generic_attribute
+        );
     }
 }

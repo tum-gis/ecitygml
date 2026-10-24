@@ -16,4 +16,8 @@ pub enum Error {
     InvalidLodName(String),
     #[error("transformation matrix expected 16 values, got {found}")]
     InvalidMatrixSize { found: usize },
+    #[error("a direct position needs at least one coordinate")]
+    EmptyCoordinates,
+    #[error("coordinate must be finite, got {value}")]
+    NonFiniteCoordinate { value: f64 },
 }

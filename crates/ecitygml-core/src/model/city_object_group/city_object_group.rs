@@ -4,7 +4,10 @@ use crate::model::city_object_group::values::{
 };
 use crate::model::common::{ForEachFeatureMut, IterFeatures};
 use crate::model::core::refs::{AbstractFeatureKindRef, AbstractFeatureKindRefMut};
-use crate::model::core::{AbstractLogicalSpace, AsAbstractLogicalSpace, AsAbstractLogicalSpaceMut};
+use crate::model::core::{
+    AbstractCityObjectReference, AbstractLogicalSpace, AsAbstractLogicalSpace,
+    AsAbstractLogicalSpaceMut,
+};
 use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;
@@ -16,6 +19,7 @@ pub struct CityObjectGroup {
     class: Option<CityObjectGroupClassValue>,
     functions: Vec<CityObjectGroupFunctionValue>,
     usages: Vec<CityObjectGroupUsageValue>,
+    parent: Option<AbstractCityObjectReference>,
     group_members: Vec<Role>,
 }
 
@@ -30,6 +34,7 @@ impl CityObjectGroup {
             class: None,
             functions: Vec::new(),
             usages: Vec::new(),
+            parent: None,
             group_members: Vec::new(),
         }
     }
@@ -91,6 +96,22 @@ impl CityObjectGroup {
 
     pub fn extend_usages(&mut self, usages: impl IntoIterator<Item = CityObjectGroupUsageValue>) {
         self.usages.extend(usages);
+    }
+
+    pub fn parent(&self) -> Option<&AbstractCityObjectReference> {
+        self.parent.as_ref()
+    }
+
+    pub fn set_parent(&mut self, parent: AbstractCityObjectReference) {
+        self.parent = Some(parent);
+    }
+
+    pub fn set_parent_opt(&mut self, parent: Option<AbstractCityObjectReference>) {
+        self.parent = parent;
+    }
+
+    pub fn clear_parent(&mut self) {
+        self.parent = None;
     }
 
     pub fn group_members(&self) -> &[Role] {

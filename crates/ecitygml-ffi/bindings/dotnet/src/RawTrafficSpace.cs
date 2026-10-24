@@ -114,6 +114,12 @@ internal partial struct TrafficSpace
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_TrafficSpace_occupancies", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern OccupancyIterator* Occupancies(TrafficSpace* handle);
 
+    [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_TrafficSpace_predecessors", CallingConvention = CallingConvention.Cdecl)]
+    internal static unsafe extern TrafficSpaceReferenceIterator* Predecessors(TrafficSpace* handle);
+
+    [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_TrafficSpace_successors", CallingConvention = CallingConvention.Cdecl)]
+    internal static unsafe extern TrafficSpaceReferenceIterator* Successors(TrafficSpace* handle);
+
     [DllImport(DiplomatNativeLib.Name, EntryPoint = "ecitygml_TrafficSpace_destroy", CallingConvention = CallingConvention.Cdecl)]
     internal static unsafe extern void Destroy(TrafficSpace* handle);
 }

@@ -1,6 +1,7 @@
 use crate::arena::city_model_arena::CityModelArena;
 use crate::arena::convert::building::abstract_building_subdivision_property::flatten_abstract_building_subdivision_property;
 use crate::arena::convert::building::building_constructive_element_property::flatten_building_constructive_element_property;
+use crate::arena::convert::building::building_furniture_property::flatten_building_furniture_property;
 use crate::arena::convert::building::building_installation_property::flatten_building_installation_property;
 use crate::arena::convert::building::building_room_property::flatten_building_room_property;
 use crate::arena::convert::construction::flatten_abstract_construction;
@@ -24,6 +25,9 @@ pub fn flatten_abstract_building(
     }
     for prop in abstract_building.building_rooms_mut() {
         flatten_building_room_property(prop, city_model_arena);
+    }
+    for prop in abstract_building.building_furniture_mut() {
+        flatten_building_furniture_property(prop, city_model_arena);
     }
     for prop in abstract_building.building_subdivisions_mut() {
         flatten_abstract_building_subdivision_property(prop, city_model_arena);

@@ -1,7 +1,7 @@
 use crate::Error;
 use crate::gml::codec::generics::generic_attribute_set::read_nested_element_index;
 use crate::gml::codec::generics::{deserialize_generic_attribute, serialize_generic_attribute};
-use crate::gml::util::{CityGmlElement, CityGmlNamespace};
+use crate::gml::util::{CityGmlElement, CityGmlNamespace, DeserializationConfig};
 use ecitygml_core::model::generics::GenericAttributeKind;
 use egml::io::util::{ChunkedSink, XmlFragmentWriter};
 use quick_xml::Reader;
@@ -9,6 +9,7 @@ use quick_xml::events::Event;
 
 pub fn deserialize_generic_attribute_property(
     xml_document: &[u8],
+    config: &DeserializationConfig,
 ) -> Result<GenericAttributeKind, Error> {
     let mut reader = Reader::from_reader(xml_document);
     reader.config_mut().trim_text(true);
@@ -27,7 +28,7 @@ pub fn deserialize_generic_attribute_property(
     }
 
     let (pos_start, pos_end) = read_nested_element_index(&mut reader)?;
-    deserialize_generic_attribute(&xml_document[pos_start..pos_end])
+    deserialize_generic_attribute(&xml_document[pos_start..pos_end], config)
 }
 
 pub fn serialize_generic_attribute_property(
@@ -59,7 +60,8 @@ mod tests {
 </genericAttribute>";
 
         let generic_attribute =
-            deserialize_generic_attribute_property(xml_document).expect("should work");
+            deserialize_generic_attribute_property(xml_document, &DeserializationConfig::default())
+                .expect("should work");
 
         match generic_attribute {
             GenericAttributeKind::StringAttribute(x) => {
@@ -110,7 +112,8 @@ mod tests {
 </genericAttribute>";
 
         let generic_attribute =
-            deserialize_generic_attribute_property(xml_document).expect("should work");
+            deserialize_generic_attribute_property(xml_document, &DeserializationConfig::default())
+                .expect("should work");
 
         let mut xml_fragment_writer =
             XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
@@ -130,8 +133,11 @@ mod tests {
         })
         .expect("should convert to string");
 
-        let round_tripped =
-            deserialize_generic_attribute_property(xml.as_bytes()).expect("should work");
+        let round_tripped = deserialize_generic_attribute_property(
+            xml.as_bytes(),
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
 
         assert_eq!(generic_attribute, round_tripped);
     }

@@ -2,12 +2,13 @@
 //!
 //! Like all abstract-type macros (see `src/gml/core/model/feature/abstract_feature.rs`): each type invokes the
 //! macro of every abstract supertype itself and includes this file with `#[diplomat::include(...)]`.
-//! Not bound yet: bridge_installations, bridge_constructive_elements.
+//! Not bound yet: bridge_installations, bridge_constructive_elements, bridge_rooms, bridge_furniture.
 
 #[diplomat::macro_rules]
 macro_rules! impl_abstract_bridge_methods {
     () => {
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
+        #[diplomat::attr(dart, rename = "classifier")] // `class` is reserved in Dart, which has no escaping
         pub fn class<'a>(
             &'a self,
         ) -> Option<&'a crate::citygml::core::model::bridge::values::bridge_class_value::ffi::BridgeClassValue> {

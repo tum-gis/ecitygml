@@ -1,4 +1,10 @@
 use crate::Error;
+use crate::gml::codec::construction::construction_event_property::{
+    deserialize_construction_event_property, serialize_construction_event_property,
+};
+use crate::gml::codec::construction::elevation_property::{
+    deserialize_elevation_property, serialize_elevation_property,
+};
 use crate::gml::codec::construction::height_property::{
     deserialize_height_property, serialize_height_property,
 };
@@ -11,7 +17,8 @@ use crate::gml::util::{
     CityGmlElement, CityGmlNamespace, CombinedCityGmlElement, DeserializationConfig,
 };
 use ecitygml_core::model::construction::{
-    AbstractConstruction, AsAbstractConstruction, AsAbstractConstructionMut, Height,
+    AbstractConstruction, AsAbstractConstruction, AsAbstractConstructionMut, ConstructionEvent,
+    Elevation, Height,
 };
 use ecitygml_core::model::core::{AsAbstractOccupiedSpace, Occupancy};
 use egml::io::codec::xs::{deserialize_date, serialize_date};
@@ -42,6 +49,20 @@ pub fn deserialize_abstract_construction(
         .map(|x| deserialize_date(&xml_document[x.range()], config.gml_config()))
         .transpose()?;
     abstract_construction.set_date_of_demolition(date_of_demolition);
+
+    let construction_events: Vec<ConstructionEvent> = index
+        .get(CityGmlElement::ConstructionEventProperty.into())
+        .iter()
+        .map(|x| deserialize_construction_event_property(&xml_document[x.range()], config))
+        .collect::<Result<_, _>>()?;
+    abstract_construction.set_construction_events(construction_events);
+
+    let elevations: Vec<Elevation> = index
+        .get(CityGmlElement::ElevationProperty.into())
+        .iter()
+        .map(|x| deserialize_elevation_property(&xml_document[x.range()]))
+        .collect::<Result<_, _>>()?;
+    abstract_construction.set_elevations(elevations);
 
     let heights: Vec<Height> = index
         .get(CityGmlElement::HeightProperty.into())
@@ -84,6 +105,24 @@ pub fn serialize_abstract_construction(
             xml_fragment_writer,
             CityGmlNamespace::Construction,
             CityGmlElement::DateOfDemolitionProperty,
+        )?;
+    }
+
+    for construction_event in abstract_construction.construction_events() {
+        serialize_construction_event_property(
+            construction_event,
+            xml_fragment_writer,
+            CityGmlNamespace::Construction,
+            CityGmlElement::ConstructionEventProperty,
+        )?;
+    }
+
+    for elevation in abstract_construction.elevations() {
+        serialize_elevation_property(
+            elevation,
+            xml_fragment_writer,
+            CityGmlNamespace::Construction,
+            CityGmlElement::ElevationProperty,
         )?;
     }
 
@@ -432,6 +471,213 @@ mod tests {
         assert_eq!(
             abstract_construction.date_of_demolition(),
             round_tripped.date_of_demolition()
+        );
+    }
+
+    const BUILDING_WITH_CONSTRUCTION_EVENTS: &[u8] = b"\
+<bldg:Building gml:id=\"BUILDING_1\">
+    <con:dateOfDemolition>2040-01-01</con:dateOfDemolition>
+    <con:constructionEvent>
+        <con:ConstructionEvent>
+            <con:event>construction</con:event>
+            <con:dateOfEvent>1998-03-15</con:dateOfEvent>
+        </con:ConstructionEvent>
+    </con:constructionEvent>
+    <con:constructionEvent>
+        <con:ConstructionEvent>
+            <con:event>renovation</con:event>
+            <con:dateOfEvent>2015-06-01</con:dateOfEvent>
+            <con:description>Facade renovation</con:description>
+        </con:ConstructionEvent>
+    </con:constructionEvent>
+    <con:height>
+        <con:Height>
+            <con:highReference>topOfConstruction</con:highReference>
+            <con:lowReference>lowestGroundPoint</con:lowReference>
+            <con:status>measured</con:status>
+            <con:value uom=\"m\">11.7</con:value>
+        </con:Height>
+    </con:height>
+</bldg:Building>";
+
+    #[test]
+    fn test_deserialize_abstract_construction_with_construction_events() {
+        let index = XmlDocumentIndex::from_scan(BUILDING_WITH_CONSTRUCTION_EVENTS, None)
+            .expect("should work");
+        let abstract_construction = deserialize_abstract_construction(
+            BUILDING_WITH_CONSTRUCTION_EVENTS,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        let events = abstract_construction.construction_events();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].event().code().value(), "construction");
+        assert_eq!(
+            events[0].date_of_event().date(),
+            NaiveDate::from_ymd_opt(1998, 3, 15).expect("valid date")
+        );
+        assert_eq!(events[1].description(), Some("Facade renovation"));
+    }
+
+    #[test]
+    fn test_round_trip_abstract_construction_with_construction_events() {
+        let index = XmlDocumentIndex::from_scan(BUILDING_WITH_CONSTRUCTION_EVENTS, None)
+            .expect("should work");
+        let abstract_construction = deserialize_abstract_construction(
+            BUILDING_WITH_CONSTRUCTION_EVENTS,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(CityGmlNamespace::Building, CityGmlElement::Building)
+            .expect("should work");
+        serialize_abstract_construction(&abstract_construction, &mut xml_fragment_writer)
+            .expect("should serialize");
+        xml_fragment_writer
+            .write_end_event(CityGmlNamespace::Building, CityGmlElement::Building)
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        let demolition = xml
+            .find("<con:dateOfDemolition>")
+            .expect("should write dateOfDemolition");
+        let event = xml
+            .find("<con:constructionEvent>")
+            .expect("should write constructionEvent");
+        let height = xml.find("<con:height>").expect("should write height");
+        assert!(
+            demolition < event && event < height,
+            "constructionEvent must follow dateOfDemolition and precede height (XSD order)"
+        );
+
+        let round_tripped_index =
+            XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work");
+        let round_tripped = deserialize_abstract_construction(
+            xml.as_bytes(),
+            &round_tripped_index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+        assert_eq!(
+            round_tripped.construction_events(),
+            abstract_construction.construction_events()
+        );
+    }
+
+    const BUILDING_WITH_ELEVATIONS: &[u8] = b"\
+<bldg:Building gml:id=\"BUILDING_1\">
+    <con:constructionEvent>
+        <con:ConstructionEvent>
+            <con:event>construction</con:event>
+            <con:dateOfEvent>1998-03-15</con:dateOfEvent>
+        </con:ConstructionEvent>
+    </con:constructionEvent>
+    <con:elevation>
+        <con:Elevation>
+            <con:elevationReference>generalGroundSurface</con:elevationReference>
+            <con:elevationValue srsDimension=\"1\">105.3</con:elevationValue>
+        </con:Elevation>
+    </con:elevation>
+    <con:elevation>
+        <con:Elevation>
+            <con:elevationReference>entrancePoint</con:elevationReference>
+            <con:elevationValue srsDimension=\"1\">105.8</con:elevationValue>
+        </con:Elevation>
+    </con:elevation>
+    <con:height>
+        <con:Height>
+            <con:highReference>topOfConstruction</con:highReference>
+            <con:lowReference>lowestGroundPoint</con:lowReference>
+            <con:status>measured</con:status>
+            <con:value uom=\"m\">11.7</con:value>
+        </con:Height>
+    </con:height>
+</bldg:Building>";
+
+    #[test]
+    fn test_deserialize_abstract_construction_with_elevations() {
+        let index =
+            XmlDocumentIndex::from_scan(BUILDING_WITH_ELEVATIONS, None).expect("should work");
+        let abstract_construction = deserialize_abstract_construction(
+            BUILDING_WITH_ELEVATIONS,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        let elevations = abstract_construction.elevations();
+        assert_eq!(elevations.len(), 2);
+        assert_eq!(
+            elevations[0].elevation_reference().code().value(),
+            "generalGroundSurface"
+        );
+        assert_eq!(elevations[1].elevation_value().coordinates(), &[105.8]);
+    }
+
+    #[test]
+    fn test_round_trip_abstract_construction_with_elevations() {
+        let index =
+            XmlDocumentIndex::from_scan(BUILDING_WITH_ELEVATIONS, None).expect("should work");
+        let abstract_construction = deserialize_abstract_construction(
+            BUILDING_WITH_ELEVATIONS,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        xml_fragment_writer
+            .write_start_event(CityGmlNamespace::Building, CityGmlElement::Building)
+            .expect("should work");
+        serialize_abstract_construction(&abstract_construction, &mut xml_fragment_writer)
+            .expect("should serialize");
+        xml_fragment_writer
+            .write_end_event(CityGmlNamespace::Building, CityGmlElement::Building)
+            .expect("should work");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+
+        let event = xml
+            .find("<con:constructionEvent>")
+            .expect("should write constructionEvent");
+        let elevation = xml.find("<con:elevation>").expect("should write elevation");
+        let height = xml.find("<con:height>").expect("should write height");
+        assert!(
+            event < elevation && elevation < height,
+            "elevation must follow constructionEvent and precede height (XSD order)"
+        );
+
+        let round_tripped_index =
+            XmlDocumentIndex::from_scan(xml.as_bytes(), None).expect("should work");
+        let round_tripped = deserialize_abstract_construction(
+            xml.as_bytes(),
+            &round_tripped_index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+        assert_eq!(
+            round_tripped.elevations(),
+            abstract_construction.elevations()
         );
     }
 }

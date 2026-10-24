@@ -15,6 +15,13 @@ pub mod ffi {
     pub struct Reference(egml::model::base::Reference);
 
     impl Reference {
+        /// An owned copy of a traffic space reference (Rust: `From<&TrafficSpaceReference>`).
+        pub fn from_traffic_space_reference(
+            reference: &crate::citygml::core::model::transportation::traffic_space_reference::ffi::TrafficSpaceReference,
+        ) -> Box<Reference> {
+            Box::new(Reference(egml::model::base::Reference::from(&reference.0)))
+        }
+
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
         pub fn href<'a>(&'a self) -> Option<&'a HRef> {
             self.0.href().map(HRef::transparent_convert)

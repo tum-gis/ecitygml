@@ -1,5 +1,6 @@
 use crate::Error;
 use crate::Error::AttributeWithoutName;
+use crate::gml::codec::common::deserialize_string;
 use crate::gml::util::{CityGmlElement, CityGmlNamespace};
 use ecitygml_core::model::generics::IntAttribute;
 use egml::io::util::{ChunkedSink, XmlFragmentWriter};
@@ -10,43 +11,40 @@ pub fn deserialize_int_attribute(xml_document: &[u8]) -> Result<IntAttribute, Er
     let mut reader = Reader::from_reader(xml_document);
     reader.config_mut().trim_text(true);
 
-    #[derive(PartialEq)]
-    enum Current {
-        None,
-        Name,
-        Value,
+    // Consume the root `<IntAttribute>` element's own start tag.
+    loop {
+        match reader.read_event()? {
+            Event::Start(_) => break,
+            Event::Eof => {
+                return Err(Error::ElementNotFound("IntAttribute".to_string()));
+            }
+            _ => {}
+        }
     }
 
-    let mut current = Current::None;
     let mut name: Option<String> = None;
     let mut value: Option<i64> = None;
 
+    // Each child is read as a whole element, so that entities such as `&amp;` are unescaped instead of splitting
+    // the text into several events.
     loop {
         match reader.read_event()? {
             Event::Start(start) => {
-                current = match start.local_name().as_ref() {
-                    "name" => Current::Name,
-                    "value" => Current::Value,
-                    _ => Current::None,
-                };
-            }
-            Event::Text(text) => {
-                let text_value = text.as_ref();
-                match current {
-                    Current::Name => name = Some(text_value.trim().to_string()),
-                    Current::Value => {
-                        let parsed: i64 = text_value.trim().parse().map_err(|_| {
-                            Error::UnknownElementNode(format!(
-                                "expected i64 value, got `{text_value}`"
-                            ))
+                let pos_start = reader.buffer_position() as usize - start.len() - 2;
+                reader.read_to_end(start.name())?;
+                let pos_end = reader.buffer_position() as usize;
+                let text = deserialize_string(&xml_document[pos_start..pos_end])?;
+
+                match start.local_name().as_ref() {
+                    "name" => name = Some(text.trim().to_string()),
+                    "value" => {
+                        let parsed: i64 = text.trim().parse().map_err(|_| {
+                            Error::UnknownElementNode(format!("expected i64 value, got `{text}`"))
                         })?;
                         value = Some(parsed);
                     }
-                    Current::None => {}
+                    _ => {}
                 }
-            }
-            Event::End(_) => {
-                current = Current::None;
             }
             Event::Eof => break,
             _ => {}
@@ -167,5 +165,16 @@ mod tests {
         let round_tripped = deserialize_int_attribute(xml.as_bytes()).expect("should work");
 
         assert_eq!(int_attribute, round_tripped);
+    }
+
+    #[test]
+    fn test_deserialize_int_attribute_unescapes_name() {
+        let int_attribute = deserialize_int_attribute(
+            b"<gen:IntAttribute><gen:name>rooms &amp; halls</gen:name><gen:value>4</gen:value></gen:IntAttribute>",
+        )
+        .expect("should work");
+
+        assert_eq!(int_attribute.name, "rooms & halls");
+        assert_eq!(int_attribute.value, 4);
     }
 }

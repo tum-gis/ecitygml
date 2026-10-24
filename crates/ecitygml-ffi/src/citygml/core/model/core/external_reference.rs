@@ -14,21 +14,27 @@ pub mod ffi {
     impl ExternalReference {
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
         pub fn target_resource<'a>(&'a self) -> &'a str {
-            &self.0.target_resource
+            self.0.target_resource.as_str()
         }
 
         // Not in .NET: diplomat-tool 0.16 can't return an optional borrowed string there yet.
         #[diplomat::attr(dotnet, disable)]
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
         pub fn information_system<'a>(&'a self) -> Option<&'a str> {
-            self.0.information_system.as_deref()
+            self.0
+                .information_system
+                .as_ref()
+                .map(egml::model::xs::AnyUri::as_str)
         }
 
         // Not in .NET: diplomat-tool 0.16 can't return an optional borrowed string there yet.
         #[diplomat::attr(dotnet, disable)]
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
         pub fn relation_type<'a>(&'a self) -> Option<&'a str> {
-            self.0.relation_type.as_deref()
+            self.0
+                .relation_type
+                .as_ref()
+                .map(egml::model::xs::AnyUri::as_str)
         }
     }
 

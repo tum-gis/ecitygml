@@ -10,8 +10,8 @@ public class ConsoleCollection;
 
 /// <summary>
 /// Runs the examples and compares their output with the expected output shared by all languages: for every
-/// `tests/expected/examples/&lt;example&gt;/&lt;fixture&gt;.txt`, the example runs on
-/// `tests/fixtures/&lt;fixture&gt;.gml` and must print that text. Examples that write a file get a temporary output
+/// `tests/expected/examples/&lt;example&gt;/&lt;dataset&gt;/&lt;fixture&gt;.txt`, the example runs on
+/// `tests/fixtures/&lt;dataset&gt;/&lt;fixture&gt;.gml` and must print that text. Examples that write a file get a temporary output
 /// path; if `&lt;fixture&gt;&lt;extension&gt;` exists next to the expected text, the file must match it.
 /// </summary>
 [Collection(nameof(ConsoleCollection))]
@@ -33,9 +33,12 @@ public class ExamplesTests
         var cases = new TheoryData<string, string>();
         foreach (var directory in Directory.GetDirectories(Expected).Order())
         {
-            foreach (var file in Directory.GetFiles(directory, "*.txt").Order())
+            // `<dataset>/<fixture>.txt`: the fixture is `<dataset>/<fixture>`, as below tests/fixtures.
+            foreach (var file in Directory.GetFiles(directory, "*.txt", SearchOption.AllDirectories).Order())
             {
-                cases.Add(Path.GetFileName(directory), Path.GetFileNameWithoutExtension(file));
+                cases.Add(
+                    Path.GetFileName(directory),
+                    $"{Path.GetFileName(Path.GetDirectoryName(file))}/{Path.GetFileNameWithoutExtension(file)}");
             }
         }
         return cases;

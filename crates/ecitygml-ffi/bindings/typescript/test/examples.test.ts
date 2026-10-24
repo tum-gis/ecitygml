@@ -1,7 +1,7 @@
 // Runs the scripts in examples/ and compares their output with the expected output shared by all
-// languages: for every `tests/expected/examples/<example>/<fixture>.txt`, the example runs on
-// `tests/fixtures/<fixture>.gml` and must print that text. Examples that write a file get a
-// temporary output path; if `expected/<example>/<fixture><extension>` exists, the file must match it.
+// languages: for every `tests/expected/examples/<example>/<dataset>/<fixture>.txt`, the example runs on
+// `tests/fixtures/<dataset>/<fixture>.gml` and must print that text. Examples that write a file get a
+// temporary output path; if `expected/<example>/<dataset>/<fixture><extension>` exists, the file must match it.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
@@ -21,7 +21,7 @@ function run(script: string, ...args: string[]) {
 }
 
 for (const example of readdirSync(expected).sort()) {
-    for (const file of readdirSync(join(expected, example)).filter((name) => name.endsWith('.txt')).sort()) {
+    for (const file of readdirSync(join(expected, example), { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.txt')).sort()) {
         const fixture = file.slice(0, -'.txt'.length);
         test(`${example} ${fixture}`, () => {
             const extension = outputExtensions[example];

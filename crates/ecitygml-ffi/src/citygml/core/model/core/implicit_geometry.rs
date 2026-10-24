@@ -41,7 +41,7 @@ pub mod ffi {
         #[diplomat::attr(dotnet, disable)]
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
         pub fn library_object<'a>(&'a self) -> Option<&'a str> {
-            self.0.library_object()
+            self.0.library_object().map(egml::model::xs::AnyUri::as_str)
         }
 
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types

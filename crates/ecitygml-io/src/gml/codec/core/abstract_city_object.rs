@@ -29,6 +29,7 @@ use ecitygml_core::model::core::{
 };
 use egml::io::util::collect_children;
 use egml::io::util::{ChunkedSink, XmlDocumentIndex, XmlFragmentWriter};
+use tracing::warn;
 
 pub fn deserialize_abstract_city_object(
     xml_document: &[u8],
@@ -94,11 +95,21 @@ pub fn deserialize_abstract_city_object(
         .collect::<Result<_, _>>()?;
     abstract_city_object.set_external_references(external_references);
 
+    // An invalid generic attribute (e.g. an `IntAttribute` with an empty `value`, which violates
+    // `xs:integer`) is dropped and logged instead of failing the whole city object.
     let generic_attributes = index
         .get(CityGmlElement::GenericAttributeProperty.into())
         .iter()
-        .map(|x| deserialize_generic_attribute_property(&xml_document[x.range()]))
-        .collect::<Result<_, _>>()?;
+        .filter_map(|x| {
+            match deserialize_generic_attribute_property(&xml_document[x.range()], config) {
+                Ok(attribute) => Some(attribute),
+                Err(error) => {
+                    warn!(?error, "dropping invalid generic attribute");
+                    None
+                }
+            }
+        })
+        .collect();
     abstract_city_object.set_generic_attributes(generic_attributes);
 
     abstract_city_object
@@ -180,6 +191,37 @@ mod tests {
     use egml::io::util::{Formatting, XmlFragmentWriter};
     use egml::model::base::{AsAbstractGml, HasAssociationAttributes, Id};
     use egml::model::basic_types::Code;
+    use egml::model::xs::AnyUri;
+
+    #[test]
+    fn test_deserialize_drops_generic_attribute_with_empty_int_value() {
+        let xml_document = b"
+    <bldg:Building gml:id=\"test-id\">
+      <genericAttribute>
+        <gen:IntAttribute>
+          <gen:name>tip_prem_name</gen:name>
+          <gen:value></gen:value>
+        </gen:IntAttribute>
+      </genericAttribute>
+      <genericAttribute>
+        <gen:StringAttribute>
+          <gen:name>material</gen:name>
+          <gen:value>concrete</gen:value>
+        </gen:StringAttribute>
+      </genericAttribute>
+    </bldg:Building>";
+
+        let index = XmlDocumentIndex::from_scan(xml_document, None).expect("should work");
+        let city_object = deserialize_abstract_city_object(
+            xml_document,
+            &index,
+            &DeserializationConfig::default(),
+        )
+        .expect("should work");
+
+        assert_eq!(city_object.generic_attributes().len(), 1);
+        assert_eq!(city_object.generic_attributes()[0].name(), "material");
+    }
 
     #[test]
     fn test_deserialize_with_name_and_generic_attributes() {
@@ -408,17 +450,22 @@ mod tests {
 
         assert_eq!(city_object.external_references().len(), 2);
         assert_eq!(
-            city_object.external_references()[0].target_resource,
+            city_object.external_references()[0]
+                .target_resource
+                .as_str(),
             "DEHHALKA70002P5E"
         );
         assert_eq!(
             city_object.external_references()[0]
                 .information_system
-                .as_deref(),
+                .as_ref()
+                .map(AnyUri::as_str),
             Some("http://example.com")
         );
         assert_eq!(
-            city_object.external_references()[1].target_resource,
+            city_object.external_references()[1]
+                .target_resource
+                .as_str(),
             "DEHHALKA70002P5F"
         );
     }

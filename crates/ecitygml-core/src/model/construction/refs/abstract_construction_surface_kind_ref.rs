@@ -6,6 +6,8 @@ use crate::model::construction::{
     CeilingSurface, FloorSurface, GroundSurface, InteriorWallSurface, OuterCeilingSurface,
     OuterFloorSurface, RoofSurface, WallSurface,
 };
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractConstructionSurfaceKindRef<'a> {
@@ -123,3 +125,18 @@ impl_try_from_thematic_surface_kind_ref_for_enum!(
     AbstractConstructionSurfaceKind,
     AbstractConstructionSurfaceKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractConstructionSurfaceKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractConstructionSurfaceKindRef::CeilingSurface(x) => x.compute_envelope(),
+            AbstractConstructionSurfaceKindRef::FloorSurface(x) => x.compute_envelope(),
+            AbstractConstructionSurfaceKindRef::GroundSurface(x) => x.compute_envelope(),
+            AbstractConstructionSurfaceKindRef::InteriorWallSurface(x) => x.compute_envelope(),
+            AbstractConstructionSurfaceKindRef::OuterCeilingSurface(x) => x.compute_envelope(),
+            AbstractConstructionSurfaceKindRef::OuterFloorSurface(x) => x.compute_envelope(),
+            AbstractConstructionSurfaceKindRef::RoofSurface(x) => x.compute_envelope(),
+            AbstractConstructionSurfaceKindRef::WallSurface(x) => x.compute_envelope(),
+        }
+    }
+}

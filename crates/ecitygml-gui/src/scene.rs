@@ -29,7 +29,8 @@ type MeshBuffers = (Vec<Vec3>, Vec<Vec3>, Vec<u32>);
 /// Clear color used for the interactive viewport. Screenshot export uses its own
 /// (white) background instead — see `screenshot::BACKGROUND` — so the two are
 /// deliberately kept independent rather than sharing one constant.
-pub const VIEWPORT_BACKGROUND: ClearState = ClearState::color_and_depth(0.9, 0.9, 0.9, 1.0, 1.0);
+pub const VIEWPORT_BACKGROUND: ClearState =
+    ClearState::color_and_depth(243.0 / 255.0, 244.0 / 255.0, 246.0 / 255.0, 1.0, 1.0);
 
 /// Vertical field of view the camera is constructed with in `main.rs`. `fit_camera` needs this
 /// to compute a distance that frames the whole model, so it's shared rather than duplicated.
@@ -163,8 +164,8 @@ impl Scene {
             .collect();
         let bvh = Bvh::build(&mut bvh_shapes);
 
-        let ambient = AmbientLight::new(context, 0.3, Srgba::WHITE);
-        let sun = DirectionalLight::new(context, 1.0, Srgba::WHITE, Vec3::new(-1.0, -2.0, -1.0));
+        let ambient = AmbientLight::new(context, 0.55, Srgba::WHITE);
+        let sun = DirectionalLight::new(context, 2.1, Srgba::WHITE, Vec3::new(-1.0, -2.0, -1.5));
 
         Self {
             entries,

@@ -1,6 +1,6 @@
 # Builds the C snippets (`<name>.c`, short programs giving a first impression of the
 # bindings) and registers a CTest case for every expected output shared by all languages: for
-# `tests/expected/snippets/<snippet>/<fixture>.txt` (at the repository root), the snippet runs on `<FIXTURES>/<fixture>.gml` and must print that text
+# `tests/expected/snippets/<snippet>/<dataset>/<fixture>.txt` (at the repository root), the snippet runs on `<FIXTURES>/<dataset>/<fixture>.gml` and must print that text
 # (see ../../cmake/compare_output.cmake). Added by ../../CMakeLists.txt (`add_subdirectory`); expects
 # REPOSITORY_ROOT, ECITYGML_FFI, ECITYGML_FFI_LIBRARY_DIR and FIXTURES.
 
@@ -19,21 +19,24 @@ foreach(source ${snippet_sources})
     # Find libecitygml_ffi at runtime (Linux doesn't search its directory otherwise).
     set_target_properties(${target} PROPERTIES BUILD_RPATH "${ECITYGML_FFI_LIBRARY_DIR}")
 
-    file(GLOB cases CONFIGURE_DEPENDS "${EXPECTED_SNIPPETS_DIR}/${snippet}/*.txt")
+    file(GLOB cases CONFIGURE_DEPENDS "${EXPECTED_SNIPPETS_DIR}/${snippet}/*/*.txt")
     if(NOT cases)
         message(FATAL_ERROR "No expected output for ${snippet} in ${EXPECTED_SNIPPETS_DIR}/${snippet}")
     endif()
     foreach(case ${cases})
-        get_filename_component(fixture "${case}" NAME_WLE)
+        # `<dataset>/<fixture>.txt` -> the fixture `<dataset>/<fixture>.gml`.
+        get_filename_component(stem "${case}" NAME_WLE)
+        get_filename_component(case_dir "${case}" DIRECTORY)
+        get_filename_component(dataset "${case_dir}" NAME)
         set(output_arguments "")
         if(DEFINED OUTPUT_EXTENSION_${snippet})
             set(extension "${OUTPUT_EXTENSION_${snippet}}")
             set(output_arguments
-                "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/snippet-output/${snippet}-${fixture}${extension}"
-                "-DEXPECTED_OUTPUT=${EXPECTED_SNIPPETS_DIR}/${snippet}/${fixture}${extension}")
+                "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/snippet-output/${snippet}-${dataset}-${stem}${extension}"
+                "-DEXPECTED_OUTPUT=${case_dir}/${stem}${extension}")
         endif()
-        add_test(NAME ${target}_${fixture}
-            COMMAND ${CMAKE_COMMAND} -DEXAMPLE=$<TARGET_FILE:${target}> "-DINPUT=${FIXTURES}/${fixture}.gml"
+        add_test(NAME ${target}_${dataset}_${stem}
+            COMMAND ${CMAKE_COMMAND} -DEXAMPLE=$<TARGET_FILE:${target}> "-DINPUT=${FIXTURES}/${dataset}/${stem}.gml"
                 "-DEXPECTED=${case}" ${output_arguments} -P "${PROJECT_SOURCE_DIR}/cmake/compare_output.cmake")
     endforeach()
 endforeach()

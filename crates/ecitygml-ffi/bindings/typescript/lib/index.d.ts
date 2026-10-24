@@ -216,6 +216,10 @@ export { TrafficSpaceProperty } from "./TrafficSpaceProperty"
 
 export { TrafficSpacePropertyIterator } from "./TrafficSpacePropertyIterator"
 
+export { TrafficSpaceReference } from "./TrafficSpaceReference"
+
+export { TrafficSpaceReferenceIterator } from "./TrafficSpaceReferenceIterator"
+
 export { AuxiliaryTrafficAreaClassValue } from "./AuxiliaryTrafficAreaClassValue"
 
 export { AuxiliaryTrafficAreaFunctionValue } from "./AuxiliaryTrafficAreaFunctionValue"

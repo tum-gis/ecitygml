@@ -3,6 +3,7 @@ use crate::arena::convert::city_furniture::flatten_city_furniture;
 use crate::arena::convert::construction::flatten_abstract_construction_kind;
 use crate::arena::convert::construction::flatten_abstract_constructive_element_kind;
 use crate::arena::convert::construction::flatten_abstract_filling_element_kind;
+use crate::arena::convert::construction::flatten_abstract_furniture_kind;
 use crate::arena::convert::construction::flatten_abstract_installation_kind;
 use crate::arena::convert::generics::flatten_generic_occupied_space;
 use crate::arena::convert::vegetation::flatten_abstract_vegetation_object_kind;
@@ -27,6 +28,9 @@ pub fn flatten_abstract_occupied_space_kind(
         }
         AbstractOccupiedSpaceKind::GenericOccupiedSpace(x) => {
             flatten_generic_occupied_space(x, city_model_arena)
+        }
+        AbstractOccupiedSpaceKind::AbstractFurnitureKind(x) => {
+            flatten_abstract_furniture_kind(x, city_model_arena)
         }
         AbstractOccupiedSpaceKind::AbstractInstallationKind(x) => {
             flatten_abstract_installation_kind(x, city_model_arena)

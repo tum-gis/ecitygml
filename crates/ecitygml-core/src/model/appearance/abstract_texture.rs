@@ -8,12 +8,13 @@ use crate::model::core::refs::{AbstractFeatureKindRef, AbstractFeatureKindRefMut
 use egml::model::base::Id;
 use egml::model::common::{ApplyTransform, ComputeEnvelope};
 use egml::model::geometry::Envelope;
+use egml::model::xs::AnyUri;
 use nalgebra::{Isometry3, Rotation3, Scale3, Transform3, Vector3};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AbstractTexture {
     pub(crate) abstract_surface_data: AbstractSurfaceData,
-    image_uri: Option<String>,
+    image_uri: Option<AnyUri>,
     texture_type: Option<TextureType>,
     wrap_mode: Option<WrapMode>,
     border_color: Option<ColorPlusOpacity>,
@@ -38,8 +39,8 @@ impl AbstractTexture {
 pub trait AsAbstractTexture: AsAbstractSurfaceData {
     fn abstract_texture(&self) -> &AbstractTexture;
 
-    fn image_uri(&self) -> Option<&str> {
-        self.abstract_texture().image_uri.as_deref()
+    fn image_uri(&self) -> Option<&AnyUri> {
+        self.abstract_texture().image_uri.as_ref()
     }
 
     fn texture_type(&self) -> Option<TextureType> {
@@ -58,7 +59,7 @@ pub trait AsAbstractTexture: AsAbstractSurfaceData {
 pub trait AsAbstractTextureMut: AsAbstractSurfaceDataMut + AsAbstractTexture {
     fn abstract_texture_mut(&mut self) -> &mut AbstractTexture;
 
-    fn set_image_uri(&mut self, image_uri: Option<String>) {
+    fn set_image_uri(&mut self, image_uri: Option<AnyUri>) {
         self.abstract_texture_mut().image_uri = image_uri;
     }
 

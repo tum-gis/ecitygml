@@ -3,6 +3,8 @@ use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
 use crate::model::core::refs::{AbstractSpaceBoundaryKindRef, AbstractSpaceKindRef};
 use crate::model::core::{AbstractCityObject, AbstractCityObjectKind, AsAbstractCityObject};
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractCityObjectKindRef<'a> {
@@ -107,3 +109,12 @@ impl_try_from_feature_with_lifespan_kind_ref_for_enum!(
     AbstractCityObjectKind,
     AbstractCityObjectKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractCityObjectKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractCityObjectKindRef::AbstractSpaceKind(x) => x.compute_envelope(),
+            AbstractCityObjectKindRef::AbstractSpaceBoundaryKind(x) => x.compute_envelope(),
+        }
+    }
+}

@@ -41,6 +41,7 @@ pub mod ffi {
         }
 
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
+        #[diplomat::attr(dart, rename = "classifier")] // `class` is reserved in Dart, which has no escaping
         pub fn class<'a>(&'a self) -> Option<&'a crate::citygml::core::model::city_furniture::values::city_furniture_class_value::ffi::CityFurnitureClassValue>{
             self.0.class().map(crate::citygml::core::model::city_furniture::values::city_furniture_class_value::ffi::CityFurnitureClassValue::transparent_convert)
         }

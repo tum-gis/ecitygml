@@ -1,5 +1,6 @@
 use crate::Error;
 use crate::Error::AttributeWithoutName;
+use crate::gml::codec::common::deserialize_string;
 use crate::gml::util::{CityGmlElement, CityGmlNamespace};
 use ecitygml_core::model::generics::MeasureAttribute;
 use egml::io::codec::basic::{deserialize_measure, serialize_measure};
@@ -18,9 +19,14 @@ pub fn deserialize_measure_attribute(xml_document: &[u8]) -> Result<MeasureAttri
     loop {
         match reader.read_event()? {
             Event::Start(start) if start.local_name().as_ref() == "name" => {
-                let text = reader.read_text(start.name())?;
-                let decoded = text.as_ref();
-                name = Some(decoded.trim().to_string());
+                let pos_start = reader.buffer_position() as usize - start.len() - 2;
+                reader.read_to_end(start.name())?;
+                let pos_end = reader.buffer_position() as usize;
+                name = Some(
+                    deserialize_string(&xml_document[pos_start..pos_end])?
+                        .trim()
+                        .to_string(),
+                );
             }
             Event::Start(start) if start.local_name().as_ref() == "value" => {
                 let pos_start = reader.buffer_position() as usize - start.len() - 2;
@@ -156,5 +162,15 @@ mod tests {
         let round_tripped = deserialize_measure_attribute(xml.as_bytes()).expect("should work");
 
         assert_eq!(measure_attribute, round_tripped);
+    }
+
+    #[test]
+    fn test_deserialize_measure_attribute_unescapes_name() {
+        let measure_attribute = deserialize_measure_attribute(
+            b"<gen:MeasureAttribute><gen:name>height &amp; width</gen:name><gen:value uom=\"m\">2.5</gen:value></gen:MeasureAttribute>",
+        )
+        .expect("should work");
+
+        assert_eq!(measure_attribute.name, "height & width");
     }
 }

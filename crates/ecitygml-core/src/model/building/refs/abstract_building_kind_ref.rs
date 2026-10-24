@@ -4,6 +4,8 @@ use crate::model::building::{
 };
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
+use egml::model::common::ComputeEnvelope;
+use egml::model::geometry::Envelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractBuildingKindRef<'a> {
@@ -76,3 +78,12 @@ macro_rules! impl_try_from_building_kind_ref {
 impl_try_from_building_kind_ref!(Building);
 impl_try_from_building_kind_ref!(BuildingPart);
 impl_try_from_construction_kind_ref_for_enum!(AbstractBuildingKind, AbstractBuildingKindRef);
+
+impl<'a> ComputeEnvelope for AbstractBuildingKindRef<'a> {
+    fn compute_envelope(&self) -> Option<Envelope> {
+        match self {
+            AbstractBuildingKindRef::Building(x) => x.compute_envelope(),
+            AbstractBuildingKindRef::BuildingPart(x) => x.compute_envelope(),
+        }
+    }
+}

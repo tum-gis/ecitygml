@@ -60,7 +60,9 @@ pub mod ffi {
         /// The three corners.
         #[allow(clippy::needless_lifetimes)] // Diplomat rejects elided lifetimes in return types
         pub fn points<'a>(&'a self) -> Box<DirectPositionIterator<'a>> {
-            Box::new(DirectPositionIterator(self.0.points().into_iter()))
+            Box::new(DirectPositionIterator(
+                self.0.points().iter().collect::<Vec<_>>().into_iter(),
+            ))
         }
 
         /// Envelope computed from the geometry (Rust: `ComputeEnvelope::compute_envelope`).

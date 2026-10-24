@@ -8,12 +8,14 @@ use crate::model::core::{
     AbstractLogicalSpace, AbstractLogicalSpaceKind, AsAbstractLogicalSpace,
     AsAbstractLogicalSpaceMut,
 };
+use crate::model::generics::GenericLogicalSpace;
 use egml::model::common::RecomputeBoundingShape;
 
 #[derive(Debug)]
 pub enum AbstractLogicalSpaceKindRefMut<'a> {
     AbstractBuildingSubdivisionKind(AbstractBuildingSubdivisionKindRefMut<'a>),
     CityObjectGroup(&'a mut CityObjectGroup),
+    GenericLogicalSpace(&'a mut GenericLogicalSpace),
 }
 
 impl<'a> From<&'a mut AbstractLogicalSpaceKind> for AbstractLogicalSpaceKindRefMut<'a> {
@@ -23,6 +25,7 @@ impl<'a> From<&'a mut AbstractLogicalSpaceKind> for AbstractLogicalSpaceKindRefM
                 Self::AbstractBuildingSubdivisionKind(x.into())
             }
             AbstractLogicalSpaceKind::CityObjectGroup(x) => Self::CityObjectGroup(x),
+            AbstractLogicalSpaceKind::GenericLogicalSpace(x) => Self::GenericLogicalSpace(x),
         }
     }
 }
@@ -32,6 +35,7 @@ impl<'a> AsAbstractLogicalSpace for AbstractLogicalSpaceKindRefMut<'a> {
         match self {
             Self::AbstractBuildingSubdivisionKind(x) => x.abstract_logical_space(),
             Self::CityObjectGroup(x) => x.abstract_logical_space(),
+            Self::GenericLogicalSpace(x) => x.abstract_logical_space(),
         }
     }
 }
@@ -41,6 +45,7 @@ impl<'a> AsAbstractLogicalSpaceMut for AbstractLogicalSpaceKindRefMut<'a> {
         match self {
             Self::AbstractBuildingSubdivisionKind(x) => x.abstract_logical_space_mut(),
             Self::CityObjectGroup(x) => x.abstract_logical_space_mut(),
+            Self::GenericLogicalSpace(x) => x.abstract_logical_space_mut(),
         }
     }
 }
@@ -52,6 +57,7 @@ impl<'a> HasFeatureType for AbstractLogicalSpaceKindRefMut<'a> {
         match self {
             Self::AbstractBuildingSubdivisionKind(x) => x.feature_type(),
             Self::CityObjectGroup(x) => x.feature_type(),
+            Self::GenericLogicalSpace(x) => x.feature_type(),
         }
     }
 }
@@ -74,6 +80,7 @@ macro_rules! impl_from_for_logical_space_kind_ref_mut {
 }
 impl_from_for_logical_space_kind_ref_mut!(AbstractBuildingSubdivisionKind);
 impl_from_for_logical_space_kind_ref_mut!(CityObjectGroup);
+impl_from_for_logical_space_kind_ref_mut!(GenericLogicalSpace);
 
 #[macro_export]
 macro_rules! impl_try_from_for_logical_space_kind_ref_mut {
@@ -98,6 +105,7 @@ macro_rules! impl_try_from_for_logical_space_kind_ref_mut {
     };
 }
 impl_try_from_for_logical_space_kind_ref_mut!(CityObjectGroup, CityObjectGroup);
+impl_try_from_for_logical_space_kind_ref_mut!(GenericLogicalSpace, GenericLogicalSpace);
 
 #[macro_export]
 macro_rules! impl_try_from_logical_space_kind_ref_mut_for_enum {
@@ -131,6 +139,7 @@ impl<'a> RecomputeBoundingShape for AbstractLogicalSpaceKindRefMut<'a> {
         match self {
             Self::AbstractBuildingSubdivisionKind(x) => x.recompute_bounding_shape(),
             Self::CityObjectGroup(x) => x.recompute_bounding_shape(),
+            Self::GenericLogicalSpace(x) => x.recompute_bounding_shape(),
         }
     }
 }

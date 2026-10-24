@@ -87,3 +87,6 @@ macro_rules! impl_try_from_for_feature_kind {
         $crate::impl_try_from_for_feature_kind!($variant, $variant);
     };
 }
+impl_try_from_for_feature_kind!(AbstractFeatureWithLifespanKind);
+impl_try_from_for_feature_kind!(AbstractSurfaceDataKind);
+impl_try_from_for_feature_kind!(AbstractPointCloudKind);

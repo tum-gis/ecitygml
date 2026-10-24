@@ -1,5 +1,6 @@
 use crate::Error;
 use crate::Error::AttributeWithoutName;
+use crate::gml::codec::common::deserialize_string;
 use crate::gml::util::{CityGmlElement, CityGmlNamespace};
 use ecitygml_core::model::generics::StringAttribute;
 use egml::io::util::{ChunkedSink, XmlFragmentWriter};
@@ -10,36 +11,37 @@ pub fn deserialize_string_attribute(xml_document: &[u8]) -> Result<StringAttribu
     let mut reader = Reader::from_reader(xml_document);
     reader.config_mut().trim_text(true);
 
-    #[derive(PartialEq)]
-    enum Current {
-        None,
-        Name,
-        Value,
+    // Consume the root `<StringAttribute>` element's own start tag.
+    loop {
+        match reader.read_event()? {
+            Event::Start(_) => break,
+            Event::Eof => {
+                return Err(Error::ElementNotFound("StringAttribute".to_string()));
+            }
+            _ => {}
+        }
     }
 
-    let mut current = Current::None;
     let mut name: Option<String> = None;
     let mut value: Option<String> = None;
 
+    // Each child is read as a whole element, so that entities such as `&amp;` are unescaped instead of splitting
+    // the text into several events.
     loop {
         match reader.read_event()? {
             Event::Start(start) => {
-                current = match start.local_name().as_ref() {
-                    "name" => Current::Name,
-                    "value" => Current::Value,
-                    _ => Current::None,
-                };
-            }
-            Event::Text(text) => {
-                let text_value = text.as_ref();
-                match current {
-                    Current::Name => name = Some(text_value.trim().to_string()),
-                    Current::Value => value = Some(text_value.trim().to_string()),
-                    Current::None => {}
+                let pos_start = reader.buffer_position() as usize - start.len() - 2;
+                reader.read_to_end(start.name())?;
+                let pos_end = reader.buffer_position() as usize;
+                let text = deserialize_string(&xml_document[pos_start..pos_end])?;
+
+                match start.local_name().as_ref() {
+                    "name" => name = Some(text.trim().to_string()),
+                    "value" => {
+                        value = Some(text.trim().to_string());
+                    }
+                    _ => {}
                 }
-            }
-            Event::End(_) => {
-                current = Current::None;
             }
             Event::Eof => break,
             _ => {}
@@ -160,5 +162,44 @@ mod tests {
         let round_tripped = deserialize_string_attribute(xml.as_bytes()).expect("should work");
 
         assert_eq!(string_attribute, round_tripped);
+    }
+
+    #[test]
+    fn test_deserialize_string_attribute_unescapes_entities() {
+        let string_attribute = deserialize_string_attribute(
+            b"<gen:StringAttribute><gen:name>owner &amp; tenant</gen:name><gen:value>R&amp;D &lt;lab&gt;</gen:value></gen:StringAttribute>",
+        )
+        .expect("should work");
+
+        assert_eq!(string_attribute.name, "owner & tenant");
+        assert_eq!(string_attribute.value, "R&D <lab>");
+    }
+
+    #[test]
+    fn test_round_trip_string_attribute_escapes_once() {
+        let string_attribute = StringAttribute {
+            name: "owner & tenant".to_string(),
+            value: "R&D <lab>".to_string(),
+        };
+
+        let mut xml_fragment_writer =
+            XmlFragmentWriter::<ChunkedSink>::new_chunked(Formatting::Compact);
+        serialize_string_attribute(&string_attribute, &mut xml_fragment_writer)
+            .expect("should serialize");
+        let xml = String::from_utf8({
+            let mut buf = Vec::new();
+            xml_fragment_writer
+                .write_to(&mut buf)
+                .expect("should flush fragments");
+            buf
+        })
+        .expect("should convert to string");
+        assert!(xml.contains("R&amp;D &lt;lab&gt;"));
+        assert!(!xml.contains("&amp;amp;"));
+
+        assert_eq!(
+            deserialize_string_attribute(xml.as_bytes()).expect("should round trip"),
+            string_attribute
+        );
     }
 }

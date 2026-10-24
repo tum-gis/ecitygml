@@ -5,6 +5,7 @@ use crate::model::building::{
 };
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
+use egml::model::common::ComputeEnvelope;
 
 #[derive(Debug, Clone, Copy)]
 pub enum AbstractBuildingSubdivisionKindRef<'a> {
@@ -84,3 +85,12 @@ impl_try_from_logical_space_kind_ref_for_enum!(
     AbstractBuildingSubdivisionKind,
     AbstractBuildingSubdivisionKindRef
 );
+
+impl<'a> ComputeEnvelope for AbstractBuildingSubdivisionKindRef<'a> {
+    fn compute_envelope(&self) -> Option<egml::model::geometry::Envelope> {
+        match self {
+            AbstractBuildingSubdivisionKindRef::BuildingUnit(x) => x.compute_envelope(),
+            AbstractBuildingSubdivisionKindRef::Storey(x) => x.compute_envelope(),
+        }
+    }
+}

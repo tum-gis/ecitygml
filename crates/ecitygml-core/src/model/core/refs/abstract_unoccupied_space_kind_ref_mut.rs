@@ -1,4 +1,5 @@
 use crate::impl_try_from_physical_space_kind_ref_mut_for_enum;
+use crate::model::bridge::BridgeRoom;
 use crate::model::building::BuildingRoom;
 use crate::model::common::FeatureType;
 use crate::model::common::HasFeatureType;
@@ -6,17 +7,22 @@ use crate::model::core::{
     AbstractUnoccupiedSpace, AbstractUnoccupiedSpaceKind, AsAbstractUnoccupiedSpace,
     AsAbstractUnoccupiedSpaceMut,
 };
+use crate::model::generics::GenericUnoccupiedSpace;
 use crate::model::transportation::refs::AbstractTransportationSpaceKindRefMut;
 use crate::model::transportation::{AbstractTransportationSpaceKind, Hole};
 use crate::model::transportation::{AuxiliaryTrafficSpace, ClearanceSpace, TrafficSpace};
+use crate::model::tunnel::HollowSpace;
 use egml::model::common::RecomputeBoundingShape;
 
 #[derive(Debug)]
 pub enum AbstractUnoccupiedSpaceKindRefMut<'a> {
     AuxiliaryTrafficSpace(&'a mut AuxiliaryTrafficSpace),
+    BridgeRoom(&'a mut BridgeRoom),
     BuildingRoom(&'a mut BuildingRoom),
     ClearanceSpace(&'a mut ClearanceSpace),
+    GenericUnoccupiedSpace(&'a mut GenericUnoccupiedSpace),
     Hole(&'a mut Hole),
+    HollowSpace(&'a mut HollowSpace),
     TrafficSpace(&'a mut TrafficSpace),
     AbstractTransportationSpaceKind(AbstractTransportationSpaceKindRefMut<'a>),
 }
@@ -25,9 +31,14 @@ impl<'a> From<&'a mut AbstractUnoccupiedSpaceKind> for AbstractUnoccupiedSpaceKi
     fn from(item: &'a mut AbstractUnoccupiedSpaceKind) -> Self {
         match item {
             AbstractUnoccupiedSpaceKind::AuxiliaryTrafficSpace(x) => Self::AuxiliaryTrafficSpace(x),
+            AbstractUnoccupiedSpaceKind::BridgeRoom(x) => Self::BridgeRoom(x),
             AbstractUnoccupiedSpaceKind::BuildingRoom(x) => Self::BuildingRoom(x),
             AbstractUnoccupiedSpaceKind::ClearanceSpace(x) => Self::ClearanceSpace(x),
+            AbstractUnoccupiedSpaceKind::GenericUnoccupiedSpace(x) => {
+                Self::GenericUnoccupiedSpace(x)
+            }
             AbstractUnoccupiedSpaceKind::Hole(x) => Self::Hole(x),
+            AbstractUnoccupiedSpaceKind::HollowSpace(x) => Self::HollowSpace(x),
             AbstractUnoccupiedSpaceKind::TrafficSpace(x) => Self::TrafficSpace(x),
             AbstractUnoccupiedSpaceKind::AbstractTransportationSpaceKind(x) => {
                 Self::AbstractTransportationSpaceKind(x.into())
@@ -40,9 +51,12 @@ impl<'a> AsAbstractUnoccupiedSpace for AbstractUnoccupiedSpaceKindRefMut<'a> {
     fn abstract_unoccupied_space(&self) -> &AbstractUnoccupiedSpace {
         match self {
             Self::AuxiliaryTrafficSpace(x) => x.abstract_unoccupied_space(),
+            Self::BridgeRoom(x) => x.abstract_unoccupied_space(),
             Self::BuildingRoom(x) => x.abstract_unoccupied_space(),
             Self::ClearanceSpace(x) => x.abstract_unoccupied_space(),
+            Self::GenericUnoccupiedSpace(x) => x.abstract_unoccupied_space(),
             Self::Hole(x) => x.abstract_unoccupied_space(),
+            Self::HollowSpace(x) => x.abstract_unoccupied_space(),
             Self::TrafficSpace(x) => x.abstract_unoccupied_space(),
             Self::AbstractTransportationSpaceKind(x) => x.abstract_unoccupied_space(),
         }
@@ -53,9 +67,12 @@ impl<'a> AsAbstractUnoccupiedSpaceMut for AbstractUnoccupiedSpaceKindRefMut<'a> 
     fn abstract_unoccupied_space_mut(&mut self) -> &mut AbstractUnoccupiedSpace {
         match self {
             Self::AuxiliaryTrafficSpace(x) => x.abstract_unoccupied_space_mut(),
+            Self::BridgeRoom(x) => x.abstract_unoccupied_space_mut(),
             Self::BuildingRoom(x) => x.abstract_unoccupied_space_mut(),
             Self::ClearanceSpace(x) => x.abstract_unoccupied_space_mut(),
+            Self::GenericUnoccupiedSpace(x) => x.abstract_unoccupied_space_mut(),
             Self::Hole(x) => x.abstract_unoccupied_space_mut(),
+            Self::HollowSpace(x) => x.abstract_unoccupied_space_mut(),
             Self::TrafficSpace(x) => x.abstract_unoccupied_space_mut(),
             Self::AbstractTransportationSpaceKind(x) => x.abstract_unoccupied_space_mut(),
         }
@@ -68,9 +85,12 @@ impl<'a> HasFeatureType for AbstractUnoccupiedSpaceKindRefMut<'a> {
     fn feature_type(&self) -> FeatureType {
         match self {
             Self::AuxiliaryTrafficSpace(x) => x.feature_type(),
+            Self::BridgeRoom(x) => x.feature_type(),
             Self::BuildingRoom(x) => x.feature_type(),
             Self::ClearanceSpace(x) => x.feature_type(),
+            Self::GenericUnoccupiedSpace(x) => x.feature_type(),
             Self::Hole(x) => x.feature_type(),
+            Self::HollowSpace(x) => x.feature_type(),
             Self::TrafficSpace(x) => x.feature_type(),
             Self::AbstractTransportationSpaceKind(x) => x.feature_type(),
         }
@@ -94,9 +114,12 @@ macro_rules! impl_from_for_unoccupied_space_kind_ref_mut {
     };
 }
 impl_from_for_unoccupied_space_kind_ref_mut!(AuxiliaryTrafficSpace);
+impl_from_for_unoccupied_space_kind_ref_mut!(BridgeRoom);
 impl_from_for_unoccupied_space_kind_ref_mut!(BuildingRoom);
 impl_from_for_unoccupied_space_kind_ref_mut!(ClearanceSpace);
+impl_from_for_unoccupied_space_kind_ref_mut!(GenericUnoccupiedSpace);
 impl_from_for_unoccupied_space_kind_ref_mut!(Hole);
+impl_from_for_unoccupied_space_kind_ref_mut!(HollowSpace);
 impl_from_for_unoccupied_space_kind_ref_mut!(TrafficSpace);
 impl_from_for_unoccupied_space_kind_ref_mut!(AbstractTransportationSpaceKind);
 
@@ -126,9 +149,12 @@ macro_rules! impl_try_from_for_unoccupied_space_kind_ref_mut {
     };
 }
 impl_try_from_for_unoccupied_space_kind_ref_mut!(AuxiliaryTrafficSpace);
+impl_try_from_for_unoccupied_space_kind_ref_mut!(BridgeRoom);
 impl_try_from_for_unoccupied_space_kind_ref_mut!(BuildingRoom);
 impl_try_from_for_unoccupied_space_kind_ref_mut!(ClearanceSpace);
+impl_try_from_for_unoccupied_space_kind_ref_mut!(GenericUnoccupiedSpace);
 impl_try_from_for_unoccupied_space_kind_ref_mut!(Hole);
+impl_try_from_for_unoccupied_space_kind_ref_mut!(HollowSpace);
 impl_try_from_for_unoccupied_space_kind_ref_mut!(TrafficSpace);
 
 #[macro_export]
@@ -165,9 +191,12 @@ impl<'a> RecomputeBoundingShape for AbstractUnoccupiedSpaceKindRefMut<'a> {
     fn recompute_bounding_shape(&mut self) {
         match self {
             Self::AuxiliaryTrafficSpace(x) => x.recompute_bounding_shape(),
+            Self::BridgeRoom(x) => x.recompute_bounding_shape(),
             Self::BuildingRoom(x) => x.recompute_bounding_shape(),
             Self::ClearanceSpace(x) => x.recompute_bounding_shape(),
+            Self::GenericUnoccupiedSpace(x) => x.recompute_bounding_shape(),
             Self::Hole(x) => x.recompute_bounding_shape(),
+            Self::HollowSpace(x) => x.recompute_bounding_shape(),
             Self::TrafficSpace(x) => x.recompute_bounding_shape(),
             Self::AbstractTransportationSpaceKind(x) => x.recompute_bounding_shape(),
         }
